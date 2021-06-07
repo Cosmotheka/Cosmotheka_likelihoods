@@ -1,0 +1,200 @@
+# Let's start just looking at the shear, using xC-ell/ShearCl DES data
+
+# Path to sacc files
+sacc_covG: '/mnt/extraspace/gravityls_3/S8z/Cls_new_pipeline/4096_DES_eBOSS_CMB/cls_covG_new.fits'
+# sacc_covNG: '/mnt/extraspace/gravityls_3/S8z/Cls_2/4096_asDavid_recompute_newfid/nls_covNG.fits'
+
+# Compute the Cls at all ells or interpolate
+interpolate_cls: True
+
+# Tracers
+tracers:
+  # - name: tracer's name in sacc file
+  #    type: 'gc' for galaxies, 'wl' for weak lensing, 'cv' for convergence
+  #    dz: redshift shift
+  #    m: prior on magnification bias
+  #    bin: the z-bin 
+
+  DESgc__0:
+    type: 'gc'
+    dz: [0., 0.007]
+    bin: 0
+
+  DESgc__1:
+    type: 'gc'
+    dz: [0., 0.007]
+    bin: 1
+
+  DESgc__2:
+    type: 'gc'
+    dz: [0., 0.006]
+    bin: 2
+
+  DESgc__3:
+    type: 'gc'
+    dz: [0., 0.01]
+    bin: 3
+
+  DESgc__4:
+    type: 'gc'
+    dz: [0., 0.01]
+    bin: 4
+
+  DESwl__0:
+    type: 'wl'
+    dz: [-0.001, 0.016]
+    m: [0.012, 0.023]
+    bin: 0
+
+  DESwl__1:
+    type: 'wl'
+    dz: [-0.019, 0.013]
+    m: [0.012, 0.023]
+    bin: 1
+    
+  DESwl__2:
+    type: 'wl'
+    dz: [0.009, 0.011]
+    m: [0.012, 0.023]
+    bin: 2
+  
+  DESwl__3:
+    type: 'wl'
+    dz: [-0.018, 0.022]
+    m: [0.012, 0.023]
+    bin: 3
+
+    #  eBOSS__0:
+    #    type: 'gc'
+    #    bin: 0
+    #
+    #  eBOSS__0:
+    #    type: 'gc'
+    #    bin: 1
+
+  PLAcv:
+    type: 'cv'
+
+
+# biases:
+#   - wl:
+#     m: True
+#     IA: True
+
+# List all the different combinations of power spectra you want to analyze
+tracer_combinations:
+
+    # gc-gc
+    - tracers: ['DESgc__0', 'DESgc__0']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc__1', 'DESgc__1']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc__2', 'DESgc__2']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc__3', 'DESgc__3']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc__4', 'DESgc__4']
+      ell_cuts: [0, 435]
+
+    # gc -wl
+    - tracers: ['DESgc__0', 'DESwl__0']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc__0', 'DESwl__1']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc__0', 'DESwl__2']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc__0', 'DESwl__3']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc__1', 'DESwl__0']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc__1', 'DESwl__1']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc__1', 'DESwl__2']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc__1', 'DESwl__3']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc__2', 'DESwl__0']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc__2', 'DESwl__1']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc__2', 'DESwl__2']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc__2', 'DESwl__3']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc__3', 'DESwl__0']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc__3', 'DESwl__1']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc__3', 'DESwl__2']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc__3', 'DESwl__3']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc__4', 'DESwl__0']
+      ell_cuts: [0, 435]
+    - tracers: ['DESgc__4', 'DESwl__1']
+      ell_cuts: [0, 435]
+    - tracers: ['DESgc__4', 'DESwl__2']
+      ell_cuts: [0, 435]
+    - tracers: ['DESgc__4', 'DESwl__3']
+      ell_cuts: [0, 435]
+      
+    # gc -cv
+    # To remove ells < 8 we remove the first bin 
+    - tracers: ['DESgc__0', 'PLAcv']
+      ell_cuts: [30, 145]
+    - tracers: ['DESgc__1', 'PLAcv']
+      ell_cuts: [30, 225]
+    - tracers: ['DESgc__2', 'PLAcv']
+      ell_cuts: [30, 298]
+    - tracers: ['DESgc__3', 'PLAcv']
+      ell_cuts: [30, 371]
+    - tracers: ['DESgc__4', 'PLAcv']
+      ell_cuts: [30, 435]
+
+    # wl -wl
+    - tracers: ['DESwl__0', 'DESwl__0']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__0', 'DESwl__1']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__0', 'DESwl__2']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__0', 'DESwl__3']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__1', 'DESwl__1']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__1', 'DESwl__2']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__1', 'DESwl__3']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__2', 'DESwl__2']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__2', 'DESwl__3']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__3', 'DESwl__3']
+      ell_cuts: [30, 2000]
+
+    # wl -cv
+    - tracers: ['DESwl__0', 'PLAcv']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__1', 'PLAcv']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__2', 'PLAcv']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__3', 'PLAcv']
+      ell_cuts: [30, 2000]
+
+      #     # eBOSS - eBOSS
+      #     # kmax = 0.15
+      #     # lmax \sim chi(z_mean) * kmax
+      #     # z_mean = 1.2, 1.8
+      #     - tracers: ['eBOSS__0', 'eBOSS__0']
+      #       ell_cuts: [0, 590]
+      #     - tracers: ['eBOSS__1', 'eBOSS__1']
+      #       ell_cuts: [0, 764]
+      #      
+      #     # eBOSS - PLAcv
+      #     - tracers: ['eBOSS__0', 'PLAcv']
+      #       ell_cuts: [30, 590]
+      #     - tracers: ['eBOSS__1', 'PLAcv']
+      #       ell_cuts: [30, 764]
+

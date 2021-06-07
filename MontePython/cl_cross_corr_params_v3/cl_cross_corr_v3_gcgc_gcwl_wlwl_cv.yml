@@ -1,0 +1,177 @@
+# Let's start just looking at the shear, using xC-ell/ShearCl DES data
+
+# Path to sacc files
+sacc_covG: '/mnt/extraspace/gravityls_3/S8z/Cls_2/4096_asDavid_recompute_newfid/cls_cov.fits'
+sacc_covNG: '/mnt/extraspace/gravityls_3/S8z/Cls_2/4096_asDavid_recompute_newfid/nls_covNG.fits'
+
+# Compute the Cls at all ells or interpolate
+interpolate_cls: True
+
+# Tracers
+tracers:
+  # - name: tracer's name in sacc file
+  #    type: 'gc' for galaxies, 'wl' for weak lensing, 'cv' for convergence
+  #    dz: redshift shift
+  #    m: prior on magnification bias
+  #    bin: the z-bin 
+
+  DESgc0:
+    type: 'gc'
+    dz: [0., 0.007]
+    bin: 0
+
+  DESgc1:
+    type: 'gc'
+    dz: [0., 0.007]
+    bin: 1
+
+  DESgc2:
+    type: 'gc'
+    dz: [0., 0.006]
+    bin: 2
+
+  DESgc3:
+    type: 'gc'
+    dz: [0., 0.01]
+    bin: 3
+
+  DESgc4:
+    type: 'gc'
+    dz: [0., 0.01]
+    bin: 4
+
+  DESwl0:
+    type: 'wl'
+    dz: [-0.001, 0.016]
+    m: [0.012, 0.023]
+    bin: 0
+
+  DESwl1:
+    type: 'wl'
+    dz: [-0.019, 0.013]
+    m: [0.012, 0.023]
+    bin: 1
+    
+  DESwl2:
+    type: 'wl'
+    dz: [0.009, 0.011]
+    m: [0.012, 0.023]
+    bin: 2
+  
+  DESwl3:
+    type: 'wl'
+    dz: [-0.018, 0.022]
+    m: [0.012, 0.023]
+    bin: 3
+
+  PLAcv:
+    type: 'cv'
+
+
+# biases:
+#   - wl:
+#     m: True
+#     IA: True
+
+# List all the different combinations of power spectra you want to analyze
+tracer_combinations:
+
+    # gc-gc
+    - tracers: ['DESgc0', 'DESgc0']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc1', 'DESgc1']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc2', 'DESgc2']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc3', 'DESgc3']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc4', 'DESgc4']
+      ell_cuts: [0, 435]
+
+    # gc -wl
+    - tracers: ['DESgc0', 'DESwl0']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc0', 'DESwl1']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc0', 'DESwl2']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc0', 'DESwl3']
+      ell_cuts: [0, 145]
+    - tracers: ['DESgc1', 'DESwl0']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc1', 'DESwl1']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc1', 'DESwl2']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc1', 'DESwl3']
+      ell_cuts: [0, 225]
+    - tracers: ['DESgc2', 'DESwl0']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc2', 'DESwl1']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc2', 'DESwl2']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc2', 'DESwl3']
+      ell_cuts: [0, 298]
+    - tracers: ['DESgc3', 'DESwl0']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc3', 'DESwl1']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc3', 'DESwl2']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc3', 'DESwl3']
+      ell_cuts: [0, 371]
+    - tracers: ['DESgc4', 'DESwl0']
+      ell_cuts: [0, 435]
+    - tracers: ['DESgc4', 'DESwl1']
+      ell_cuts: [0, 435]
+    - tracers: ['DESgc4', 'DESwl2']
+      ell_cuts: [0, 435]
+    - tracers: ['DESgc4', 'DESwl3']
+      ell_cuts: [0, 435]
+      
+    # gc -cv
+    # To remove ells < 8 we remove the first bin 
+    - tracers: ['DESgc0', 'PLAcv']
+      ell_cuts: [30, 145]
+    - tracers: ['DESgc1', 'PLAcv']
+      ell_cuts: [30, 225]
+    - tracers: ['DESgc2', 'PLAcv']
+      ell_cuts: [30, 298]
+    - tracers: ['DESgc3', 'PLAcv']
+      ell_cuts: [30, 371]
+    - tracers: ['DESgc4', 'PLAcv']
+      ell_cuts: [30, 435]
+
+    # wl -wl
+    - tracers: ['DESwl0', 'DESwl0']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl0', 'DESwl1']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl0', 'DESwl2']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl0', 'DESwl3']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl1', 'DESwl1']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl1', 'DESwl2']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl1', 'DESwl3']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl2', 'DESwl2']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl2', 'DESwl3']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl3', 'DESwl3']
+      ell_cuts: [30, 2000]
+
+    # wl -cv
+    - tracers: ['DESwl0', 'PLAcv']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl1', 'PLAcv']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl2', 'PLAcv']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl3', 'PLAcv']
+      ell_cuts: [30, 2000]
+

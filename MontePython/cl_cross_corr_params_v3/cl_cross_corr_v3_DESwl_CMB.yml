@@ -1,0 +1,84 @@
+# Let's start just looking at the shear, using xC-ell/ShearCl DES data
+
+# Path to sacc files
+sacc_covG: '/mnt/extraspace/gravityls_3/S8z/Cls_new_pipeline/4096_DES_eBOSS_CMB/cls_covG_new.fits'
+# sacc_covNG: '/mnt/extraspace/gravityls_3/S8z/Cls_2/4096_asDavid_recompute_newfid/nls_covNG.fits'
+
+# Compute the Cls at all ells or interpolate
+interpolate_cls: True
+
+# Tracers
+tracers:
+  # - name: tracer's name in sacc file
+  #    type: 'gc' for galaxies, 'wl' for weak lensing, 'cv' for convergence
+  #    dz: redshift shift
+  #    m: prior on magnification bias
+  #    bin: the z-bin 
+
+  DESwl__0:
+    type: 'wl'
+    dz: [-0.001, 0.016]
+    m: [0.012, 0.023]
+    bin: 0
+
+  DESwl__1:
+    type: 'wl'
+    dz: [-0.019, 0.013]
+    m: [0.012, 0.023]
+    bin: 1
+    
+  DESwl__2:
+    type: 'wl'
+    dz: [0.009, 0.011]
+    m: [0.012, 0.023]
+    bin: 2
+  
+  DESwl__3:
+    type: 'wl'
+    dz: [-0.018, 0.022]
+    m: [0.012, 0.023]
+    bin: 3
+
+  PLAcv:
+    type: 'cv'
+
+
+# biases:
+#   - wl:
+#     m: True
+#     IA: True
+
+# List all the different combinations of power spectra you want to analyze
+tracer_combinations:
+
+    # wl -wl
+    - tracers: ['DESwl__0', 'DESwl__0']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__0', 'DESwl__1']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__0', 'DESwl__2']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__0', 'DESwl__3']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__1', 'DESwl__1']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__1', 'DESwl__2']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__1', 'DESwl__3']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__2', 'DESwl__2']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__2', 'DESwl__3']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__3', 'DESwl__3']
+      ell_cuts: [30, 2000]
+
+    # wl -cv
+    - tracers: ['DESwl__0', 'PLAcv']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__1', 'PLAcv']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__2', 'PLAcv']
+      ell_cuts: [30, 2000]
+    - tracers: ['DESwl__3', 'PLAcv']
+      ell_cuts: [30, 2000]

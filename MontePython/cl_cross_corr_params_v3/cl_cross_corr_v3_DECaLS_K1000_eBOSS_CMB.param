@@ -1,0 +1,150 @@
+#------ Experiments ------
+
+data.experiments=['cl_cross_corr_v3']
+data.over_sampling=[1, 4]
+
+
+
+#------ Cosmo Parameters ------
+# BF 5x2pt chains/cl_cross_corr_v2_gcgc_gcwl_wlwl_cv
+
+# Omega_b = Omega_m /5; Omega_c = Omega_m * 4 / 5 
+# Omega_m = 0.271 in DES18 paper Sec. F
+data.parameters['Omega_b']  = [ 3.081261e-02, 0.03,    0.07,   0.028,  1.,  'cosmo']
+data.parameters['Omega_c']  = [ 2.605159e-01, 0.07,    0.83,   0.0027,  1.,  'cosmo']
+
+# Using aprox results in Fig. 7 DES18 paper + bounds in Table I
+data.parameters['A_s']      = [ 1.846715, 0.5,       5,     0.3,  1e-9,  'cosmo']
+# data.parameters['sigma_8']      = [ 0.821, None,       None,     0.3,  1,  'cosmo']
+# Planck 18 + DES18 priors in Table I
+data.parameters['n_s']      = [ 8.794578e-01 , 0.87,    1.07,   0.004,  1.,  'cosmo']
+
+# Using aprox results in Fig. 7 DES18 paper + bounds in Table I
+data.parameters['h']        = [ 6.784803e-01, 0.55,    0.91,   0.09,  1.,  'cosmo']
+
+# Not read by CCL
+# data.parameters['tau_reio'] = [ 0.08, None,    None,   0.,  1.,  'cosmo']
+
+data.parameters['w_0']      = [-1.000000,    None,    None,     0.0,  1.,  'cosmo']
+data.parameters['w_a']      = [ 0.000000,    None,    None,     0.0,  1.,  'cosmo']
+
+
+#------ Cosmo Arguments ------
+
+data.cosmo_arguments['params_dir']  = 'cl_cross_corr_params_v3/cl_cross_corr_v3_DECaLS_K1000_eBOSS_CMB.yml'
+
+
+#------ Nuisance Parameters ------
+# Table II DES18 paper (BF in v2 chains)
+data.parameters['DECALS__0_gc_b']         = [ 1.13,    0.8,    3,     0.13,  1.,  'nuisance']
+data.parameters['DECALS__1_gc_b']         = [ 1.40,    0.8,    3,     0.12,  1.,  'nuisance']
+data.parameters['DECALS__2_gc_b']         = [ 1.35,    0.8,    3,     0.11,  1.,  'nuisance']
+data.parameters['DECALS__3_gc_b']         = [ 1.77,    0.8,    3,     0.14,  1.,  'nuisance']
+
+# Using parameters from priors in Table I DES18 paper
+data.parameters['DECALS__0_dz']         = [ 0,    None,    None,     0.007,  1.,  'nuisance']
+data.parameters['DECALS__1_dz']         = [ 0,    None,    None,     0.007,  1.,  'nuisance']
+data.parameters['DECALS__2_dz']         = [ 0,    None,    None,     0.006,  1.,  'nuisance']
+data.parameters['DECALS__3_dz']         = [ 0,    None,    None,     0.010,  1.,  'nuisance']
+
+# Using aprox results in Fig. 7 DES18 paper
+data.parameters['wl_ia_A']        = [ 2.243244e-01,    -5.0,    5.0,     0.25, 1., 'nuisance']
+data.parameters['wl_ia_eta']      = [ -3.612401e+00,    -5.0,    5.0,     3.2,  1.,  'nuisance']
+data.parameters['wl_ia_z0']       = [ 0.620000,    None,    None,     0.0,  1.,  'nuisance']
+
+# Table III DES18 paper
+data.parameters['KiDS1000__0_wl_m']         = [ 0,    None,    None,     0.034 ,  1.,  'nuisance']
+data.parameters['KiDS1000__1_wl_m']         = [ 0,    None,    None,     0.027 ,  1.,  'nuisance']
+data.parameters['KiDS1000__2_wl_m']         = [ 0,    None,    None,     0.020 ,  1.,  'nuisance']
+data.parameters['KiDS1000__3_wl_m']         = [ 0,    None,    None,     0.018 ,  1.,  'nuisance']
+data.parameters['KiDS1000__4_wl_m']         = [ 0,    None,    None,     0.018 ,  1.,  'nuisance']
+
+# Using parameters from priors in Table A.2 in 2007.15633
+data.parameters['KiDS1000__0_dz']         = [0.003,    None,    None,  0.010,  1.,  'nuisance']
+data.parameters['KiDS1000__1_dz']         = [0.009,    None,    None,  0.010,  1.,  'nuisance']
+data.parameters['KiDS1000__2_dz']         = [-0.018,    None,    None,  0.010,  1.,  'nuisance']
+data.parameters['KiDS1000__3_dz']         = [-0.014,    None,    None,  0.008,  1.,  'nuisance']
+data.parameters['KiDS1000__4_dz']         = [0.007,    None,    None,  0.008,  1.,  'nuisance']
+
+# eBOSS 
+data.parameters['eBOSS__0_gc_b']         = [ 2.410000,    0.8,    5,     0.13,  1.,  'nuisance']
+data.parameters['eBOSS__1_gc_b']         = [ 2.600000,    0.8,    5,     0.12,  1.,  'nuisance']
+
+
+#------ Derived Parameters ------
+
+data.parameters['sigma_8']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Omega_m']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S_8']      = [  1.,  None,  None,  0.,  1.,  'derived']
+
+
+data.parameters['sigma8z_0']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.1']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.2']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.25']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.3']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.35']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.4']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.45']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.5']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.55']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.6']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.65']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.7']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.75']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.8']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.85']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_0.9']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_1.0']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_2.0']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_5']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['sigma8z_10']  = [  1.,  None,  None,  0.,  1.,  'derived']
+
+data.parameters['S8z_0']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.1']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.2']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.25']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.3']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.35']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.4']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.45']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.5']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.55']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.6']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.65']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.7']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.75']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.8']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.85']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_0.9']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_1.0']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_2.0']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_5']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['S8z_10']  = [  1.,  None,  None,  0.,  1.,  'derived']
+
+data.parameters['Dz_0']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.1']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.2']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.25']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.3']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.35']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.4']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.45']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.5']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.55']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.6']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.65']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.7']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.75']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.8']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.85']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_0.9']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_1.0']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_2.0']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_5']  = [  1.,  None,  None,  0.,  1.,  'derived']
+data.parameters['Dz_10']  = [  1.,  None,  None,  0.,  1.,  'derived']
+
+#------ Mcmc parameters ------
+
+data.N=10
+data.write_step=5

@@ -1,0 +1,3 @@
+# Defining dummy variable
+# Use cl_cross_corr_v3.yml to config it
+cl_cross_corr_v3.dummy = None

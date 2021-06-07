@@ -1,0 +1,52 @@
+# Let's start just looking at the shear, using xC-ell/ShearCl DES data
+
+# Path to sacc files
+sacc_covG: '/mnt/extraspace/gravityls_3/S8z/Cls_new_pipeline/4096_DES_eBOSS_CMB/cls_covG_new.fits'
+# sacc_covNG: '/mnt/extraspace/gravityls_3/S8z/Cls_2/4096_asDavid_recompute_newfid/nls_covNG.fits'
+
+# Compute the Cls at all ells or interpolate
+interpolate_cls: True
+
+# Tracers
+tracers:
+  # - name: tracer's name in sacc file
+  #    type: 'gc' for galaxies, 'wl' for weak lensing, 'cv' for convergence
+  #    dz: redshift shift
+  #    m: prior on magnification bias
+  #    bin: the z-bin 
+
+  eBOSS__0:
+    type: 'gc'
+    bin: 0
+
+  eBOSS__1:
+    type: 'gc'
+    bin: 1
+
+  PLAcv:
+    type: 'cv'
+
+
+# biases:
+#   - wl:
+#     m: True
+#     IA: True
+
+# List all the different combinations of power spectra you want to analyze
+tracer_combinations:
+    # eBOSS - eBOSS
+    # kmin = 0.02
+    # kmax = 0.15
+    # l \sim chi(z_mean) * k
+    # z_mean = 1.2, 1.8
+    - tracers: ['eBOSS__0', 'eBOSS__0']
+      ell_cuts: [79, 590]
+    - tracers: ['eBOSS__1', 'eBOSS__1']
+      ell_cuts: [102, 764]
+     
+    # eBOSS - PLAcv
+    - tracers: ['eBOSS__0', 'PLAcv']
+      ell_cuts: [79, 590]
+    - tracers: ['eBOSS__1', 'PLAcv']
+      ell_cuts: [102, 764]
+
