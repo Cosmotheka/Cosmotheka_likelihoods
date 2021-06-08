@@ -1,0 +1,215 @@
+params:
+  # Cosmo
+  Omega_c: 0.2640
+  Omega_b: 0.0493
+  h: 0.6736
+  n_s: 0.9649
+  # sigma8: 0.8111
+  A_sE9: 2.101
+  m_nu: 0.
+  # Nuisance (should all start with 'input_params_prefix')
+  xCell_DESgc__0_gc_b: 1.48
+  xCell_DESgc__1_gc_b: 1.76
+  xCell_DESgc__2_gc_b: 1.78
+  xCell_DESgc__3_gc_b: 2.19
+  xCell_DESgc__4_gc_b: 2.23
+  xCell_DESgc__0_dz: 0.0
+  xCell_DESgc__1_dz: 0.0
+  xCell_DESgc__2_dz: 0.0
+  xCell_DESgc__3_dz: 0.0
+  xCell_DESgc__4_dz: 0.0
+  xCell_DESwl__0_wl_m: 0.0
+  xCell_DESwl__1_wl_m: 0.0
+  xCell_DESwl__2_wl_m: 0.0
+  xCell_DESwl__3_wl_m: 0.0
+  xCell_DESwl__0_dz: 0.0
+  xCell_DESwl__1_dz: 0.0
+  xCell_DESwl__2_dz: 0.0
+  xCell_DESwl__3_dz: 0.0
+  xCell_wl_ia_A: 0.0
+  xCell_wl_ia_eta: 0.0
+  xCell_wl_ia_z0: 0.0
+  xCell_eBOSS__0_gc_b: 2.1
+  xCell_eBOSS__1_gc_b: 2.2
+  xCell_eBOSS__0_gc_s: 0.4
+  xCell_eBOSS__1_gc_s: 0.4
+
+theory:
+  # CCL settings
+  xCell_lkl.CCL:
+    transfer_function: boltzmann_class
+    matter_pk: halofit
+    baryons_pk: nobaryons
+
+likelihood:
+  # Likelihood settings
+  xCell_lkl.xCell_lkl:
+    # Input sacc file
+    input_file: ../test/clsFid_covG.fits
+    # List all relevant tracers
+    tracers:
+      - DESgc__0
+      - DESgc__1
+      - DESgc__2
+      - DESgc__3
+      - DESgc__4
+      - DESwl__0
+      - DESwl__1
+      - DESwl__2
+      - DESwl__3
+      - eBOSS__0
+      - eBOSS__1
+      - PLAcv
+    # List all 2-points that should go into the
+    # data vector
+    tracer_combinations:
+      ('DESgc__0', 'DESgc__0'):
+        lmax: 145
+      ('DESgc__1', 'DESgc__1'):
+        lmax: 225
+      ('DESgc__2', 'DESgc__2'):
+        lmax: 298
+      ('DESgc__3', 'DESgc__3'):
+        lmax: 371
+      ('DESgc__4', 'DESgc__4'):
+        lmax: 435
+
+      # gc -wl
+      ('DESgc__0', 'DESwl__0'):
+        lmax: 145
+      ('DESgc__0', 'DESwl__1'):
+        lmax: 145
+      ('DESgc__0', 'DESwl__2'):
+        lmax: 145
+      ('DESgc__0', 'DESwl__3'):
+        lmax: 145
+      ('DESgc__1', 'DESwl__0'):
+        lmax: 225
+      ('DESgc__1', 'DESwl__1'):
+        lmax: 225
+      ('DESgc__1', 'DESwl__2'):
+        lmax: 225
+      ('DESgc__1', 'DESwl__3'):
+        lmax: 225
+      ('DESgc__2', 'DESwl__0'):
+        lmax: 298
+      ('DESgc__2', 'DESwl__1'):
+        lmax: 298
+      ('DESgc__2', 'DESwl__2'):
+        lmax: 298
+      ('DESgc__2', 'DESwl__3'):
+        lmax: 298
+      ('DESgc__3', 'DESwl__0'):
+        lmax: 371
+      ('DESgc__3', 'DESwl__1'):
+        lmax: 371
+      ('DESgc__3', 'DESwl__2'):
+        lmax: 371
+      ('DESgc__3', 'DESwl__3'):
+        lmax: 371
+      ('DESgc__4', 'DESwl__0'):
+        lmax: 435
+      ('DESgc__4', 'DESwl__1'):
+        lmax: 435
+      ('DESgc__4', 'DESwl__2'):
+        lmax: 435
+      ('DESgc__4', 'DESwl__3'):
+        lmax: 435
+        
+      # gc -cv
+      # To remove ells < 8 we remove the first bin 
+      ('DESgc__0', 'PLAcv'):
+        lmin: 30
+        lmax: 145
+      ('DESgc__1', 'PLAcv'):
+        lmin: 30
+        lmax: 225
+      ('DESgc__2', 'PLAcv'):
+        lmin: 30
+        lmax: 298
+      ('DESgc__3', 'PLAcv'):
+        lmin: 30
+        lmax: 371
+      ('DESgc__4', 'PLAcv'):
+        lmin: 30
+        lmax: 435
+
+      # wl -wl
+      ('DESwl__0', 'DESwl__0'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__0', 'DESwl__1'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__0', 'DESwl__2'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__0', 'DESwl__3'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__1', 'DESwl__1'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__1', 'DESwl__2'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__1', 'DESwl__3'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__2', 'DESwl__2'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__2', 'DESwl__3'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__3', 'DESwl__3'):
+        lmin: 30
+        lmin: 2000
+
+      # wl -cv
+      ('DESwl__0', 'PLAcv'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__1', 'PLAcv'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__2', 'PLAcv'):
+        lmin: 30
+        lmin: 2000
+      ('DESwl__3', 'PLAcv'):
+        lmin: 30
+        lmin: 2000
+
+      # eBOSS - eBOSS
+      # kmin = 0.02
+      # kmax = 0.15
+      # l \sim chi(z_mean) * k
+      # z_mean = 1.2, 1.8
+      ('eBOSS__0', 'eBOSS__0'):
+        lmin: 79
+        lmax: 590
+      ('eBOSS__1', 'eBOSS__1'):
+        lmin: 102
+        lmax: 764
+       
+      # eBOSS - PLAcv
+      ('eBOSS__0', 'PLAcv'):
+        lmin: 79
+        lmax: 590
+      ('eBOSS__1', 'PLAcv'):
+        lmin: 102
+        lmax: 764
+    # Default scale cuts
+    defaults:
+      lmin: 0
+      lmax: 1000
+    # Prefix associated to all nuisance params
+    input_params_prefix: xCell
+
+sampler:
+  # mcmc: null
+  evaluate: null
+
+stop_at_error: True
+
+debug: True
