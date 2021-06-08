@@ -207,7 +207,6 @@ likelihood:
     input_params_prefix: xCell
 
 sampler:
-  # mcmc: null
   evaluate: null
 
 stop_at_error: True
