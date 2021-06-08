@@ -1,7 +1,7 @@
-import common as co
 import pyccl as ccl
 import numpy as np
 import sacc
+from . import common as co
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 from scipy.interpolate import interp1d
@@ -10,17 +10,9 @@ class xCell_lkl(Likelihood):
 
     # All parameters starting with this will be
     # identified as belonging to this stage.
-    input_params_prefix: str = ""
+    input_params_prefix: str = "xCell"
     # Input sacc file
     input_file: str = ""
-    # IA model name. Currently all of these are
-    # just flags, but we could turn them into
-    # homogeneous systematic classes.
-    ia_model: str = "IANone"
-    # N(z) model name
-    nz_model: str = "NzNone"
-    # P(k) model name
-    pk_model: str = "PkDefault"
     # Interpolate cls
     interpolate_cls: bool = True
     # List of bin names
@@ -30,11 +22,14 @@ class xCell_lkl(Likelihood):
     # Dict of two-point functions that make up the data vector.
     #  - Keys are tuples with the tracer names that make the different
     #    combinations as given by sacc e.g. ('DESgc__0', 'DESgc__0')
+    #  - YAML read ('DESgc__0', 'DESgc__0') as a string. We will first change
+    #    it to lists in the initialize method
     #  - Values can be lmin, lmax
     tracer_combinations: dict = {}
 
-
     def initialize(self):
+        # Rewrite tracer_combinations with keys as tuples not string
+        self._rewrite_tracer_combinations()
         # Read SACC file
         self.scovG = self._load_sacc_file(self.input_file)
         # Store tracers info in a metadata dictionary. This is specially
@@ -46,6 +41,19 @@ class xCell_lkl(Likelihood):
         self.cov = self.scovG.covariance.covmat
         # Store inverse covariance
         self.icov = self.scovG.covariance.covmat
+
+    def _rewrite_tracer_combinations(self):
+        # Check if the dictionary keys are already tuple
+        k0 =  list(self.tracer_combinations.keys())[0]
+        if type(k0) is not tuple:
+            # If they're not, change str -> tuple
+            d = {}
+            for k, v in self.tracer_combinations.items():
+                k1 = tuple(k.replace('(', '').replace(')', '').replace(',', '').split())
+                d[k1] = v
+
+            self.tracer_combinations = d.copy()
+        return
 
     def _load_sacc_file(self, sacc_file):
         print(f'Loading {sacc_file}')
@@ -127,7 +135,7 @@ class xCell_lkl(Likelihood):
         return metadata
 
     def _get_ccl_tracer_gc(self, cosmo, trname, sacc_tr,  **pars):
-        pars_prefix = '_'.join([self.input_params_prefix, trname, 'gc'])
+        pars_prefix = '_'.join([self.input_params_prefix, trname])
 
         # Shift the redshift mean
         z = sacc_tr.z
@@ -138,17 +146,20 @@ class xCell_lkl(Likelihood):
         nz = sacc_tr.nz[z_sel]
 
         # Galaxy bias
-        b = pars.get(pars_prefix + '_b')
+        b = pars.get(pars_prefix + '_gc_b')
         bz = np.ones_like(z)
 
         # Magnification bias
-        mag_bias = pars.get(pars_prefix + '_s', None)
+        s = pars.get(pars_prefix + '_gc_s', None)
+        mag_bias = None
+        if s is not None:
+            mag_bias = (z, s * np.ones_like(z))
 
         return ccl.NumberCountsTracer(cosmo, has_rsd=False, dndz=(z, nz),
                                       bias=(z, bz), mag_bias=mag_bias)
 
     def _get_ccl_tracer_sh(self, cosmo, trname, sacc_tr,  **pars):
-        pars_prefix = '_'.join([self.input_params_prefix, trname, 'wl'])
+        pars_prefix = '_'.join([self.input_params_prefix, trname])
 
         # Shift the redshift mean
         z = sacc_tr.z
@@ -172,7 +183,7 @@ class xCell_lkl(Likelihood):
         return ccl.CMBLensingTracer(cosmo, z_source=1100)
 
     def _get_ccl_tracers(self, **pars):
-        res = self.provider.get_CCL()
+        res = self.provider.get_result('CCL')
         cosmo = res['cosmo']
         ccl_tracers = {}
 
@@ -190,15 +201,14 @@ class xCell_lkl(Likelihood):
 
         return ccl_tracers
 
-
     def _get_cl_theory(self, **pars):
-        res = self.provider.get_CCL()
+        res = self.provider.get_result('CCL')
         cosmo = res['cosmo']
         ccl_tracers = self._get_ccl_tracers(**pars)
         cl_th = np.array([])
         for tr1, tr2 in self.scovG.get_tracer_combinations():
-            ell_bpw = self.xCell_metadata['ell_bpw']
-            w_bpw = self.xCell_metadata['w_bpw']
+            ell_bpw = self.xCell_metadata[(tr1, tr2)]['ell_bpw']
+            w_bpw = self.xCell_metadata[(tr1, tr2)]['w_bpw']
             cl_trs = co.get_binned_cl(cosmo, ccl_tracers[tr1],
                                       ccl_tracers[tr2], ell_bpw, w_bpw,
                                       interp=self.interpolate_cls)
@@ -210,6 +220,10 @@ class xCell_lkl(Likelihood):
             cl_th = np.concatenate([cl_th, cl_trs])
         cl_th = np.array(cl_th)
         return cl_th
+
+    def get_requirements(self):
+        return {'CCL': {'cosmo': None}}
+
 
     def logp(self, **pars):
         """
