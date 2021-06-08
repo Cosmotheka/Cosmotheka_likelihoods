@@ -25,7 +25,7 @@ params:
       max: 10
     ref:
       dist: norm
-      loc: 2.101
+      loc: 2.0989
       scale: 0.02
   m_nu: 0.
 
@@ -52,7 +52,7 @@ params:
   xCell_wl_ia_eta: 0.0
   xCell_wl_ia_z0: 0.0
   xCell_eBOSS__0_gc_b: 2.1
-  xCell_eBOSS__1_gc_b: 2.2
+  xCell_eBOSS__1_gc_b: 2.5
   xCell_eBOSS__0_gc_s: 0.4
   xCell_eBOSS__1_gc_s: 0.4
 
