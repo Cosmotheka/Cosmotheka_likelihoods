@@ -40,7 +40,7 @@ class xCell_lkl(Likelihood):
         # Load covariance matrix
         self.cov = self.scovG.covariance.covmat
         # Store inverse covariance
-        self.icov = self.scovG.covariance.covmat
+        self.icov = np.linalg.inv(self.cov)
 
     def _rewrite_tracer_combinations(self):
         # Check if the dictionary keys are already tuple
