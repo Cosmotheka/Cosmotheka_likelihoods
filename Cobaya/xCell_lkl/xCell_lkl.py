@@ -87,16 +87,17 @@ class xCell_lkl(Likelihood):
 
         print('Applying scale cuts')
         for trs in s.get_tracer_combinations():
+            trs_input = trs
             # Check if trs is in tracer_combinations
             if trs not in self.tracer_combinations:
-                trs = trs[::-1]
+                trs_input = trs[::-1]
             # Check if trs ordered the other way round is in
             # tracer_combinations and remove it if not
-            if trs not in self.tracer_combinations:
+            if trs_input not in self.tracer_combinations:
                 s.remove_selection(tracers=trs)
                 continue
 
-            trs_val = self.tracer_combinations[trs]
+            trs_val = self.tracer_combinations[trs_input]
             lmin = trs_val.get('lmin', self.defaults['lmin'])
             lmax = trs_val.get('lmax', self.defaults['lmax'])
             print(trs, lmin, lmax)
@@ -124,15 +125,15 @@ class xCell_lkl(Likelihood):
 
         return dtype
 
-    def _extract_tracers_metadata(self, sacc):
+    def _extract_tracers_metadata(self, sfile):
         metadata = {}
 
-        for tr1, tr2 in self.scovG.get_tracer_combinations():
+        for tr1, tr2 in sfile.get_tracer_combinations():
             dtype = self._get_dtype_for_trs(tr1, tr2)
-            ell, cl, cov, ind = self.scovG.get_ell_cl(dtype, tr1, tr2,
+            ell, cl, cov, ind = sfile.get_ell_cl(dtype, tr1, tr2,
                                                       return_cov=True,
                                                       return_ind=True)
-            bpw = self.scovG.get_bandpower_windows(ind)
+            bpw = sfile.get_bandpower_windows(ind)
             metadata[(tr1, tr2)] = {'ell_eff': ell, 'cl': cl,
                                     'cov': cov, 'ind': ind,
                                     'ell_bpw': bpw.values,
