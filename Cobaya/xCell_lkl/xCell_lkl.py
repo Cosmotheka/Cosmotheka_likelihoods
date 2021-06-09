@@ -134,10 +134,8 @@ class xCell_lkl(Likelihood):
 
         return metadata
 
-    def _get_ccl_tracer_gc(self, cosmo, trname, sacc_tr,  **pars):
+    def _get_dndz(self, trname, sacc_tr, **pars):
         pars_prefix = '_'.join([self.input_params_prefix, trname])
-
-        # Shift the redshift mean
         z = sacc_tr.z
         dz = pars.get(pars_prefix + '_dz', 0)
         z -= dz
@@ -145,9 +143,17 @@ class xCell_lkl(Likelihood):
         z = z[z_sel]
         nz = sacc_tr.nz[z_sel]
 
+        return z, nz
+
+    def _get_ccl_tracer_gc(self, cosmo, trname, sacc_tr,  **pars):
+        pars_prefix = '_'.join([self.input_params_prefix, trname])
+
+        # Shift the redshift mean
+        z, nz = self._get_dndz(trname, sacc_tr, **pars)
+
         # Galaxy bias
         b = pars.get(pars_prefix + '_gc_b')
-        bz = np.ones_like(z)
+        bz = b * np.ones_like(z)
 
         # Magnification bias
         s = pars.get(pars_prefix + '_gc_s', None)
@@ -162,12 +168,8 @@ class xCell_lkl(Likelihood):
         pars_prefix = '_'.join([self.input_params_prefix, trname])
 
         # Shift the redshift mean
-        z = sacc_tr.z
-        dz = pars.get(pars_prefix + '_dz', 0)
-        z -= dz
-        z_sel = z>=0
-        z = z[z_sel]
-        nz = sacc_tr.nz[z_sel]
+        # Shift the redshift mean
+        z, nz = self._get_dndz(trname, sacc_tr, **pars)
 
         # Intrinsic Alignments (same for all wl tracers)
         A = pars.get(self.input_params_prefix + '_' +  'wl_ia_A')
