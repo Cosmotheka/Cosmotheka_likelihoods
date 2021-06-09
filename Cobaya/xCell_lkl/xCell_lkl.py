@@ -49,8 +49,13 @@ class xCell_lkl(Likelihood):
             # If they're not, change str -> tuple
             d = {}
             for k, v in self.tracer_combinations.items():
-                k1 = tuple(k.replace('(', '').replace(')', '').replace(',', '').split())
-                d[k1] = v
+                k1 = k
+                # Remove parenthesis and comma
+                k1 = k1.replace('(', '').replace(')', '').replace(',', '')
+                # Remove possible ' or "
+                k1 = k1.replace('"', '').replace("'", '')
+                # Split and convert list to tuple
+                d[tuple(k1.split())] = v
 
             self.tracer_combinations = d.copy()
         return
@@ -80,6 +85,7 @@ class xCell_lkl(Likelihood):
             if 'b' in dt:
                 s.remove_selection(data_type=dt)
 
+        print('Applying scale cuts')
         for trs in s.get_tracer_combinations():
             # Check if trs is in tracer_combinations
             if trs not in self.tracer_combinations:
