@@ -85,140 +85,140 @@ likelihood:
     # List all 2-points that should go into the
     # data vector
     tracer_combinations:
-      ('DESgc__0', 'DESgc__0'):
+      (DESgc__0, DESgc__0):
         lmax: 145
-      ('DESgc__1', 'DESgc__1'):
+      (DESgc__1, DESgc__1):
         lmax: 225
-      ('DESgc__2', 'DESgc__2'):
+      (DESgc__2, DESgc__2):
         lmax: 298
-      ('DESgc__3', 'DESgc__3'):
+      (DESgc__3, DESgc__3):
         lmax: 371
-      ('DESgc__4', 'DESgc__4'):
+      (DESgc__4, DESgc__4):
         lmax: 435
 
       # gc -wl
-      ('DESgc__0', 'DESwl__0'):
+      (DESgc__0, DESwl__0):
         lmax: 145
-      ('DESgc__0', 'DESwl__1'):
+      (DESgc__0, DESwl__1):
         lmax: 145
-      ('DESgc__0', 'DESwl__2'):
+      (DESgc__0, DESwl__2):
         lmax: 145
-      ('DESgc__0', 'DESwl__3'):
+      (DESgc__0, DESwl__3):
         lmax: 145
-      ('DESgc__1', 'DESwl__0'):
+      (DESgc__1, DESwl__0):
         lmax: 225
-      ('DESgc__1', 'DESwl__1'):
+      (DESgc__1, DESwl__1):
         lmax: 225
-      ('DESgc__1', 'DESwl__2'):
+      (DESgc__1, DESwl__2):
         lmax: 225
-      ('DESgc__1', 'DESwl__3'):
+      (DESgc__1, DESwl__3):
         lmax: 225
-      ('DESgc__2', 'DESwl__0'):
+      (DESgc__2, DESwl__0):
         lmax: 298
-      ('DESgc__2', 'DESwl__1'):
+      (DESgc__2, DESwl__1):
         lmax: 298
-      ('DESgc__2', 'DESwl__2'):
+      (DESgc__2, DESwl__2):
         lmax: 298
-      ('DESgc__2', 'DESwl__3'):
+      (DESgc__2, DESwl__3):
         lmax: 298
-      ('DESgc__3', 'DESwl__0'):
+      (DESgc__3, DESwl__0):
         lmax: 371
-      ('DESgc__3', 'DESwl__1'):
+      (DESgc__3, DESwl__1):
         lmax: 371
-      ('DESgc__3', 'DESwl__2'):
+      (DESgc__3, DESwl__2):
         lmax: 371
-      ('DESgc__3', 'DESwl__3'):
+      (DESgc__3, DESwl__3):
         lmax: 371
-      ('DESgc__4', 'DESwl__0'):
+      (DESgc__4, DESwl__0):
         lmax: 435
-      ('DESgc__4', 'DESwl__1'):
+      (DESgc__4, DESwl__1):
         lmax: 435
-      ('DESgc__4', 'DESwl__2'):
+      (DESgc__4, DESwl__2):
         lmax: 435
-      ('DESgc__4', 'DESwl__3'):
+      (DESgc__4, DESwl__3):
         lmax: 435
         
       # gc -cv
       # To remove ells < 8 we remove the first bin 
-      ('DESgc__0', 'PLAcv'):
+      (DESgc__0, PLAcv):
         lmin: 30
         lmax: 145
-      ('DESgc__1', 'PLAcv'):
+      (DESgc__1, PLAcv):
         lmin: 30
         lmax: 225
-      ('DESgc__2', 'PLAcv'):
+      (DESgc__2, PLAcv):
         lmin: 30
         lmax: 298
-      ('DESgc__3', 'PLAcv'):
+      (DESgc__3, PLAcv):
         lmin: 30
         lmax: 371
-      ('DESgc__4', 'PLAcv'):
+      (DESgc__4, PLAcv):
         lmin: 30
         lmax: 435
 
       # wl -wl
-      ('DESwl__0', 'DESwl__0'):
+      (DESwl__0, DESwl__0):
         lmin: 30
-        lmin: 2000
-      ('DESwl__0', 'DESwl__1'):
+        lmax: 2000
+      (DESwl__0, DESwl__1):
         lmin: 30
-        lmin: 2000
-      ('DESwl__0', 'DESwl__2'):
+        lmax: 2000
+      (DESwl__0, DESwl__2):
         lmin: 30
-        lmin: 2000
-      ('DESwl__0', 'DESwl__3'):
+        lmax: 2000
+      (DESwl__0, DESwl__3):
         lmin: 30
-        lmin: 2000
-      ('DESwl__1', 'DESwl__1'):
+        lmax: 2000
+      (DESwl__1, DESwl__1):
         lmin: 30
-        lmin: 2000
-      ('DESwl__1', 'DESwl__2'):
+        lmax: 2000
+      (DESwl__1, DESwl__2):
         lmin: 30
-        lmin: 2000
-      ('DESwl__1', 'DESwl__3'):
+        lmax: 2000
+      (DESwl__1, DESwl__3):
         lmin: 30
-        lmin: 2000
-      ('DESwl__2', 'DESwl__2'):
+        lmax: 2000
+      (DESwl__2, DESwl__2):
         lmin: 30
-        lmin: 2000
-      ('DESwl__2', 'DESwl__3'):
+        lmax: 2000
+      (DESwl__2, DESwl__3):
         lmin: 30
-        lmin: 2000
-      ('DESwl__3', 'DESwl__3'):
+        lmax: 2000
+      (DESwl__3, DESwl__3):
         lmin: 30
-        lmin: 2000
+        lmax: 2000
 
       # wl -cv
-      ('DESwl__0', 'PLAcv'):
+      (DESwl__0, PLAcv):
         lmin: 30
-        lmin: 2000
-      ('DESwl__1', 'PLAcv'):
+        lmax: 2000
+      (DESwl__1, PLAcv):
         lmin: 30
-        lmin: 2000
-      ('DESwl__2', 'PLAcv'):
+        lmax: 2000
+      (DESwl__2, PLAcv):
         lmin: 30
-        lmin: 2000
-      ('DESwl__3', 'PLAcv'):
+        lmax: 2000
+      (DESwl__3, PLAcv):
         lmin: 30
-        lmin: 2000
+        lmax: 2000
 
       # eBOSS - eBOSS
       # kmin = 0.02
       # kmax = 0.15
       # l \sim chi(z_mean) * k
       # z_mean = 1.2, 1.8
-      ('eBOSS__0', 'eBOSS__0'):
+      (eBOSS__0, eBOSS__0):
         lmin: 79
         lmax: 590
-      ('eBOSS__1', 'eBOSS__1'):
+      (eBOSS__1, eBOSS__1):
         lmin: 102
         lmax: 764
        
       # eBOSS - PLAcv
-      ('eBOSS__0', 'PLAcv'):
+      (eBOSS__0, PLAcv):
         lmin: 79
         lmax: 590
-      ('eBOSS__1', 'PLAcv'):
+      (eBOSS__1, PLAcv):
         lmin: 102
         lmax: 764
     # Default scale cuts
