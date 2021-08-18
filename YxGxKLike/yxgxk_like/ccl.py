@@ -101,7 +101,7 @@ class CCL(Theory):
 
         state['CCL'] = {'cosmo': cosmo}
         # Compute sigma8 (we should actually only do this if required -- TODO)
-        #state['derived'] = {'sigma8': ccl.sigma8(cosmo)}
+        # state['derived'] = {'sigma8': ccl.sigma8(cosmo)}
         for req_res, method in self._required_results.items():
             state['CCL'][req_res] = method(cosmo)
 

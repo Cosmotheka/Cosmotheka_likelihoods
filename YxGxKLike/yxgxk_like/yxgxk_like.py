@@ -1,10 +1,36 @@
-import time
 import numpy as np
 from scipy.interpolate import interp1d
 import pyccl as ccl
 import pyccl.nl_pt as pt
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
+
+
+def beam_gaussian(ll, fwhm_amin):
+    """
+    Returns the SHT of a Gaussian beam.
+    Args:
+        l (float or array): multipoles.
+        fwhm_amin (float): full-widht half-max in arcmins.
+    Returns:
+        float or array: beam sampled at `l`.
+    """
+    sigma_rad = np.radians(fwhm_amin / 2.355 / 60)
+    return np.exp(-0.5 * ll * (ll + 1) * sigma_rad**2)
+
+
+def beam_hpix(ll, ns):
+    """
+    Returns the SHT of the beam associated with a HEALPix
+    pixel size.
+    Args:
+        l (float or array): multipoles.
+        ns (int): HEALPix resolution parameter.
+    Returns:
+        float or array: beam sampled at `l`.
+    """
+    fwhm_hp_amin = 60 * 41.7 / ns
+    return beam_gaussian(ll, fwhm_hp_amin)
 
 
 class ConcentrationDuffy08M500c(ccl.halos.Concentration):
@@ -73,6 +99,10 @@ class YxGxKLike(Likelihood):
     defaults: dict = {}
     # List of two-point functions that make up the data vector
     twopoints: list = []
+    # Angular resolution
+    nside: int = -1
+    # M0-mode
+    M0_track: bool = True
 
     def initialize(self):
         # Read SACC file
@@ -87,6 +117,8 @@ class YxGxKLike(Likelihood):
                       'galaxy_shear': 'm',
                       'cmb_convergence': 'm',
                       'cmb_tSZ': 'y'}
+        self.beam_pix = beam_hpix(self.l_sample, self.nside)
+
         # Initialize parameterless HM stuff
         if self.bz_model == 'HaloModel':
             self.massdef = ccl.halos.MassDef(500, 'critical')
@@ -291,7 +323,8 @@ class YxGxKLike(Likelihood):
         else:
             z = self.bin_properties[name]['z_fid']
             if self.ia_model == 'IAPerBin':
-                A = pars.get(self.input_params_prefix + '_' + name + '_A_IA', 0.)
+                A = pars.get(self.input_params_prefix +
+                             '_' + name + '_A_IA', 0.)
                 A_IA = np.ones_like(z) * A
             elif self.ia_model == 'IADESY1':
                 A0 = pars.get(self.input_params_prefix + '_A_IA', 0.)
@@ -315,7 +348,8 @@ class YxGxKLike(Likelihood):
             if q == 'galaxy_density':
                 nz = self._get_nz(cosmo, name, **pars)
                 bz = self._get_bz(cosmo, name, **pars)
-                t = ccl.NumberCountsTracer(cosmo, dndz=nz, bias=bz, has_rsd=False)
+                t = ccl.NumberCountsTracer(cosmo, dndz=nz,
+                                           bias=bz, has_rsd=False)
                 if self.bz_model == 'EulerianPT':
                     z = self.bin_properties[name]['z_fid']
                     zmean = self.bin_properties[name]['zmean_fid']
@@ -324,10 +358,14 @@ class YxGxKLike(Likelihood):
                     bz = b1 + b1p * (z - zmean)
                     b2 = pars.get(prefix + '_b2', 0.)
                     bs = pars.get(prefix + '_bs', 0.)
-                    ptt = pt.PTNumberCountsTracer(b1=(z,bz), b2=b2, bs=bs)
+                    ptt = pt.PTNumberCountsTracer(b1=(z, bz), b2=b2, bs=bs)
                 if self.bz_model == 'HaloModel':
                     hod_pars = {k: pars[prefix + '_' + k]
-                                for k in ['lMmin_0', 'lM0_0', 'lM1_0']}
+                                for k in ['lMmin_0', 'lM1_0']}
+                    if self.M0_track:
+                        hod_pars['lM0_0'] = hod_pars['lMmin_0']
+                    else:
+                        hod_pars['lM0_0'] = pars[prefix + '_lM0_0']
                     slM = pars.get(prefix + '_siglM_0', None)
                     if slM is None:
                         slM = pars[self.input_params_prefix + '_siglM_0']
@@ -347,7 +385,8 @@ class YxGxKLike(Likelihood):
             elif q == 'cmb_tSZ':
                 t = ccl.tSZTracer(cosmo, z_max=3.)
                 if self.bz_model == 'HaloModel':
-                    o_m_b = pars.get(self.input_params_prefix + '_mass_bias', 1.)
+                    o_m_b = pars.get(self.input_params_prefix +
+                                     '_mass_bias', 1.)
                     prof.update_parameters(mass_bias=o_m_b)
                     normed = False
                 else:
@@ -377,7 +416,8 @@ class YxGxKLike(Likelihood):
             cosmo.compute_nonlin_power()
             pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
             ptc = pt.PTCalculator(with_NC=True, with_IA=False,
-                                  log10k_min=-4, log10k_max=2, nk_per_decade=20)
+                                  log10k_min=-4, log10k_max=2,
+                                  nk_per_decade=20)
             pk_lin_z0 = ccl.linear_matter_power(cosmo, ptc.ks, 1.)
             ptc.update_pk(pk_lin_z0)
             return {'ptc': ptc, 'pk_mm': pkmm}
@@ -391,7 +431,8 @@ class YxGxKLike(Likelihood):
             hmc = ccl.halos.HMCalculator(cosmo, mf, hb, self.massdef)
             return {'hmc': hmc, 'pk_mm': pkmm}
         else:
-            raise LoggedError(self.log, "Unknown bias model %s" % self.bz_model)
+            raise LoggedError(self.log,
+                              "Unknown bias model %s" % self.bz_model)
 
     def _get_pkxy(self, cosmo, clm, pkd, trs, **pars):
         """ Get the P(k) between two tracers. """
@@ -411,7 +452,8 @@ class YxGxKLike(Likelihood):
             else:
                 ptt1 = trs[clm['bin_1']]['PT_tracer']
                 ptt2 = trs[clm['bin_2']]['PT_tracer']
-                pk_pt = pt.get_pt_pk2d(cosmo, ptt1, tracer2=ptt2, ptc=pkd['ptc'])
+                pk_pt = pt.get_pt_pk2d(cosmo, ptt1, tracer2=ptt2,
+                                       ptc=pkd['ptc'])
                 return pk_pt
         elif self.bz_model == 'HaloModel':
             k_s = np.geomspace(1E-4, 1E2, self.nk_hmc)
@@ -430,8 +472,11 @@ class YxGxKLike(Likelihood):
             alpha = pars.get(self.input_params_prefix + '_alpha' + comb, None)
             if alpha is None:
                 alpha = pars.get(self.input_params_prefix + '_alpha', 1.)
-            fsmooth = lambda a: alpha
-            fsuppress = lambda a: self.k_1h_suppress
+
+            def fsmooth(a): return alpha
+
+            def fsuppress(a): return self.k_1h_suppress
+
             pk = ccl.halos.halomod_Pk2D(cosmo, pkd['hmc'],
                                         p1, prof_2pt=prof2pt, prof2=p2,
                                         normprof1=norm1,
@@ -441,7 +486,20 @@ class YxGxKLike(Likelihood):
                                         supress_1h=fsuppress)
             return pk
         else:
-            raise LoggedError(self.log, "Unknown bias model %s" % self.bz_model)
+            raise LoggedError(self.log,
+                              "Unknown bias model %s" % self.bz_model)
+
+    def _get_pixel_window(self, clm):
+        q1 = self.used_tracers[clm['bin_1']]
+        q2 = self.used_tracers[clm['bin_2']]
+        pixwin = np.ones(self.l_sample.size)
+        # No window for CMB lensing or shear
+        # (the latter only in the sampling limit)
+        if q1 in ['galaxy_density', 'cmb_tSZ']:
+            pixwin *= self.beam_pix
+        if q2 in ['galaxy_density', 'cmb_tSZ']:
+            pixwin *= self.beam_pix
+        return pixwin
 
     def _get_cl_all(self, cosmo, pk, **pars):
         """ Compute all C_ells."""
@@ -456,6 +514,8 @@ class YxGxKLike(Likelihood):
                                 trs[clm['bin_1']]['ccl_tracer'],
                                 trs[clm['bin_2']]['ccl_tracer'],
                                 self.l_sample, p_of_k_a=pkxy)
+            # Pixel window function
+            cl *= self._get_pixel_window(clm)
             clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
             cls.append(clb)
         return cls
@@ -492,6 +552,7 @@ class YxGxKLike(Likelihood):
 
         # Multiplicative bias if needed
         self._apply_shape_systematics(cls, **pars)
+
         return cls
 
     def get_sacc_file(self, **pars):

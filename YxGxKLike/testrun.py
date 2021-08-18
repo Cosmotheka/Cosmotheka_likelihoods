@@ -25,3 +25,10 @@ print("params_dict = ", p0)
 model = get_model(info)
 loglikes, derived = model.loglikes(p0)
 print("chi2 = ", -2 * loglikes[0])
+
+# Minimize
+updated_info, sampler = run(info)
+bf = sampler.products()['minimum'].bestfit()
+pf = {k: bf[k] for k in p0.keys()}
+print("Final params: ")
+print(pf)

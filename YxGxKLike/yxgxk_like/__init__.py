@@ -1,4 +1,4 @@
-from . import yxgxk_like, ccl
+from . import yxgxk_like, ccl  # noqa
 
-from .yxgxk_like import YxGxKLike
-from .ccl import CCL
+from .yxgxk_like import YxGxKLike  # noqa
+from .ccl import CCL  # noqa
