@@ -26,7 +26,7 @@ params:
       max: 15
     ref:
       dist: norm
-      loc: 12.
+      loc: 11.843329709192787
       scale: 0.1
     latex: \log_{10}M_{\rm min}
     proposal: 0.005
@@ -36,7 +36,7 @@ params:
       max: 15
     ref:
       dist: norm
-      loc: 13.
+      loc: 13.121405912636249
       scale: 0.1
     latex: \log_{10}M_1
     proposal: 0.005
@@ -49,7 +49,7 @@ params:
       max: 1.5
     ref:
       dist: norm
-      loc: 0.8
+      loc: 0.6124887972288015
       scale: 0.05
     latex: 1-b_H
     proposal: 0.005
@@ -60,11 +60,19 @@ params:
       max: 1.
     ref:
       dist: norm
-      loc: -0.5
+      loc: 0.19678626251909215
       scale: 0.02
     proposal: 0.01
-  ygk_alphagm: 1.
-  ygk_alphagy: 1.
+  ygk_alpha: 0.7
+  #ygk_alpha:
+  #  prior:
+  #    min: 0.2
+  #    max: 1.8
+  #  ref:
+  #    dist: norm
+  #    loc: 1.0
+  #    scale: 0.02
+  #  proposal: 0.01
 
 
 # CCL settings
@@ -87,6 +95,7 @@ likelihood:
     nside: 512
     # M0 tracking Mmin?
     M0_track: True
+    HM_correction: halofit
     # List all relevant bins
     bins:
       - name: LOWZ__0
@@ -104,9 +113,9 @@ likelihood:
       - bins: [LOWZ__2, YMILCA]
 
     defaults:
-      kmax: 0.5
+      kmax: 1.0
       lmin: 0
-      lmax: 2000
+      lmax: 1024
       LOWZ__1:
         lmin: 10
       LOWZ__2:
@@ -125,5 +134,5 @@ likelihood:
     shape_model: ShapeNone
     bz_model: HaloModel
 
-debug: True
+debug: False
 output: 'cobaya_out/test'

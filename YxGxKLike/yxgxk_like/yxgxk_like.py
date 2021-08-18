@@ -6,6 +6,50 @@ from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 
 
+class HalomodCorrection(object):
+    """Provides methods to estimate the correction to the halo
+    model in the 1h - 2h transition regime.
+
+    Args:
+        cosmo (:obj:`ccl.Cosmology`): cosmology.
+        k_range (list): range of k to use (in Mpc^-1).
+        nlk (int): number of samples in log(k) to use.
+        z_range (list): range of redshifts to use.
+        nz (int): number of samples in redshift to use.
+    """
+    def __init__(self,
+                 k_range=[1E-1, 5], nlk=20,
+                 z_range=[0., 1.], nz=16):
+        from scipy.interpolate import interp2d
+
+        cosmo = ccl.CosmologyVanillaLCDM()
+        lkarr = np.linspace(np.log10(k_range[0]),
+                            np.log10(k_range[1]),
+                            nlk)
+        karr = 10.**lkarr
+        zarr = np.linspace(z_range[0], z_range[1], nz)
+
+        pk_hm = np.array([ccl.halomodel_matter_power(cosmo, karr, a)
+                          for a in 1. / (1 + zarr)])
+        pk_hf = np.array([ccl.nonlin_matter_power(cosmo, karr, a)
+                          for a in 1. / (1 + zarr)])
+        ratio = pk_hf / pk_hm
+
+        self.rk_func = interp2d(lkarr, 1/(1+zarr), ratio,
+                                bounds_error=False, fill_value=1)
+
+    def rk_interp(self, k, a):
+        """
+        Returns the halo model correction for an array of k
+        values at a given redshift.
+
+        Args:
+            k (float or array): wavenumbers in units of Mpc^-1.
+            a (float): value of the scale factor.
+        """
+        return self.rk_func(np.log10(k), a)
+
+
 def beam_gaussian(ll, fwhm_amin):
     """
     Returns the SHT of a Gaussian beam.
@@ -103,6 +147,8 @@ class YxGxKLike(Likelihood):
     nside: int = -1
     # M0-mode
     M0_track: bool = True
+    # HM correction
+    HM_correction: str = "HMCode"
 
     def initialize(self):
         # Read SACC file
@@ -118,6 +164,10 @@ class YxGxKLike(Likelihood):
                       'cmb_convergence': 'm',
                       'cmb_tSZ': 'y'}
         self.beam_pix = beam_hpix(self.l_sample, self.nside)
+        if self.HM_correction == 'halofit':
+            self.hmcorr = HalomodCorrection()
+        else:
+            self.hmcorr = None
 
         # Initialize parameterless HM stuff
         if self.bz_model == 'HaloModel':
@@ -164,11 +214,14 @@ class YxGxKLike(Likelihood):
             if b['name'] not in s.tracers:
                 raise LoggedError(self.log, "Unknown tracer %s" % b['name'])
             t = s.tracers[b['name']]
-            if t.quantity == 'galaxy_density':
+            if t.quantity in ['galaxy_density', 'galaxy_shear']:
                 zmid = np.average(t.z, weights=t.nz)
                 self.bin_properties[b['name']] = {'z_fid': t.z,
                                                   'nz_fid': t.nz,
                                                   'zmean_fid': zmid}
+            else:
+                self.bin_properties[b['name']] = {}
+
             # Ensure all tracers have ell_min
             if b['name'] not in self.defaults:
                 self.defaults[b['name']] = {}
@@ -251,11 +304,7 @@ class YxGxKLike(Likelihood):
         # Reorder data vector and covariance
         self.data_vec = s.mean[indices]
         self.cov = s.covariance.covmat[indices][:, indices]
-        # Spectral decomposition to avoid negative eigenvalues
-        self.inv_cov = np.linalg.pinv(self.cov, rcond=1E-15, hermitian=True)
-        self.ic_w, self.ic_v = np.linalg.eigh(self.inv_cov)
-        self.ic_v = self.ic_v.T
-        self.ic_w[self.ic_w < 0] = 0
+        self.inv_cov = np.linalg.inv(self.cov)
         self.ndata = len(self.data_vec)
 
     def _get_ell_sampling(self, nl_per_decade=30):
@@ -469,21 +518,32 @@ class YxGxKLike(Likelihood):
             else:
                 r = pars.get(self.input_params_prefix + '_rho' + comb, 0.)
                 prof2pt = ccl.halos.Profile2pt(r_corr=r)
-            alpha = pars.get(self.input_params_prefix + '_alpha' + comb, None)
-            if alpha is None:
-                alpha = pars.get(self.input_params_prefix + '_alpha', 1.)
 
-            def fsmooth(a): return alpha
+            if self.HM_correction == "HMCode":
+                alpha = pars.get(self.input_params_prefix +
+                                 '_alpha' + comb, None)
+                if alpha is None:
+                    alpha = pars.get(self.input_params_prefix + '_alpha', 1.)
+
+                def fsmooth(a): return alpha
+            else:
+                fsmooth = None
 
             def fsuppress(a): return self.k_1h_suppress
 
-            pk = ccl.halos.halomod_Pk2D(cosmo, pkd['hmc'],
-                                        p1, prof_2pt=prof2pt, prof2=p2,
-                                        normprof1=norm1,
-                                        normprof2=norm2,
-                                        lk_arr=np.log(k_s), a_arr=a_s,
-                                        smooth_transition=fsmooth,
-                                        supress_1h=fsuppress)
+            pkt = ccl.halos.halomod_power_spectrum(cosmo, pkd['hmc'], k_s, a_s,
+                                                   p1,
+                                                   prof_2pt=prof2pt, prof2=p2,
+                                                   normprof1=norm1,
+                                                   normprof2=norm2,
+                                                   smooth_transition=fsmooth,
+                                                   supress_1h=fsuppress)
+            if self.HM_correction == 'halofit':
+                ratio = np.array([self.hmcorr.rk_interp(k_s, a) for a in a_s])
+                pkt *= ratio
+            pk = ccl.Pk2D(a_arr=a_s, lk_arr=np.log(k_s), pk_arr=np.log(pkt),
+                          extrap_order_lok=1, extrap_order_hik=2,
+                          cosmo=cosmo, is_logp=True)
             return pk
         else:
             raise LoggedError(self.log,
@@ -563,8 +623,10 @@ class YxGxKLike(Likelihood):
 
         # Add tracers
         for n, p in self.bin_properties.items():
+            if n not in self.used_tracers:
+                continue
             q = self.used_tracers[n]
-            if q != 'cmb_convergence':
+            if q in ['galaxy_density', 'galaxy_shear']:
                 s.add_tracer('NZ', n, quantity=q, spin=0,
                              z=p['z_fid'], nz=p['nz_fid'])
             else:
@@ -602,8 +664,5 @@ class YxGxKLike(Likelihood):
         """
         t = self._get_theory(**pars)
         r = t - self.data_vec
-        # t = np.random.multivariate_normal(t, self.cov)
-        # chi2 = np.dot(r, self.inv_cov.dot(r))
-        re = np.dot(self.ic_v, r)
-        chi2 = np.sum(re**2*self.ic_w)
+        chi2 = np.dot(r, np.dot(self.inv_cov, r))
         return -0.5*chi2
