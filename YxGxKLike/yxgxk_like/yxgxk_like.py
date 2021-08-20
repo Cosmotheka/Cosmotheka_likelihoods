@@ -47,7 +47,7 @@ class HalomodCorrection(object):
             k (float or array): wavenumbers in units of Mpc^-1.
             a (float): value of the scale factor.
         """
-        return self.rk_func(np.log10(k), a)
+        return self.rk_func(np.log10(k), a)-1
 
 
 def beam_gaussian(ll, fwhm_amin):
@@ -304,7 +304,17 @@ class YxGxKLike(Likelihood):
         # Reorder data vector and covariance
         self.data_vec = s.mean[indices]
         self.cov = s.covariance.covmat[indices][:, indices]
-        self.inv_cov = np.linalg.inv(self.cov)
+        # Check eigenvalues
+        w, v = np.linalg.eigh(self.cov)
+        if np.any(w <= 0):
+            print(w)
+            exit(1)
+            #iw = 1./w
+            #iw[w <= 0] = 0
+            #self.inv_cov = np.dot(v, np.dot(np.diag(iw), v.T))
+            self.inv_cov = np.linalg.inv(self.cov)
+        else:
+            self.inv_cov = np.linalg.inv(self.cov)
         self.ndata = len(self.data_vec)
 
     def _get_ell_sampling(self, nl_per_decade=30):
@@ -539,7 +549,11 @@ class YxGxKLike(Likelihood):
                                                    smooth_transition=fsmooth,
                                                    supress_1h=fsuppress)
             if self.HM_correction == 'halofit':
-                ratio = np.array([self.hmcorr.rk_interp(k_s, a) for a in a_s])
+                A = pars.get(self.input_params_prefix +
+                             '_Ahmc' + comb, None)
+                if A is None:
+                    A = pars.get(self.input_params_prefix + '_Ahmc', 1.)
+                ratio = np.array([1+A*self.hmcorr.rk_interp(k_s, a) for a in a_s])
                 pkt *= ratio
             pk = ccl.Pk2D(a_arr=a_s, lk_arr=np.log(k_s), pk_arr=np.log(pkt),
                           extrap_order_lok=1, extrap_order_hik=2,

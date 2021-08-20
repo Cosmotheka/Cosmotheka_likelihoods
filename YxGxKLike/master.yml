@@ -1,0 +1,397 @@
+sampler:
+  minimize:
+    ignore_prior: True
+    max_evals: 1000
+
+params:
+  sigma8:
+    prior: {min: 0.2, max: 1.5}
+    ref: {dist: norm, scale: 0.02, loc: 0.8102}
+    latex: \sigma_8
+    proposal: 0.02
+  Omega_c:
+    prior: {min: 0.05, max: 0.7}
+    ref: {dist: norm, scale: 0.01, loc: 0.26066676}
+    latex: \Omega_c
+    proposal: 0.01
+  Omega_b:
+    prior: {min: 0.045, max: 0.055}
+    ref: {dist: norm, scale: 0.0005, loc: 0.048974682}
+    latex: \Omega_b
+    proposal: 0.0005
+  h:
+    prior: {min: 0.4, max: 0.9}
+    ref: {dist: norm, scale: 0.01, loc: 0.6766}
+    latex: h
+    proposal: 0.01
+  n_s:
+    prior: {min: 0.85, max: 1.1}
+    ref: {dist: norm, scale: 0.005, loc: 0.9665}
+    latex: n_s
+    proposal: 0.005
+  m_nu:
+    prior: {min: 0.0, max: 1.}
+    ref: {dist: norm, scale: 0.001, loc: 0.0}
+    latex: m_\nu
+    proposal: 0.001
+  ygk_LOWZ__0_b0:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__1_b0:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__2_b0:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__3_b0:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__4_b0:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__5_b0:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__0_bp:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_p
+    proposal: 0.002
+  ygk_LOWZ__1_bp:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_p
+    proposal: 0.002
+  ygk_LOWZ__2_bp:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_p
+    proposal: 0.002
+  ygk_LOWZ__3_bp:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_p
+    proposal: 0.002
+  ygk_LOWZ__4_bp:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_p
+    proposal: 0.002
+  ygk_LOWZ__5_bp:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_p
+    proposal: 0.002
+  ygk_LOWZ__0_b1:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__1_b1:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__2_b1:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__3_b1:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__4_b1:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__5_b1:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 2.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__0_b2:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__1_b2:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__2_b2:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__3_b2:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__4_b2:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__5_b2:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__0_bs:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__1_bs:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__2_bs:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__3_bs:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__4_bs:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__5_bs:
+    prior: {min: 0., max: 5}
+    ref: {dist: norm, scale: 0.1, loc: 0.}
+    latex: b_0
+    proposal: 0.002
+  ygk_LOWZ__0_lMmin_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 12.602721}
+    latex: \log_{10}M_{\rm min}
+    proposal: 0.005
+  ygk_LOWZ__1_lMmin_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 11.653036}
+    latex: \log_{10}M_{\rm min}
+    proposal: 0.005
+  ygk_LOWZ__2_lMmin_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 11.869872}
+    latex: \log_{10}M_{\rm min}
+    proposal: 0.005
+  ygk_LOWZ__3_lMmin_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 12.069004}
+    latex: \log_{10}M_{\rm min}
+    proposal: 0.005
+  ygk_LOWZ__4_lMmin_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 12.114722}
+    latex: \log_{10}M_{\rm min}
+    proposal: 0.005
+  ygk_LOWZ__5_lMmin_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 12.09721}
+    latex: \log_{10}M_{\rm min}
+    proposal: 0.005
+  ygk_LOWZ__0_lM1_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 14.082529}
+    latex: \log_{10}M_{1}
+    proposal: 0.005
+  ygk_LOWZ__1_lM1_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 12.9802}
+    latex: \log_{10}M_{1}
+    proposal: 0.005
+  ygk_LOWZ__2_lM1_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 13.158662}
+    latex: \log_{10}M_{1}
+    proposal: 0.005
+  ygk_LOWZ__3_lM1_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 13.364201}
+    latex: \log_{10}M_{1}
+    proposal: 0.005
+  ygk_LOWZ__4_lM1_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 13.388862}
+    latex: \log_{10}M_{1}
+    proposal: 0.005
+  ygk_LOWZ__5_lM1_0:
+    prior: {min: 8., max: 15}
+    ref: {dist: norm, scale: 0.1, loc: 13.035974}
+    latex: \log_{10}M_{1}
+    proposal: 0.005
+  ygk_siglM_0:
+    prior: {min: 0.1, max: 0.6}
+    ref: {dist: norm, scale: 0.01, loc: 0.345}
+  ygk_LOWZ__0_dz:
+    prior: {min: -0.1, max: 0.1}
+    ref: {dist: norm, scale: 0.002, loc: 0.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__1_dz:
+    prior: {min: -0.1, max: 0.1}
+    ref: {dist: norm, scale: 0.002, loc: 0.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__2_dz:
+    prior: {min: -0.1, max: 0.1}
+    ref: {dist: norm, scale: 0.002, loc: 0.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__3_dz:
+    prior: {min: -0.1, max: 0.1}
+    ref: {dist: norm, scale: 0.002, loc: 0.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__4_dz:
+    prior: {min: -0.1, max: 0.1}
+    ref: {dist: norm, scale: 0.002, loc: 0.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__5_dz:
+    prior: {min: -0.1, max: 0.1}
+    ref: {dist: norm, scale: 0.002, loc: 0.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__0_wz:
+    prior: {min: 0.9, max: 1.1}
+    ref: {dist: norm, scale: 0.002, loc: 1.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__1_wz:
+    prior: {min: 0.9, max: 1.1}
+    ref: {dist: norm, scale: 0.002, loc: 1.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__2_wz:
+    prior: {min: 0.9, max: 1.1}
+    ref: {dist: norm, scale: 0.002, loc: 1.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__3_wz:
+    prior: {min: 0.9, max: 1.1}
+    ref: {dist: norm, scale: 0.002, loc: 1.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__4_wz:
+    prior: {min: 0.9, max: 1.1}
+    ref: {dist: norm, scale: 0.002, loc: 1.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_LOWZ__5_wz:
+    prior: {min: 0.9, max: 1.1}
+    ref: {dist: norm, scale: 0.002, loc: 1.}
+    latex: \Delta z
+    proposal: 0.002
+  ygk_mass_bias:
+    prior: {min: 0.05, max: 1.5}
+    ref: {dist: norm, scale: 0.05, loc: 0.73}
+    latex: 1-b_H
+    proposal: 0.005
+  ygk_rhogm:
+    prior: {min: -1., max: 1.}
+    ref: {dist: norm, scale: 0.01, loc: 0.0}
+    proposal: 0.01
+    latex: \rho_{gm}
+  ygk_rhogy:
+    prior: {min: -1., max: 1.}
+    ref: {dist: norm, scale: 0.01, loc: -0.5}
+    proposal: 0.01
+    latex: \rho_{gy}
+  ygk_Ahmc:
+    prior: {min: 0.1, max: 2.}
+    ref: {dist: norm, scale: 0.01, loc: 1.}
+    proposal: 0.01
+    latex: A_{\rm HMC}
+  ygk_Ahmcgg:
+    prior: {min: 0.1, max: 2.}
+    ref: {dist: norm, scale: 0.01, loc: 1.}
+    proposal: 0.01
+    latex: A^{gg}_{\rm HMC}
+  ygk_Ahmcgy:
+    prior: {min: 0.1, max: 2.}
+    ref: {dist: norm, scale: 0.01, loc: 1.}
+    proposal: 0.01
+    latex: A^{gy}_{\rm HMC}
+  ygk_Ahmcgm:
+    prior: {min: 0.1, max: 2.}
+    ref: {dist: norm, scale: 0.01, loc: 1.}
+    proposal: 0.01
+    latex: A^{gm}_{\rm HMC}
+
+theory:
+  cl_like.CCL:
+    transfer_function: boltzmann_camb
+    matter_pk: halofit
+    baryons_pk: nobaryons
+
+likelihood:
+  yxgxk_like.YxGxKLike:
+    mf_name: Tinker08
+    hb_name: Tinker10
+    cm_name: Duffy08M500c
+    input_file: ../../data/1024_yxgxk_covmix/cls_cov_comb.fits
+    nside: 1024
+    M0_track: True
+    HM_correction: halofit
+    bins:
+      - name: LOWZ__0
+      - name: LOWZ__1
+      - name: LOWZ__2
+      - name: LOWZ__3
+      - name: LOWZ__4
+      - name: LOWZ__5
+      - name: YMILCA
+      - name: KAPPA
+    twopoints:
+      - bins: [LOWZ__4, LOWZ__4]
+      - bins: [LOWZ__4, YMILCA]
+
+    defaults:
+      kmax: 1.0
+      lmin: 0
+      lmax: 1024
+      LOWZ__1:
+        lmin: 10
+      LOWZ__2:
+        lmin: 10
+      LOWZ__3:
+        lmin: 10
+      LOWZ__4:
+        lmin: 10
+      LOWZ__5:
+        lmin: 10
+
+    # Prefix associated to all nuisance params
+    input_params_prefix: ygk
+    ia_model: IANone
+    nz_model: NzShiftWidth
+    shape_model: ShapeNone
+    bz_model: HaloModel
+
+debug: True
+output: 'cobaya_out/test'
