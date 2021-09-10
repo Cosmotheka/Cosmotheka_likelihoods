@@ -10,6 +10,9 @@ setup(
     install_requires=[
         "cobaya>=3.0",
         "sacc>=0.4.2",
+        "pyccl",
+        "numpy",
+        "scipy"
     ],
     package_data={"cl_like": ["ClLike.yaml"]},
 )
