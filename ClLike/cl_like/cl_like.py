@@ -124,6 +124,11 @@ class ClLike(Likelihood):
                 self.hmcorr = HalomodCorrection()
             else:
                 self.hmcorr = None
+        elif self.bias_model == 'BACCO':
+            # load the emulators
+            import baccoemu_beta as baccoemu
+            self.lbias = baccoemu.Lbias_expansion()
+
 
     def _read_data(self):
         """
@@ -406,6 +411,21 @@ class ClLike(Likelihood):
                 trs[name]['Normed'] = normed
         return trs
 
+    def _cosmo_to_bacco(self, cosmo): # tuks
+        pars = {
+            'omega_matter' : 0.32,
+            'omega_baryon' : 0.05,
+            'hubble' : 0.67,
+            'ns' : 0.96,
+            'sigma8' : 0.83,
+            'neutrino_mass' : 0.0,
+            'w0' : -1,
+            'wa' : 0,
+            'expfactor' : 1
+        }
+        return pars
+
+        
     def _get_pk_data(self, cosmo):
         """ Get all cosmology-dependent ingredients to create the
         different P(k)s needed for the C_ell calculation.
@@ -448,6 +468,33 @@ class ClLike(Likelihood):
             hb = self.hbc(cosmo, mass_def=self.massdef)
             hmc = ccl.halos.HMCalculator(cosmo, mf, hb, self.massdef)
             return {'hmc': hmc, 'pk_mm': pkmm}
+        elif self.bias_model == 'BACCO':
+            
+            # translate the pyccl cosmology parameters into bacco notation
+            pars = self._cosmo_to_bacco(cosmo)
+
+            # set k values (TODO: could also keep k=None)
+            k_s = np.logspace(self.l10k_min_pks,
+                              self.l10k_max_pks,
+                              self.nk_pks)
+
+            # convert k_s [Mpc^-1] into h Mpc^-1 units
+            k = k_s/h # tuks
+            
+            # call the emulator of the nonlinear 15 lagrangian bias expansion terms
+            k, pnn = lbias.get_nonlinear_pnn(pars, k=k)
+            # call the emulator of the LPT-predicted 15 lagrangian bias expansion terms
+            _, plpt = lbias.get_lpt_pk(pars, k=k) # TODO: check if both calls are necessary
+            #labels = lbias.lb_term_labels # just so I don't forget this is an option
+            #print(labels)
+            # get the matter-matter power spectrum
+            pkmm = pnn[0]
+            # TODO: is this the best way to handle the matter-matter power spectrum? Or:
+            #cosmo.compute_linear_power()
+            #cosmo.compute_nonlin_power()
+            #cosmo.compute_sigma()
+            #pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+            return {'pnn': pnn, 'plpt': plpt, 'pk_mm': pkmm, 'k': k}
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
@@ -530,10 +577,68 @@ class ClLike(Likelihood):
                           extrap_order_lok=1, extrap_order_hik=2,
                           cosmo=cosmo, is_logp=True)
             return pk
+        elif self.bias_model == 'BACCO':
+            if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')):
+                return pkd['pk_mm']  # matter-matter
+            else:
+                ptt1 = trs[clm['bin_1']]['PT_tracer'] # tuks
+                ptt2 = trs[clm['bin_2']]['PT_tracer']
+                pk_pt = get_bacco_pk2d(pars, ptt1, tracer2=ptt2,
+                                     pkd=pkd)
+                return pk_pt
+        
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
 
+    def get_bacco_pk2d(pars, tracer1, tracer2=None, pkd): # tuks
+
+        if tracer2 is None:
+            tracer2 = tracer1
+        # TODO: got rid of pttracer cause doesn't have nabla
+        
+        # z # tuks
+        z_arr = 1. / self.a_s_pks - 1
+
+        if (tracer1.type == 'NC'):
+            bias1 # tuks
+
+            if (tracer2.type == 'NC'):
+                bias2 # tuks
+                # just see grand conjuration for the parsing, for the pk2d object and for the multiplication, and for the a_array
+                
+                #bias = [0.75, 0.25, 0.1, 1.4] # b1, b2, bs2, blaplacian
+                kgal, pgalauto, pgalcross = lbias.get_galaxy_real_pk(pars, bias, k=None)
+                
+
+                # needs to have redshift dependence
+                p_pt = ptc.get_pgg(Pnl, # tuks need to check
+                                   b11, b21, bs1,
+                                   b12, b22, bs2)
+            elif (tracer2.type == 'M'):
+                p_pt = ptc.get_pgm(Pnl, b11, b21, bs1)
+            else:
+                raise NotImplementedError("Combination %s-%s not implemented yet" %
+                                          (tracer1.type, tracer2.type))
+        elif (tracer1.type == 'M'):
+            if (tracer2.type == 'NC'):
+                # tuks redshift dependence
+                p_pt = ptc.get_pgm(Pnl, b12, b22, bs2)
+            elif (tracer2.type == 'M'):
+                raise NotImplementedError("Combination %s-%s not implemented yet" %
+                                          (tracer1.type, tracer2.type))
+        else:
+            raise NotImplementedError("Combination %s-%s not implemented yet" %
+                                      (tracer1.type, tracer2.type))
+
+        # Once you have created the 2-dimensional P(k) array,
+        # then generate a Pk2D object as described in pk2d.py.
+        pt_pk = ccl.Pk2D(a_arr=self.a_s_pks,
+                         lk_arr=np.log(pkd['k']), # tuks units has to be mpc -1
+                         pk_arr=p_pt, # tuks has to be Mpc^3
+                         is_logp=False)
+        return pt_pk
+        
     def _get_pixel_window(self, clm):
         pix1 = self.pixwin[clm['bin_1']]
         pix2 = self.pixwin[clm['bin_2']]
