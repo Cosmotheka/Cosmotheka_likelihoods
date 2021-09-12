@@ -1,5 +1,8 @@
+import time
+
 import numpy as np
 from scipy.interpolate import interp1d
+
 import pyccl as ccl
 import pyccl.nl_pt as pt
 from .hm_extra import HalomodCorrection
@@ -129,6 +132,27 @@ class ClLike(Likelihood):
             import baccoemu_beta as baccoemu
             self.lbias = baccoemu.Lbias_expansion()
 
+            # set k values (TODO: could also keep k=None)
+            self.k_s = np.logspace(self.l10k_min_pks,
+                              self.l10k_max_pks,
+                              self.nk_pks)
+
+            # redshifts for creating the Pk-2d object
+            z = np.array([3.0, 2.0, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0])
+            self.a_s = 1./(1. + z)
+            
+            # labels of the bias parameters
+            self.bias_labels = ['b1', 'b2', 'bs', 'bn']
+
+            # create a dictionary for the emulator outputs, following the bacco outputs
+            self.bacco_dict = {}
+            counter = 0
+            for i in range(len(self.bias_labels)):
+                for j in range(len(self.bias_labels)):
+                    if i > j: continue
+                    self.bacco_dict[self.bias_labels[i] + '_' + self.bias_labels[j]] = counter
+                    self.bacco_dict[self.bias_labels[j] + '_' + self.bias_labels[i]] = counter
+                    counter += 1
 
     def _read_data(self):
         """
@@ -319,6 +343,8 @@ class ClLike(Likelihood):
             b0 = pars[self.input_params_prefix + '_' + name + '_b1']
             bp = pars.get(self.input_params_prefix + '_' + name + '_b1p', 0.)
             bz = b0 + bp * (z - zmean)
+        elif self.bias_model == 'BACCO':
+            pass
         return (z, bz)
 
     def _get_ia_bias(self, cosmo, name, **pars):
@@ -380,17 +406,26 @@ class ClLike(Likelihood):
                     hod_pars['siglM_0'] = slM
                     prof = ccl.halos.HaloProfileHOD(self.cm)
                     prof.update_parameters(**hod_pars)
+                if self.bias_model == 'BACCO':
+                    bias = {}
+                    for b in self.bias_labels:
+                        bisd[b] = pars.get(self.input_params_prefix + '_' + name + '_' + b, 0.)
+                    bias['b0'] = 1. # TODO: can also just feed it as a fixed parameter in the yaml
             elif q == 'galaxy_shear':
                 nz = self._get_nz(cosmo, name, **pars)
                 ia = self._get_ia_bias(cosmo, name, **pars)
                 t = ccl.WeakLensingTracer(cosmo, nz, ia_bias=ia)
                 if is_PT_bias:
                     ptt = pt.PTMatterTracer()
+                if self.bias_model == 'BACCO':
+                    bias = None
             elif q == 'cmb_convergence':
                 # B.H. TODO: pass z_source as parameter to the YAML file
                 t = ccl.CMBLensingTracer(cosmo, z_source=1100)
                 if is_PT_bias:
                     ptt = pt.PTMatterTracer()
+                if self.bias_model == 'BACCO':
+                    bias = None
             elif q == 'cmb_tSZ':
                 t = ccl.tSZTracer(cosmo, z_max=3.)
                 if self.bias_model == 'HaloModel':
@@ -398,6 +433,8 @@ class ClLike(Likelihood):
                                      '_mass_bias', 1.)
                     prof.update_parameters(mass_bias=o_m_b)
                     normed = False
+                if self.bias_model == 'BACCO':
+                    bias = None
                 else:
                     raise NotImplementedError("Can't do tSZ without"
                                               " the halo model.")
@@ -409,19 +446,21 @@ class ClLike(Likelihood):
             if self.bias_model == 'HaloModel':
                 trs[name]['Profile'] = prof
                 trs[name]['Normed'] = normed
+            if self.bias_model == 'BACCO':
+                trs[name]['bias'] = bias # if not galaxy tracer, this is None
         return trs
 
-    def _cosmo_to_bacco(self, cosmo): # tuks
+    def _cosmo_to_bacco(self, cosmo):
         pars = {
-            'omega_matter' : 0.32,
-            'omega_baryon' : 0.05,
-            'hubble' : 0.67,
-            'ns' : 0.96,
-            'sigma8' : 0.83,
-            'neutrino_mass' : 0.0,
-            'w0' : -1,
-            'wa' : 0,
-            'expfactor' : 1
+            'omega_matter' : cosmo['Omega_b']+cosmo['Omega_c'],
+            'omega_baryon' : cosmo['Omega_b'],
+            'hubble' : cosmo['H0']/100.,
+            'ns' : cosmo['n_s'],
+            'sigma8' : cosmo['sigma8'], # TODO: might be a problem and nu mass
+            'neutrino_mass' : cosmo['m_nu'],
+            'w0' : cosmo['w0'],
+            'wa' : cosmo['wa'],
+            'expfactor' : 1.  # random scale factor just to initialize
         }
         return pars
 
@@ -469,36 +508,53 @@ class ClLike(Likelihood):
             hmc = ccl.halos.HMCalculator(cosmo, mf, hb, self.massdef)
             return {'hmc': hmc, 'pk_mm': pkmm}
         elif self.bias_model == 'BACCO':
-            
-            # translate the pyccl cosmology parameters into bacco notation
-            pars = self._cosmo_to_bacco(cosmo)
-
-            # set k values (TODO: could also keep k=None)
-            k_s = np.logspace(self.l10k_min_pks,
-                              self.l10k_max_pks,
-                              self.nk_pks)
-
-            # convert k_s [Mpc^-1] into h Mpc^-1 units
-            k = k_s/h # tuks
-            
-            # call the emulator of the nonlinear 15 lagrangian bias expansion terms
-            k, pnn = lbias.get_nonlinear_pnn(pars, k=k)
-            # call the emulator of the LPT-predicted 15 lagrangian bias expansion terms
-            _, plpt = lbias.get_lpt_pk(pars, k=k) # TODO: check if both calls are necessary
-            #labels = lbias.lb_term_labels # just so I don't forget this is an option
-            #print(labels)
-            # get the matter-matter power spectrum
-            pkmm = pnn[0]
-            # TODO: is this the best way to handle the matter-matter power spectrum? Or:
-            #cosmo.compute_linear_power()
-            #cosmo.compute_nonlin_power()
-            #cosmo.compute_sigma()
-            #pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-            return {'pnn': pnn, 'plpt': plpt, 'pk_mm': pkmm, 'k': k}
+            pk2d_bacco = self._compute_bacco(cosmo)
+            return {'pk2d_bacco': pk2d_bacco}
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
 
+    def _compute_bacco(self, cosmo):
+
+        # translate the pyccl cosmology parameters into bacco notation
+        pars = self._cosmo_to_bacco(cosmo)
+        
+        # convert k_s [Mpc^-1] into h Mpc^-1 units just for the calculation
+        k = self.k_s/pars['hubble']
+        
+        # 10 redshifts, 15 combinations between bias params, and the ks
+        num_comb = int(len(self.bias_labels)*(len(self.bias_labels)-1)/2 + len(self.bias_labels))
+        pk2d_bacco = np.zeros((len(self.a_s), num_comb, len(self.k_s)))
+
+        # compute the power for each redshift
+        t1 = time.time()
+        for i in range(len(self.a_s)):
+            pars['expfactor'] = self.a_s[i]
+            # call the emulator of the nonlinear 15 lagrangian bias expansion terms, shape is (15, len(k))
+            k, pnn = lbias.get_nonlinear_pnn(pars, k=k)
+            pk2d_bacco[i] = pnn
+        print("time = ", time.time()-t1)
+
+        # convert the spit out result from (Mpc/h)^3 to Mpc^3 (bacco uses h units, but pyccl doesn't)
+        pk2d_bacco /= pars['hubble']**3
+    
+        # call the emulator of the LPT-predicted 15 lagrangian bias expansion terms
+        #_, plpt = lbias.get_lpt_pk(pars, k=k) # TODO: check if both calls are necessary
+
+        #labels = lbias.lb_term_labels # just so I don't forget this is an option
+        #print(labels)
+
+        # get the matter-matter power spectrum in units of Mpc^3
+        #pkmm = pnn[0]
+
+        # TODO: is this the best way to handle the matter-matter power spectrum? Or:
+        #cosmo.compute_linear_power()
+        #cosmo.compute_nonlin_power()
+        #cosmo.compute_sigma()
+        #pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+
+        return pk2d_bacco
+        
     def _get_pkxy(self, cosmo, clm, pkd, trs, **pars):
         """ Get the P(k) between two tracers. """
         q1 = self.tracer_qs[clm['bin_1']]
@@ -578,66 +634,60 @@ class ClLike(Likelihood):
                           cosmo=cosmo, is_logp=True)
             return pk
         elif self.bias_model == 'BACCO':
-            if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')):
-                return pkd['pk_mm']  # matter-matter
+            if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')): # TODO: is this fine?
+                #return pkd['pk_mm']  # matter-matter
+                return pkd['pk2d_bacco'][:, 0, :]  # matter-matter from bacco emulator
             else:
-                ptt1 = trs[clm['bin_1']]['PT_tracer'] # tuks
-                ptt2 = trs[clm['bin_2']]['PT_tracer']
-                pk_pt = get_bacco_pk2d(pars, ptt1, tracer2=ptt2,
-                                     pkd=pkd)
-                return pk_pt
+                # bias is a dictionary holding the value for each bias parameter or None if not galaxy tracer
+                bias_eft1 = trs[clm['bin_1']]['bias']
+                bias_eft2 = trs[clm['bin_2']]['bias']
+                pk2d = _get_pk_2d_bacco(self, pkd['pk2d_bacco'], bias_eft1, bias_eft2, q1, q2)
+                return pk2d
         
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
 
-    def get_bacco_pk2d(pars, tracer1, tracer2=None, pkd): # tuks
 
-        if tracer2 is None:
-            tracer2 = tracer1
-        # TODO: got rid of pttracer cause doesn't have nabla
+    def _get_pk_2d_bacco(self, pk2d_bacco, bias_eft1, bias_eft2, q1, q2):
+        # TODO: the calculation could be sped up, but need to figure out how to do for two sets of biases
+        #bias = [0.75, 0.25, 0.1, 1.4] # b1, b2, bs2, blaplacian
+        #kgal, pgalauto, pgalcross = lbias.get_galaxy_real_pk(pars, bias, k=None)
+        # in this current version b_trs has b0 = 1 as well
         
-        # z # tuks
-        z_arr = 1. / self.a_s_pks - 1
+        # Initialize power spectrum Pk_a(as, ks)
+        Pk_a = np.zeros_like(pk2d_bacco[:, 0, :])
+        
+        # If both tracers are galaxies, Pk^{tr1,tr2} = f_i^bin1 * f_j^bin2 * Pk_ij
+        if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
+            for key1 in bias_eft1.keys():
+                bias1 = bias_eft1[key1]
+                for key2 in bias_eft2.keys():
+                    bias2 = bias_eft2[key2]
+                    if key1+'_'+key2 in self.bacco_dict.keys():
+                        comb = self.bacco_dict[key1+'_'+key2]
+                    else:
+                        comb = self.bacco_dict[key2+'_'+key1]
+                    Pk_a += bias1*bias2*pk2d_bacco[:, comb, :]
 
-        if (tracer1.type == 'NC'):
-            bias1 # tuks
+        # If first tracer is galaxies and second is matter, Pk^{tr1,tr2} = f_i^bin1 * 1. * Pk_0i
+        elif (q1 == 'galaxy_density') and (q2 != 'galaxy_density'):
+            for key1 in bias_eft1.keys():
+                bias1 = bias_eft1[key1]
+                comb = self.bacco_dict['b0'+'_'+key1]
+                Pk_a += bias1*pk2d_bacco[:, comb, :]
 
-            if (tracer2.type == 'NC'):
-                bias2 # tuks
-                # just see grand conjuration for the parsing, for the pk2d object and for the multiplication, and for the a_array
-                
-                #bias = [0.75, 0.25, 0.1, 1.4] # b1, b2, bs2, blaplacian
-                kgal, pgalauto, pgalcross = lbias.get_galaxy_real_pk(pars, bias, k=None)
-                
+        # If second tracer is galaxies and first is matter, Pk^{tr1,tr2} = f_j^bin2 * 1. * Pk_0j
+        elif (q1 != 'galaxy_density') and (q2 == 'galaxy_density'):
+            for key2 in bias_eft2.keys():
+                bias2 = bias_eft2[key2]
+                comb = self.bacco_dict['b0'+'_'+key2]
+                Pk_a += bias2*pk2d_bacco[:, comb, :]
+        
+        # Compute the 2D power spectrum
+        pk_2d_bacco = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.k_s), pk_arr=Pk_a, is_logp=False)
+        return pk_2d_bacco
 
-                # needs to have redshift dependence
-                p_pt = ptc.get_pgg(Pnl, # tuks need to check
-                                   b11, b21, bs1,
-                                   b12, b22, bs2)
-            elif (tracer2.type == 'M'):
-                p_pt = ptc.get_pgm(Pnl, b11, b21, bs1)
-            else:
-                raise NotImplementedError("Combination %s-%s not implemented yet" %
-                                          (tracer1.type, tracer2.type))
-        elif (tracer1.type == 'M'):
-            if (tracer2.type == 'NC'):
-                # tuks redshift dependence
-                p_pt = ptc.get_pgm(Pnl, b12, b22, bs2)
-            elif (tracer2.type == 'M'):
-                raise NotImplementedError("Combination %s-%s not implemented yet" %
-                                          (tracer1.type, tracer2.type))
-        else:
-            raise NotImplementedError("Combination %s-%s not implemented yet" %
-                                      (tracer1.type, tracer2.type))
-
-        # Once you have created the 2-dimensional P(k) array,
-        # then generate a Pk2D object as described in pk2d.py.
-        pt_pk = ccl.Pk2D(a_arr=self.a_s_pks,
-                         lk_arr=np.log(pkd['k']), # tuks units has to be mpc -1
-                         pk_arr=p_pt, # tuks has to be Mpc^3
-                         is_logp=False)
-        return pt_pk
         
     def _get_pixel_window(self, clm):
         pix1 = self.pixwin[clm['bin_1']]
