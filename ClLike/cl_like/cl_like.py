@@ -252,7 +252,7 @@ class ClLike(Likelihood):
         indices = np.array(indices)
         # Reorder data vector and covariance
         self.data_vec = s.mean[indices]
-        self.cov = s.covariance.covmat[indices][:, indices]
+        self.cov = s.covariance.dense[indices][:, indices]
         # Invert covariance
         self.inv_cov = np.linalg.inv(self.cov)
         self.ndata = len(self.data_vec)
