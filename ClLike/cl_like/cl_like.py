@@ -2,10 +2,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import pyccl as ccl
 import pyccl.nl_pt as pt
-from .hm_extra import HalomodCorrection
 from .pixwin import beam_hpix
-from .lpt import LPTCalculator, get_lpt_pk2d
-from .ept import EPTCalculator, get_ept_pk2d
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 
@@ -121,9 +118,14 @@ class ClLike(Likelihood):
             self.p2pt_HOD = ccl.halos.Profile2ptHOD()
             # Halo model correction for the transition regime
             if self.HM_correction == 'halofit':
+                from .hm_extra import HalomodCorrection
                 self.hmcorr = HalomodCorrection()
             else:
                 self.hmcorr = None
+        elif self.bias_model == 'LagrangianPT':
+            from .lpt import LPTCalculator, get_lpt_pk2d
+        elif self.bias_model == 'EulerianPT':
+            from .ept import EPTCalculator, get_ept_pk2d
 
     def _read_data(self):
         """
