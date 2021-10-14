@@ -335,8 +335,8 @@ class ClLike(Likelihood):
             elif self.ia_model == 'IADESY1_PerSurvey':
                 # This assumes that name = survey__zbin
                 survey = name.split('__')[0]
-                A0 = pars[self.input_params_prefix + survey + '_A_IA']
-                eta = pars[self.input_params_prefix + survey + '_eta_IA']
+                A0 = pars[self.input_params_prefix + '_' + survey + '_A_IA']
+                eta = pars[self.input_params_prefix + '_' + survey + '_eta_IA']
                 A_IA = A0 * ((1+z)/1.62)**eta
             else:
                 raise LoggedError(self.log, "Unknown IA model %s" %
