@@ -132,17 +132,20 @@ class ClLike(Likelihood):
             import baccoemu_beta as baccoemu
             self.lbias = baccoemu.Lbias_expansion()
 
-            # set k values (TODO: could also keep k=None)
-            self.k_s = np.logspace(self.l10k_min_pks,
-                              self.l10k_max_pks,
-                              self.nk_pks)
-
+            # set k values (TODO: could also keep k=None) # tuks l10k_max is too big
+            #self.k_s = np.logspace(self.l10k_min_pks,
+            #                        self.l10k_max_pks,
+            #                        self.nk_pks)
+            # set k values in units of h/Mpc; smoothing scale is 0.75 h/Mpc so between 0.45 and 0.675 for h = 0.6 and 0.9
+            self.k_s = np.logspace(-3, np.log10(0.45), 1000)
+            
             # redshifts for creating the Pk-2d object
-            z = np.array([3.0, 2.0, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0])
+            #z = np.array([3.0, 2.0, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0]) # TODO: goes to z = 1.5;ask about Pk_mm and lpt and nn
+            z = np.array([1.5, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0]) # TODO: goes to z = 1.5 what do we do beyond this redshift tuks
             self.a_s = 1./(1. + z)
             
             # labels of the bias parameters
-            self.bias_labels = ['b1', 'b2', 'bs', 'bn']
+            self.bias_labels = ['b0', 'b1', 'b2', 'bs', 'bn']
 
             # create a dictionary for the emulator outputs, following the bacco outputs
             self.bacco_dict = {}
@@ -184,7 +187,8 @@ class ClLike(Likelihood):
         self.bin_properties = {}
         # We use a default cosmology to map k_max into ell_max
         cosmo_lcdm = ccl.CosmologyVanillaLCDM()
-        kmax_default = self.defaults.get('kmax', 0.1)
+        # We give it a generous default value
+        kmax_default = self.defaults.get('kmax', 1.0)
         for b in self.bins:
             if b['name'] not in s.tracers:
                 raise LoggedError(self.log, "Unknown tracer %s" % b['name'])
@@ -204,6 +208,7 @@ class ClLike(Likelihood):
                 self.defaults[b['name']] = {}
                 self.defaults[b['name']]['lmin'] = self.defaults['lmin']
 
+                
             # Give galaxy clustering an ell_max
             if t.quantity == 'galaxy_density':
                 # Get lmax from kmax for galaxy clustering
@@ -213,12 +218,14 @@ class ClLike(Likelihood):
                     kmax = kmax_default
                 lmax = get_lmax_from_kmax(cosmo_lcdm,
                                           kmax, zmid)
-                self.defaults[b['name']]['lmax'] = lmax
+                #self.defaults[b['name']]['lmax'] = lmax
+                # If lmax cut is available for the tracer, take that instead (but only if it is more conservative)
+                self.defaults[b['name']]['lmax'] = np.min([lmax, self.defaults[b['name']].get('lmax', 1E30)])
             else:
                 # Make sure everything else has an ell_max
                 if 'lmax' not in self.defaults[b['name']]:
                     self.defaults[b['name']]['lmax'] = self.defaults['lmax']
-
+                
         # 2. Iterate through two-point functions and apply scale cuts
         indices = []
         for cl in self.twopoints:
@@ -230,10 +237,16 @@ class ClLike(Likelihood):
             # Get the suffix for both tracers
             cl_name1 = get_suffix_for_tr(s.tracers[tn1])
             cl_name2 = get_suffix_for_tr(s.tracers[tn2])
-            ind = s.indices('cl_%s%s' % (cl_name1, cl_name2), (tn1, tn2),
-                            ell__gt=lmin, ell__lt=lmax)
+            # TODO: temporary solution cause sacc doesn't like cl_e0
+            if cl_name1 == 'e' and cl_name2 == '0': # get rid of cl_e0 case
+                ind = s.indices('cl_%s%s' % (cl_name2, cl_name1), (tn1, tn2),
+                                ell__gt=lmin, ell__lt=lmax)
+            else:
+                ind = s.indices('cl_%s%s' % (cl_name1, cl_name2), (tn1, tn2),
+                                ell__gt=lmin, ell__lt=lmax)
             indices += list(ind)
         s.keep_indices(np.array(indices))
+
 
         # 3. Iterate through two-point functions, collect information about
         # them (tracer names, bandpower windows etc.), and put all C_ells in
@@ -249,11 +262,19 @@ class ClLike(Likelihood):
             tn1, tn2 = cl['bins']
             cl_name1 = get_suffix_for_tr(s.tracers[tn1])
             cl_name2 = get_suffix_for_tr(s.tracers[tn2])
-            l, c_ell, cov, ind = s.get_ell_cl('cl_%s%s' % (cl_name1, cl_name2),
-                                              tn1,
-                                              tn2,
-                                              return_cov=True,
-                                              return_ind=True)
+            # TODO: temporary solution cause sacc doesn't like cl_e0
+            if cl_name1 == 'e' and cl_name2 == '0': # get rid of cl_e0 case
+                l, c_ell, cov, ind = s.get_ell_cl('cl_%s%s' % (cl_name2, cl_name1),
+                                                  tn1,
+                                                  tn2,
+                                                  return_cov=True,
+                                                  return_ind=True)
+            else:
+                l, c_ell, cov, ind = s.get_ell_cl('cl_%s%s' % (cl_name1, cl_name2),
+                                                  tn1,
+                                                  tn2,
+                                                  return_cov=True,
+                                                  return_ind=True)
             if c_ell.size > 0:
                 if tn1 not in self.tracer_qs:
                     self.tracer_qs[tn1] = s.tracers[tn1].quantity
@@ -340,8 +361,8 @@ class ClLike(Likelihood):
         zmean = self.bin_properties[name]['zmean_fid']
         bz = np.ones_like(z)
         if self.bias_model == 'Linear':
-            b0 = pars[self.input_params_prefix + '_' + name + '_b1']
-            bp = pars.get(self.input_params_prefix + '_' + name + '_b1p', 0.)
+            b0 = pars[self.input_params_prefix + '_' + name + '_b0']
+            bp = pars.get(self.input_params_prefix + '_' + name + '_b0p', 0.)
             bz = b0 + bp * (z - zmean)
         elif self.bias_model == 'BACCO':
             pass
@@ -396,10 +417,10 @@ class ClLike(Likelihood):
                 if self.bias_model == 'HaloModel':
                     hod_pars = {k: pars[prefix + '_' + k]
                                 for k in ['lMmin_0', 'lM1_0']}
-                    if self.M0_track:
-                        hod_pars['lM0_0'] = hod_pars['lMmin_0']
-                    else:
-                        hod_pars['lM0_0'] = pars[prefix + '_lM0_0']
+                    #if self.M0_track:
+                    #    hod_pars['lM0_0'] = hod_pars['lMmin_0']
+                    #else:
+                    hod_pars['lM0_0'] = pars[prefix + '_lM0_0']
                     slM = pars.get(prefix + '_siglM_0', None)
                     if slM is None:
                         slM = pars[self.input_params_prefix + '_siglM_0']
@@ -409,7 +430,7 @@ class ClLike(Likelihood):
                 if self.bias_model == 'BACCO':
                     bias = {}
                     for b in self.bias_labels:
-                        bisd[b] = pars.get(self.input_params_prefix + '_' + name + '_' + b, 0.)
+                        bias[b] = pars.get(self.input_params_prefix + '_' + name + '_' + b, 0.)
                     bias['b0'] = 1. # TODO: can also just feed it as a fixed parameter in the yaml
             elif q == 'galaxy_shear':
                 nz = self._get_nz(cosmo, name, **pars)
@@ -451,13 +472,14 @@ class ClLike(Likelihood):
         return trs
 
     def _cosmo_to_bacco(self, cosmo):
+        # TODO: add neutrinos to omega_matter
         pars = {
-            'omega_matter' : cosmo['Omega_b']+cosmo['Omega_c'],
+            'omega_matter' : cosmo['Omega_b']+cosmo['Omega_c'], # correct
             'omega_baryon' : cosmo['Omega_b'],
             'hubble' : cosmo['H0']/100.,
             'ns' : cosmo['n_s'],
-            'sigma8' : cosmo['sigma8'], # TODO: might be a problem and nu mass
-            'neutrino_mass' : cosmo['m_nu'],
+            'sigma8' : ccl.sigma8(cosmo), # tuks should be just CDM + baryons
+            'neutrino_mass' : np.sum(cosmo['m_nu']), # tuks summing the masses of the neutrino species (should probs be selecting the single neutrino species in pyccl)
             'w0' : cosmo['w0'],
             'wa' : cosmo['wa'],
             'expfactor' : 1.  # random scale factor just to initialize
@@ -508,32 +530,32 @@ class ClLike(Likelihood):
             hmc = ccl.halos.HMCalculator(cosmo, mf, hb, self.massdef)
             return {'hmc': hmc, 'pk_mm': pkmm}
         elif self.bias_model == 'BACCO':
-            pk2d_bacco = self._compute_bacco(cosmo)
-            return {'pk2d_bacco': pk2d_bacco}
+            pk2d_bacco, pkmm = self._compute_bacco(cosmo)
+            return {'pk2d_bacco': pk2d_bacco, 'pk_mm': pkmm}
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
 
     def _compute_bacco(self, cosmo):
-
+        
         # translate the pyccl cosmology parameters into bacco notation
         pars = self._cosmo_to_bacco(cosmo)
-        
+
         # convert k_s [Mpc^-1] into h Mpc^-1 units just for the calculation
         k = self.k_s/pars['hubble']
         
-        # 10 redshifts, 15 combinations between bias params, and the ks
-        num_comb = int(len(self.bias_labels)*(len(self.bias_labels)-1)/2 + len(self.bias_labels))
+        # 10 redshifts, 15 combinations between bias params, and the ks (added b0)
+        num_comb = int((len(self.bias_labels))*(len(self.bias_labels)-1)/2 + len(self.bias_labels))
         pk2d_bacco = np.zeros((len(self.a_s), num_comb, len(self.k_s)))
 
         # compute the power for each redshift
-        t1 = time.time()
+        #t1 = time.time()
         for i in range(len(self.a_s)):
             pars['expfactor'] = self.a_s[i]
             # call the emulator of the nonlinear 15 lagrangian bias expansion terms, shape is (15, len(k))
-            k, pnn = lbias.get_nonlinear_pnn(pars, k=k)
-            pk2d_bacco[i] = pnn
-        print("time = ", time.time()-t1)
+            k, pnn = self.lbias.get_nonlinear_pnn(pars, k=k)
+            pk2d_bacco[i, :, :] = pnn
+        #print("time = ", time.time()-t1)
 
         # convert the spit out result from (Mpc/h)^3 to Mpc^3 (bacco uses h units, but pyccl doesn't)
         pk2d_bacco /= pars['hubble']**3
@@ -549,17 +571,17 @@ class ClLike(Likelihood):
 
         # TODO: is this the best way to handle the matter-matter power spectrum? Or:
         #cosmo.compute_linear_power()
-        #cosmo.compute_nonlin_power()
+        cosmo.compute_nonlin_power()
         #cosmo.compute_sigma()
-        #pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-
-        return pk2d_bacco
+        pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        
+        return pk2d_bacco, pkmm
         
     def _get_pkxy(self, cosmo, clm, pkd, trs, **pars):
         """ Get the P(k) between two tracers. """
         q1 = self.tracer_qs[clm['bin_1']]
         q2 = self.tracer_qs[clm['bin_2']]
-
+        
         if (self.bias_model == 'Linear') or (self.bias_model == 'BzNone'):
             if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
                 return pkd['pk_mm']  # galaxy-galaxy
@@ -599,7 +621,7 @@ class ClLike(Likelihood):
                 prof2pt = self.p2pt_HOD
             else:
                 r = pars.get(self.input_params_prefix + '_rho' + comb, 0.)
-                prof2pt = ccl.halos.Profile2pt(r_corr=r)
+                prof2pt = ccl.halos.Profile2pt()#r_corr=r)
 
             if self.HM_correction == "HMCode":
                 alpha = pars.get(self.input_params_prefix +
@@ -617,9 +639,9 @@ class ClLike(Likelihood):
                                                    self.a_s_pks, p1,
                                                    prof_2pt=prof2pt, prof2=p2,
                                                    normprof1=norm1,
-                                                   normprof2=norm2,
-                                                   smooth_transition=fsmooth,
-                                                   supress_1h=fsuppress)
+                                                   normprof2=norm2)
+            #smooth_transition=fsmooth,
+            #supress_1h=fsuppress)
             if self.HM_correction == 'halofit':
                 A = pars.get(self.input_params_prefix +
                              '_Ahmc' + comb, None)
@@ -635,13 +657,13 @@ class ClLike(Likelihood):
             return pk
         elif self.bias_model == 'BACCO':
             if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')): # TODO: is this fine?
-                #return pkd['pk_mm']  # matter-matter
-                return pkd['pk2d_bacco'][:, 0, :]  # matter-matter from bacco emulator
+                return pkd['pk_mm']  # matter-matter
+                #return pkd['pk2d_bacco'][:, 0, :]  # matter-matter from bacco emulator # tuks apparently this is not total matter but just CDM + baryons
             else:
                 # bias is a dictionary holding the value for each bias parameter or None if not galaxy tracer
                 bias_eft1 = trs[clm['bin_1']]['bias']
                 bias_eft2 = trs[clm['bin_2']]['bias']
-                pk2d = _get_pk_2d_bacco(self, pkd['pk2d_bacco'], bias_eft1, bias_eft2, q1, q2)
+                pk2d = self._get_pk_2d_bacco(pkd['pk2d_bacco'], bias_eft1, bias_eft2, q1, q2)
                 return pk2d
         
         else:
@@ -802,4 +824,5 @@ class ClLike(Likelihood):
         t = self._get_theory(**pars)
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r))
+        #print("chi2 = ", chi2)
         return -0.5*chi2
