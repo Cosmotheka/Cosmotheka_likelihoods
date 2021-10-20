@@ -382,6 +382,12 @@ class ClLike(Likelihood):
                 A0 = pars[self.input_params_prefix + '_A_IA']
                 eta = pars[self.input_params_prefix + '_eta_IA']
                 A_IA = A0 * ((1+z)/1.62)**eta
+            elif self.ia_model == 'IADESY1_PerSurvey': # TODO: make pretty
+                # This assumes that name = survey__zbin
+                survey = name.split('__')[0]
+                A0 = pars[self.input_params_prefix + '_' + survey + '_A_IA']
+                eta = pars[self.input_params_prefix + '_' + survey + '_eta_IA']
+                A_IA = A0 * ((1+z)/1.62)**eta
             else:
                 raise LoggedError(self.log, "Unknown IA model %s" %
                                   self.ia_model)
@@ -581,6 +587,17 @@ class ClLike(Likelihood):
         """ Get the P(k) between two tracers. """
         q1 = self.tracer_qs[clm['bin_1']]
         q2 = self.tracer_qs[clm['bin_2']]
+
+        # TESTING tuks
+        pk2d = pkd['pk_mm']
+        # kopele is for testing
+        #k_s = np.logspace(-3, np.log10(0.45), 1000)
+        #kopele1 = pk2d.eval(k_s, 1., cosmo)
+        ccl.bcm_correct_pk2d(cosmo, pk2d)
+        #kopele2 = pk2d.eval(k_s, 1., cosmo)
+        #print("fractional difference = ", (kopele1-kopele2)/kopele1) # on the order of 2% for smallest scales and tiny for larger scales
+        pkd['pk_mm'] = pk2d
+        
         
         if (self.bias_model == 'Linear') or (self.bias_model == 'BzNone'):
             if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
