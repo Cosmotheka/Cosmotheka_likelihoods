@@ -50,11 +50,11 @@ class CCL(Theory):
     matter_pk: str = 'halofit'
     baryons_pk: str = 'nobaryons'
     # Params it can accept
-    params = {'Omega_c': None,
+    params = {'Omega_m': None, # B.H. used to be Omega_c
               'Omega_b': None,
               'h': None,
               'n_s': None,
-              'A_sE9': None,
+              'sigma8': None, #  B.H. used to be A_sE9
               'm_nu': None}
 
     def initialize(self):
@@ -81,18 +81,19 @@ class CCL(Theory):
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
         return ['sigma8']
-
+    
     def get_can_support_params(self):
         # return any nuisance parameters that CCL can support
         return []
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
-        cosmo = ccl.Cosmology(Omega_c=self.provider.get_param('Omega_c'),
+        Omega_c = self.provider.get_param('Omega_m')-self.provider.get_param('Omega_b') # B.H. new line
+        cosmo = ccl.Cosmology(Omega_c=Omega_c, # B.H. used to be self.provider.get_param('Omega_c'),
                               Omega_b=self.provider.get_param('Omega_b'),
                               h=self.provider.get_param('h'),
                               n_s=self.provider.get_param('n_s'),
-                              A_s=self.provider.get_param('A_sE9')*1E-9,
+                              sigma8=self.provider.get_param('sigma8'), # B.H. used to be A_s=self.provider.get_param('A_sE9')*1E-9,
                               T_CMB=2.7255,
                               m_nu=self.provider.get_param('m_nu'),
                               transfer_function=self.transfer_function,
@@ -101,7 +102,7 @@ class CCL(Theory):
 
         state['CCL'] = {'cosmo': cosmo}
         # Compute sigma8 (we should actually only do this if required -- TODO)
-        state['derived'] = {'sigma8': ccl.sigma8(cosmo)}
+        state['derived'] = {'sigma_8': ccl.sigma8(cosmo)} # B.H. used to be sigma8
         for req_res, method in self._required_results.items():
             state['CCL'][req_res] = method(cosmo)
 
