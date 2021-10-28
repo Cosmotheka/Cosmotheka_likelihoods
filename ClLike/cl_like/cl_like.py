@@ -1,4 +1,5 @@
 import time
+import os
 
 import numpy as np
 from scipy.interpolate import interp1d
@@ -27,6 +28,8 @@ class ClLike(Likelihood):
     nz_model: str = "NzNone"
     # b(z) model name
     bias_model: str = "BzNone"
+    # Baryon model
+    baryon_model: str = "BNone"
     # Shape systamatics
     shape_model: str = "ShapeNone"
     # Mass function name
@@ -137,7 +140,7 @@ class ClLike(Likelihood):
             #                        self.l10k_max_pks,
             #                        self.nk_pks)
             # set k values in units of h/Mpc; smoothing scale is 0.75 h/Mpc so between 0.45 and 0.675 for h = 0.6 and 0.9
-            self.k_s = np.logspace(-3, np.log10(0.45), 1000)
+            self.k_s = np.logspace(-2, np.log10(0.45), 1000)
             
             # redshifts for creating the Pk-2d object
             #z = np.array([3.0, 2.0, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0]) # TODO: goes to z = 1.5;ask about Pk_mm and lpt and nn
@@ -562,7 +565,7 @@ class ClLike(Likelihood):
             k, pnn = self.lbias.get_nonlinear_pnn(pars, k=k)
             pk2d_bacco[i, :, :] = pnn
         #print("time = ", time.time()-t1)
-
+        
         # convert the spit out result from (Mpc/h)^3 to Mpc^3 (bacco uses h units, but pyccl doesn't)
         pk2d_bacco /= pars['hubble']**3
     
@@ -580,24 +583,19 @@ class ClLike(Likelihood):
         cosmo.compute_nonlin_power()
         #cosmo.compute_sigma()
         pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+
+        #pkmm_ccl = pkmm.eval(self.k_s, self.a_s[0], cosmo) # Mpc
+        #pkmm_bacco = pk2d_bacco[0, 0, :] # Mpc
+        #np.save("pkmm_ccl.npy", pkmm_ccl) # Mpc
+        #np.save("pkmm_bacco.npy", pkmm_bacco) # Mpc
+        #np.save("k_s.npy", self.k_s) # Mpc
         
         return pk2d_bacco, pkmm
         
     def _get_pkxy(self, cosmo, clm, pkd, trs, **pars):
         """ Get the P(k) between two tracers. """
         q1 = self.tracer_qs[clm['bin_1']]
-        q2 = self.tracer_qs[clm['bin_2']]
-
-        # TESTING tuks
-        pk2d = pkd['pk_mm']
-        # kopele is for testing
-        #k_s = np.logspace(-3, np.log10(0.45), 1000)
-        #kopele1 = pk2d.eval(k_s, 1., cosmo)
-        ccl.bcm_correct_pk2d(cosmo, pk2d)
-        #kopele2 = pk2d.eval(k_s, 1., cosmo)
-        #print("fractional difference = ", (kopele1-kopele2)/kopele1) # on the order of 2% for smallest scales and tiny for larger scales
-        pkd['pk_mm'] = pk2d
-        
+        q2 = self.tracer_qs[clm['bin_2']]        
         
         if (self.bias_model == 'Linear') or (self.bias_model == 'BzNone'):
             if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
@@ -738,6 +736,17 @@ class ClLike(Likelihood):
         # Gather all tracers
         trs = self._get_tracers(cosmo, **pars)
 
+        # TESTING tuks
+        if self.baryon_model == 'BCM':
+            pk2d = pk['pk_mm']
+            # kopele is for testing
+            #k_s = np.logspace(-3, np.log10(0.45), 1000)
+            #kopele1 = pk2d.eval(k_s, 1., cosmo)
+            ccl.bcm_correct_pk2d(cosmo, pk2d)
+            #kopele2 = pk2d.eval(k_s, 1., cosmo)
+            #print("fractional difference = ", (kopele1-kopele2)/kopele1) # on the order of 2% for smallest scales and tiny for larger scales
+            pk['pk_mm'] = pk2d
+        
         # Correlate all needed pairs of tracers
         cls = []
         for clm in self.cl_meta:
@@ -823,23 +832,34 @@ class ClLike(Likelihood):
 
         # Flattening into a 1D array
         cl_out = np.zeros(self.ndata)
+        ell = np.zeros(self.ndata)
+        bins = []
         for clm, cl in zip(self.cl_meta, cls):
             cl_out[clm['inds']] = cl
-
-        return cl_out
+            # B.H. saving file
+            #ell[clm['inds']] = clm['l_eff'] #
+            #bins.append(f"{clm['bin_1']:s}_!_{clm['bin_2']:s}") #
+        #return ell, cl_out, bins #
+        return cl_out # og
+        
 
     def get_requirements(self):
         # By selecting `self._get_pk_data` as a `method` of CCL here,
         # we make sure that this function is only run when the
         # cosmological parameters vary.
         return {'CCL': {'methods': {'pk_data': self._get_pk_data}}}
-
+        
     def logp(self, **pars):
         """
         Simple Gaussian likelihood.
         """
-        t = self._get_theory(**pars)
+        t = self._get_theory(**pars) # og
+        # B.H. saving file
+        #ell, t, bins = self._get_theory(**pars) #
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r))
-        #print("chi2 = ", chi2)
+        # B.H. saving file
+        #np.savez_compressed(os.path.join('/users/boryanah/repos/xCell-likelihoods/analysis/data/', f'cl_cross_corr_{self.bias_model:s}.npz'), chi2=chi2, chi2_dof=chi2/self.ndata, cls=t, ells=ell, tracers=bins) # 
         return -0.5*chi2
+
+    

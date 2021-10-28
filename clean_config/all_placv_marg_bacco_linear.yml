@@ -1,0 +1,933 @@
+debug: True
+likelihood:
+#  planck_2018_lowl.TT: null
+#  planck_2018_lowl.EE: null
+#  planck_2018_highl_plik.TTTEEE: null
+#  planck_2018_lensing.clik: null
+#  bao_like.bao_like.sdss_MGS_FS: null # working 
+#  bao_like.bao_like.sdss_DR12_LRG_baoFS: null # working 
+#  bao_like.bao_like.sdss_DR16_LRG_baoFS: null # working 
+#  bao_like.bao_like.sdss_DR16_ELG_bao: null # working 
+#  bao_like.bao_like.sdss_DR16_QSO_baoFS: null # working 
+
+  cl_like.ClLike:
+    HM_correction: halofit
+    bins:
+    - name: DESgc__0
+    - name: DESgc__1
+    - name: DESgc__2
+    - name: DESgc__3
+    - name: DESgc__4
+    - name: DESwl__0
+    - name: DESwl__1
+    - name: DESwl__2
+    - name: DESwl__3
+    - name: eBOSS__0
+    - name: eBOSS__1
+    - name: DECALS__0
+    - name: DECALS__1
+    - name: DECALS__2
+    - name: DECALS__3
+    - name: KiDS1000__0
+    - name: KiDS1000__1
+    - name: KiDS1000__2
+    - name: KiDS1000__3
+    - name: KiDS1000__4
+    - name: PLAcv
+
+#    bias_model: BACCO
+    bias_model: Linear
+    baryon_model: BCM
+    defaults:
+      kmax: 0.2 # applies only to galaxies
+      lmax: 2000 # applies only to shear
+      lmin: 30 # applies only to shear
+    hb_name: Tinker10
+    ia_model: IADESY1_PerSurvey
+    cm_name: Duffy08M500c
+    input_file: /users/boryanah/repos/GrandConjuration/data/cls_FD_covG_mMarg.fits # marginalized
+    input_params_prefix: xcell
+    mf_name: Tinker08
+    nside: 1024
+    nz_model: NzShiftWidth
+    shape_model: ShapeNone
+    twopoints:
+    # DESgc - DESgc
+    - bins:
+      - DESgc__0
+      - DESgc__0
+    - bins:
+      - DESgc__1
+      - DESgc__1
+    - bins:
+      - DESgc__2
+      - DESgc__2
+    - bins:
+      - DESgc__3
+      - DESgc__3
+    - bins:
+      - DESgc__4
+      - DESgc__4
+
+    # DESgc - DESwl
+    - bins:
+      - DESgc__0
+      - DESwl__0
+    - bins:
+      - DESgc__0
+      - DESwl__1
+    - bins:
+      - DESgc__0
+      - DESwl__2
+    - bins:
+      - DESgc__0
+      - DESwl__3
+    - bins:
+      - DESgc__1
+      - DESwl__0
+    - bins:
+      - DESgc__1
+      - DESwl__1
+    - bins:
+      - DESgc__1
+      - DESwl__2
+    - bins:
+      - DESgc__1
+      - DESwl__3
+    - bins:
+      - DESgc__2
+      - DESwl__0
+    - bins:
+      - DESgc__2
+      - DESwl__1
+    - bins:
+      - DESgc__2
+      - DESwl__2
+    - bins:
+      - DESgc__2
+      - DESwl__3
+    - bins:
+      - DESgc__3
+      - DESwl__0
+    - bins:
+      - DESgc__3
+      - DESwl__1
+    - bins:
+      - DESgc__3
+      - DESwl__2
+    - bins:
+      - DESgc__3
+      - DESwl__3
+    - bins:
+      - DESgc__4
+      - DESwl__0
+    - bins:
+      - DESgc__4
+      - DESwl__1
+    - bins:
+      - DESgc__4
+      - DESwl__2
+    - bins:
+      - DESgc__4
+      - DESwl__3
+
+    # DESwl - DESwl
+    - bins:
+      - DESwl__0
+      - DESwl__0
+    - bins:
+      - DESwl__0
+      - DESwl__1
+    - bins:
+      - DESwl__0
+      - DESwl__2
+    - bins:
+      - DESwl__0
+      - DESwl__3
+    - bins:
+      - DESwl__1
+      - DESwl__1
+    - bins:
+      - DESwl__1
+      - DESwl__2
+    - bins:
+      - DESwl__1
+      - DESwl__3
+    - bins:
+      - DESwl__2
+      - DESwl__2
+    - bins:
+      - DESwl__2
+      - DESwl__3
+    - bins:
+      - DESwl__3
+      - DESwl__3
+
+    # DESgc - CMB
+    - bins:
+      - DESgc__0
+      - PLAcv
+    - bins:
+      - DESgc__1
+      - PLAcv
+    - bins:
+      - DESgc__2
+      - PLAcv
+    - bins:
+      - DESgc__3
+      - PLAcv
+    - bins:
+      - DESgc__4
+      - PLAcv
+
+    # DESwl - CMB
+    - bins:
+      - DESwl__0
+      - PLAcv
+    - bins:
+      - DESwl__1
+      - PLAcv
+    - bins:
+      - DESwl__2
+      - PLAcv
+    - bins:
+      - DESwl__3
+      - PLAcv
+
+    # Missing DES - KIDS because no overlap
+
+    # eBOSS - eBOSS
+    # kmin = 0.02, kmax = 0.15; l \sim chi(z_mean) * k; z_mean = 1.2, 1.8
+    - bins:
+      - eBOSS__0
+      - eBOSS__0
+    - bins:
+      - eBOSS__1
+      - eBOSS__1
+
+    # eBOSS - CMB
+    - bins:
+      - eBOSS__0
+      - PLAcv
+    - bins:
+      - eBOSS__1
+      - PLAcv
+
+    # DECALS - DECALS
+    - bins:
+      - DECALS__0
+      - DECALS__0
+    - bins:
+      - DECALS__1
+      - DECALS__1
+    - bins:
+      - DECALS__2
+      - DECALS__2
+    - bins:
+      - DECALS__3
+      - DECALS__3
+
+    # DECALS - CMB
+    - bins:
+      - DECALS__0
+      - PLAcv
+    - bins:
+      - DECALS__1
+      - PLAcv
+    - bins:
+      - DECALS__2
+      - PLAcv
+    - bins:
+      - DECALS__3
+      - PLAcv
+
+    # DECALS - KiDS
+    - bins:
+      - DECALS__0
+      - KiDS1000__0
+    - bins:
+      - DECALS__0
+      - KiDS1000__1
+    - bins:
+      - DECALS__0
+      - KiDS1000__2
+    - bins:
+      - DECALS__0
+      - KiDS1000__3
+    - bins:
+      - DECALS__0
+      - KiDS1000__4
+    - bins:
+      - DECALS__1
+      - KiDS1000__1
+    - bins:
+      - DECALS__1
+      - KiDS1000__2
+    - bins:
+      - DECALS__1
+      - KiDS1000__3
+    - bins:
+      - DECALS__1
+      - KiDS1000__4
+    - bins:
+      - DECALS__2
+      - KiDS1000__2
+    - bins:
+      - DECALS__2
+      - KiDS1000__3
+    - bins:
+      - DECALS__2
+      - KiDS1000__4
+    - bins:
+      - DECALS__3
+      - KiDS1000__3
+    - bins:
+      - DECALS__3
+      - KiDS1000__4
+
+    # KiDS - KiDS
+    - bins:
+      - KiDS1000__0
+      - KiDS1000__0
+    - bins:
+      - KiDS1000__0
+      - KiDS1000__1
+    - bins:
+      - KiDS1000__0
+      - KiDS1000__2
+    - bins:
+      - KiDS1000__0
+      - KiDS1000__3
+    - bins:
+      - KiDS1000__0
+      - KiDS1000__4
+    - bins:
+      - KiDS1000__1
+      - KiDS1000__1
+    - bins:
+      - KiDS1000__1
+      - KiDS1000__2
+    - bins:
+      - KiDS1000__1
+      - KiDS1000__3
+    - bins:
+      - KiDS1000__1
+      - KiDS1000__4
+    - bins:
+      - KiDS1000__2
+      - KiDS1000__2
+    - bins:
+      - KiDS1000__2
+      - KiDS1000__3
+    - bins:
+      - KiDS1000__2
+      - KiDS1000__4
+    - bins:
+      - KiDS1000__3
+      - KiDS1000__3
+    - bins:
+      - KiDS1000__3
+      - KiDS1000__4
+    - bins:
+      - KiDS1000__4
+      - KiDS1000__4
+      
+    # KiDS - CMB
+    - bins:
+      - KiDS1000__0
+      - PLAcv
+    - bins:
+      - KiDS1000__1
+      - PLAcv
+    - bins:
+      - KiDS1000__2
+      - PLAcv
+    - bins:
+      - KiDS1000__3
+      - PLAcv
+    - bins:
+      - KiDS1000__4
+      - PLAcv
+
+output: chains/all_placv_marg_bacco_linear
+
+params:
+  Omega_b:
+    prior:
+      min: 0.04
+      max: 0.06
+    ref:
+      dist: norm
+      loc: 0.049
+      scale: 0.0001
+    proposal: 0.0001
+    latex: \Omega_\mathrm{b}
+    
+  Omega_m:
+    prior:
+      min: 0.23
+      max: 0.40
+    ref:
+      dist: norm
+      loc: 0.3
+      scale: 0.001
+    proposal: 0.0005
+    latex: \Omega_\mathrm{m}
+
+  h:
+    prior:
+      min: 0.6
+      max: 0.8
+    ref:
+      dist: norm
+      loc: 0.7
+      scale: 0.001
+    proposal: 0.001
+    latex: h
+  H0:
+    value: 'lambda h: h*100.'
+    latex: H_0
+
+  n_s:
+    prior:
+      min: 0.92
+      max: 1.01
+    ref:
+      dist: norm
+      loc: 0.965
+      scale: 0.004
+    proposal: 0.002
+    latex: n_\mathrm{s}
+
+#  A_sE9:
+#    prior:
+#      min: 1.5 #1.
+#      max: 2.5 #4.
+#    ref:
+#      dist: norm
+#      loc: 2.1
+#      scale: 0.001
+#    proposal: 0.001
+#    latex: 10^{-9} A_\mathrm{s}
+
+  sigma8:
+    prior:
+      min: 0.73
+      max: 0.90
+    ref:
+      dist: norm
+      loc: 0.80
+      scale: 0.004
+    proposal: 0.002
+    latex: \sigma_8
+
+  m_nu: 0.0 # TODO: should have neutrinos
+#    prior:
+#      min: 0.05
+#      max: 0.08
+#    ref:
+#      dist: norm
+#      loc: 0.06
+#      scale: 0.0001
+#    proposal: 0.0001
+#    latex: m_\nu
+
+  Omega_c:
+    derived: 'lambda Omega_m, Omega_b: Omega_m-Omega_b'
+#    value: 'lambda Omega_m, Omega_b: Omega_m-Omega_b'
+    latex: \Omega_c
+#  sigma8:
+#    latex: \sigma_8
+  S8:
+    derived: 'lambda sigma8, Omega_m: sigma8*(Omega_m/0.3)**(0.5)'
+    latex: S_8
+
+
+# to make faster!
+#  mnu: 0.06
+  mnu: 0.0
+
+#  omega_de:
+#    latex: \Omega_\Lambda
+
+  YHe:
+    latex: Y_\mathrm{P}
+
+  Y_p:
+    latex: Y_P^\mathrm{BBN}
+    
+  DHBBN:
+    derived: 'lambda DH: 10**5*DH'
+    latex: 10^5 \mathrm{D}/\mathrm{H}
+
+#  tau:
+#    prior:
+#      min: 0.01
+#      max: 0.8
+#    ref:
+#      dist: norm
+#      loc: 0.055
+#      scale: 0.006
+#    proposal: 0.003
+#    latex: \tau_\mathrm{reio}
+  tau: 0.08 # because not running CMB!!!
+
+  zrei:
+    latex: z_\mathrm{re}
+    
+#  sigma8:
+#    latex: \sigma_8
+    
+#  s8h5:
+#    derived: 'lambda sigma8, H0: sigma8*(H0*1e-2)**(-0.5)'
+#    latex: \sigma_8/h^{0.5}
+    
+  s8omegamp5:
+    derived: 'lambda sigma8, omegam: sigma8*omegam**0.5'
+    latex: \sigma_8 \Omega_\mathrm{m}^{0.5}
+    
+  s8omegamp25:
+    derived: 'lambda sigma8, omegam: sigma8*omegam**0.25'
+    latex: \sigma_8 \Omega_\mathrm{m}^{0.25}
+    
+#  A:
+#    derived: 'lambda As: 1e9*As'
+#    latex: 10^9 A_\mathrm{s}
+    
+#  clamp:
+#    derived: 'lambda As, tau: 1e9*As*np.exp(-2*tau)'
+#    latex: 10^9 A_\mathrm{s} e^{-2\tau}
+    
+#  age:
+#    latex: '{\rm{Age}}/\mathrm{Gyr}'
+    
+#  rdrag:
+#    latex: r_\mathrm{drag}
+
+
+# for xcell
+#  S8:
+#    derived: 'lambda sigma8, Omega_m: sigma8*(Omega_m/0.3)**(0.5)'
+#    latex: S_8
+
+# this is needed perhaps when running BACCO
+#  Omega_b:
+#    value: 'lambda omegab: omegab'
+
+#  Omega_c:
+#    value: 'lambda omegac: omegac'
+    
+#  Omega_b:
+#    value: 'lambda ombh2, H0: ombh2/(H0*1e-2)**2'
+#    latex: \Omega_b
+  
+#  Omega_c:
+#    value: 'lambda omch2, H0: omch2/(H0*1e-2)**2'
+#    latex: \Omega_c
+
+#  h:
+#    value: 'lambda H0: H0*1e-2'
+#    ylatex: h
+
+#  A_s:
+#    derived: 'lambda logA: 1e-10*np.exp(logA)'
+#    latex: A_s
+
+#  A_sE9:
+#    value: 'lambda logA: 1e-1*np.exp(logA)'
+
+#  n_s:
+#    value: 'lambda ns: ns'
+#    latex: n_s
+
+  m_nu:
+    value: 'lambda mnu: mnu'
+    latex: m_\nu
+
+  xcell_DESgc__0_b0:
+    prior:
+      min: 0.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.41
+      scale: 0.1
+    proposal: 0.13
+    
+  xcell_DESgc__1_b0:
+    prior:
+      min: 0.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.6
+      scale: 0.1
+    proposal: 0.12
+   
+  xcell_DESgc__2_b0:
+    prior:
+      min: 0.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.6
+      scale: 0.1
+    proposal: 0.11
+    
+  xcell_DESgc__3_b0:
+    prior:
+      min: 0.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.91
+      scale: 0.1
+    proposal: 0.14
+    
+  xcell_DESgc__4_b0:
+    prior:
+      min: 0.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.96
+      scale: 0.1
+    proposal: 0.14
+    
+  # marginalized multiplicative bias for DESwl!!!
+  
+  xcell_DESgc__0_dz:
+    prior:
+      dist: norm
+      loc: 0.000
+      scale: 0.007
+    ref:
+      dist: norm
+      loc: 0.000
+      scale: 0.0007
+    proposal: 0.005
+    
+  xcell_DESgc__1_dz:
+    prior:
+      dist: norm
+      loc: 0.000
+      scale: 0.007
+    ref:
+      dist: norm
+      loc: 0.000
+      scale: 0.0007
+    proposal: 0.005
+    
+  xcell_DESgc__2_dz:
+    prior:
+      dist: norm
+      loc: 0.000
+      scale: 0.006
+    ref:
+      dist: norm
+      loc: 0.000
+      scale: 0.0006
+    proposal: 0.005
+    
+  xcell_DESgc__3_dz:
+    prior:
+      dist: norm
+      loc: 0.000
+      scale: 0.01
+    ref:
+      dist: norm
+      loc: 0.000
+      scale: 0.001
+    proposal: 0.005
+    
+  xcell_DESgc__4_dz:
+    prior:
+      dist: norm
+      loc: 0.000
+      scale: 0.01
+    ref:
+      dist: norm
+      loc: 0.000
+      scale: 0.001
+    proposal: 0.005
+
+  xcell_DESwl__0_dz:
+    prior:
+      dist: norm
+      loc: -0.001
+      scale: 0.016
+    ref:
+      dist: norm
+      loc: -0.001
+      scale: 0.0016
+    proposal: 0.005
+    
+  xcell_DESwl__1_dz:
+    prior:
+      dist: norm
+      loc: -0.019
+      scale: 0.013
+    ref:
+      dist: norm
+      loc: -0.019
+      scale: 0.0013
+    proposal: 0.005
+    
+  xcell_DESwl__2_dz:
+    prior:
+      dist: norm
+      loc: 0.009
+      scale: 0.011
+    ref:
+      dist: norm
+      loc: 0.009
+      scale: 0.0011
+    proposal: 0.005
+    
+  xcell_DESwl__3_dz:
+    prior:
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    ref:
+      dist: norm
+      loc: -0.018
+      scale: 0.0022
+    proposal: 0.005
+
+  xcell_eBOSS__0_b0:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.91
+      scale: 0.1
+    proposal: 0.14
+  
+  xcell_eBOSS__1_b0:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.91
+      scale: 0.1
+    proposal: 0.14
+
+  # fixed to s = 0.2
+  xcell_eBOSS__0_s: 0.2
+
+  xcell_eBOSS__1_s: 0.2
+
+  # marginalized multiplicative bias for KiDS!!!
+  
+  xcell_KiDS1000__0_dz:
+    prior:
+      dist: norm
+      loc: 0.000
+      scale: 0.0106
+    ref:
+      dist: norm
+      loc: 0.000
+      scale: 0.00106
+    proposal: 0.005
+
+  xcell_KiDS1000__1_dz:
+    prior:
+      dist: norm
+      loc: 0.002
+      scale: 0.0113
+    ref:
+      dist: norm
+      loc: 0.002
+      scale: 0.00113
+    proposal: 0.005
+
+  xcell_KiDS1000__2_dz:
+    prior:
+      dist: norm
+      loc: 0.013
+      scale: 0.018
+    ref:
+      dist: norm
+      loc: 0.013
+      scale: 0.00118
+    proposal: 0.005
+
+  xcell_KiDS1000__3_dz:
+    prior:
+      dist: norm
+      loc: 0.011
+      scale: 0.0087
+    ref:
+      dist: norm
+      loc: 0.011
+      scale: 0.00087
+    proposal: 0.005
+
+  xcell_KiDS1000__4_dz:
+    prior:
+      dist: norm
+      loc: -0.006
+      scale: 0.0097
+    ref:
+      dist: norm
+      loc: -0.006
+      scale: 0.00097
+    proposal: 0.005
+
+  xcell_DECALS__0_b0:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.91
+      scale: 0.1
+    proposal: 0.14
+
+  xcell_DECALS__1_b0:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.91
+      scale: 0.1
+    proposal: 0.14
+
+  xcell_DECALS__2_b0:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.91
+      scale: 0.1
+    proposal: 0.14
+
+  xcell_DECALS__3_b0:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 1.91
+      scale: 0.1
+    proposal: 0.14
+
+  xcell_DECALS__0_dz:
+    prior:
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    ref:
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    proposal: 0.005
+
+  xcell_DECALS__1_dz:
+    prior:
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    ref:
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    proposal: 0.005
+
+  xcell_DECALS__2_dz:
+    prior:
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    ref:
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    proposal: 0.005
+
+  xcell_DECALS__3_dz:
+    prior:
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    ref:
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    proposal: 0.005
+
+  xcell_DESwl_A_IA:
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.
+      scale: 0.1
+    latex: A_{IA}^{DESwl}
+    proposal: 0.1
+
+  xcell_DESwl_eta_IA: 
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.
+      scale: 0.1
+    latex: \eta_{IA}^{DESwl}
+    proposal: 0.1
+
+  xcell_KiDS1000_A_IA:
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.
+      scale: 0.1
+    latex: A_{IA}^{KiDS1000}
+    proposal: 0.1
+
+  xcell_KiDS1000_eta_IA: 
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.
+      scale: 0.1
+    latex: \eta_{IA}^{KiDS1000}
+    proposal: 0.1
+
+sampler:
+  mcmc:
+    burn_in: 10
+    learn_proposal: True
+    max_samples: 100000
+    measure_speeds: True
+#    oversample_power: 1
+#    drag: True
+
+theory:
+  camb:
+    extra_args:
+      halofit_version: mead
+      bbn_predictor: PArthENoPE_880.2_standard.dat
+      lens_potential_accuracy: 1
+      num_massive_neutrinos: 0 # 1
+      nnu: 3.046 # ask
+#      theta_H0_range:
+#      - 20
+#      - 100
+  cl_like.CCL:
+    baryons_pk: nobaryons
+    matter_pk: halofit
+    transfer_function: boltzmann_camb
+    output_params:
+      - sigma8
