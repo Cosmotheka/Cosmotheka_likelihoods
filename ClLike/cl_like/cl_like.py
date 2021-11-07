@@ -13,6 +13,7 @@ from .ept import EPTCalculator, get_ept_pk2d
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 
+from velocileptors.EPT.cleft_kexpanded_resummed_fftw import RKECLEFT
 
 class ClLike(Likelihood):
     # All parameters starting with this will be
@@ -130,6 +131,7 @@ class ClLike(Likelihood):
                 self.hmcorr = HalomodCorrection()
             else:
                 self.hmcorr = None
+                
         elif self.bias_model == 'BACCO':
             # load the emulators
             import baccoemu_beta as baccoemu
@@ -140,11 +142,12 @@ class ClLike(Likelihood):
             #                        self.l10k_max_pks,
             #                        self.nk_pks)
             # set k values in units of h/Mpc; smoothing scale is 0.75 h/Mpc so between 0.45 and 0.675 for h = 0.6 and 0.9
-            self.k_s = np.logspace(-2, np.log10(0.45), 1000)
+            #self.k_s = np.logspace(-2, np.log10(0.75), 1000)
+            self.k_s = np.logspace(-1.999, np.log10(0.75), 1000)
             
             # redshifts for creating the Pk-2d object
-            #z = np.array([3.0, 2.0, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0]) # TODO: goes to z = 1.5;ask about Pk_mm and lpt and nn
-            z = np.array([1.5, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0]) # TODO: goes to z = 1.5 what do we do beyond this redshift tuks
+            #z = np.array([3.0, 2.0, 1.5, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0]) # BACCO goes to z = 1.5
+            z = np.array([1.5, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0])
             self.a_s = 1./(1. + z)
             
             # labels of the bias parameters
@@ -155,11 +158,46 @@ class ClLike(Likelihood):
             counter = 0
             for i in range(len(self.bias_labels)):
                 for j in range(len(self.bias_labels)):
-                    if i > j: continue
+                    if i > j: continue # !!!!!!!!!!!!!! notice different convention
                     self.bacco_dict[self.bias_labels[i] + '_' + self.bias_labels[j]] = counter
                     self.bacco_dict[self.bias_labels[j] + '_' + self.bias_labels[i]] = counter
                     counter += 1
+            # bacco: 0: <1,1>, 1: <1,d>, 2: <1,d^2>, 3: <1,s^2>, 4: <1,nabla^2 d>, 5: <d,d>, 6: <d,d^2>, 7: <d,s^2>, 8: <d,nabla^2 d>, 9: <d^2,d^2> (!), 10: <d^2,s^2> (!), 11: <d^2,nabla^2 d>, 12: <s^2,s^2> (!), 13: <s^2,nabla^2 d>, 14: <nabla^2 d,nabla^2 d>
+            
+        elif self.bias_model == 'anzu':
+            from anzu.emu_funcs import LPTEmulator
+            
+            # Initialize Hybrid EFT emulator
+            self.emu = LPTEmulator(use_sigma_8=True, kecleft=True)
 
+            # k values over which templates are computed # h/Mpc
+            self.k_s = np.logspace(-2, 0, 1000)
+            self.k_lpt = np.logspace(-4, 0, 1000)
+
+            # If we don't pass redshift (scale factor), emu assumes:
+            # [3.0, 2.0, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0] but zmax = 2.0!, so 9
+            #z = np.array([2.0, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0])
+            z = np.linspace(0., 4., 30)[::-1]
+            self.a_s = 1./(1. + z)
+
+            # Available fields for the emulator # B.H. bn is not available
+            self.b_emu = ['b0', 'b1', 'b2', 'bs']
+
+            # Create a dictionary for the emulator outputs
+            self.emu_dict = {}
+            counter = 0
+            for i in range(len(self.b_emu)):
+                for j in range(len(self.b_emu)):
+                    if j > i: continue # !!!!!!!!!!!!!!!! notice different convention
+                    self.emu_dict[self.b_emu[i] + '_' + self.b_emu[j]] = counter
+                    self.emu_dict[self.b_emu[j] + '_' + self.b_emu[i]] = counter
+                    counter += 1
+
+            # cleft: 0: k, 1: <1,1>, 2: 2*<1,d>, 3: <d,d>, 4: 2*<1,d^2/2>, 5: 2*<d,d^2/2>, 6: <d^2/2,d^2/2> (!), 7: 2*<1,s^2>, 8: 2*<d,s^2>, 9: 2*<d^2/2,s^2> (!), 10: <s^2,s^2> (!), 11: 2*<1, O3>, 12: 2*<d, O3>
+            # anzu: 0: k, 1: <1,1>, 2: <1,d>, 3: <d,d>, 4: <1,d^2>, 5: <d,d^2>, 6: <d^2,d^2>, 7: <1,s^2>, 8: <d,s^2> (!), 9: <d^2,s^2> (!), 10: <s^2,s^2> (!),
+
+            
+                    
     def _read_data(self):
         """
         Reads sacc file
@@ -369,6 +407,8 @@ class ClLike(Likelihood):
             bz = b0 + bp * (z - zmean)
         elif self.bias_model == 'BACCO':
             pass
+        elif self.bias_model == 'anzu':
+            pass
         return (z, bz)
 
     def _get_ia_bias(self, cosmo, name, **pars):
@@ -441,6 +481,12 @@ class ClLike(Likelihood):
                     for b in self.bias_labels:
                         bias[b] = pars.get(self.input_params_prefix + '_' + name + '_' + b, 0.)
                     bias['b0'] = 1. # TODO: can also just feed it as a fixed parameter in the yaml
+                if self.bias_model == 'anzu':
+                    # note that anzu is missing bn
+                    bias = {}
+                    for b in self.b_emu:
+                        bias[b] = pars.get(self.input_params_prefix + '_' + name + '_' + b, 0.)
+                    bias['b0'] = 1. # TODO: can also just feed it as a fixed parameter in the yaml
             elif q == 'galaxy_shear':
                 nz = self._get_nz(cosmo, name, **pars)
                 ia = self._get_ia_bias(cosmo, name, **pars)
@@ -449,12 +495,16 @@ class ClLike(Likelihood):
                     ptt = pt.PTMatterTracer()
                 if self.bias_model == 'BACCO':
                     bias = None
+                if self.bias_model == 'anzu':
+                    bias = None
             elif q == 'cmb_convergence':
                 # B.H. TODO: pass z_source as parameter to the YAML file
                 t = ccl.CMBLensingTracer(cosmo, z_source=1100)
                 if is_PT_bias:
                     ptt = pt.PTMatterTracer()
                 if self.bias_model == 'BACCO':
+                    bias = None
+                if self.bias_model == 'anzu':
                     bias = None
             elif q == 'cmb_tSZ':
                 t = ccl.tSZTracer(cosmo, z_max=3.)
@@ -464,6 +514,8 @@ class ClLike(Likelihood):
                     prof.update_parameters(mass_bias=o_m_b)
                     normed = False
                 if self.bias_model == 'BACCO':
+                    bias = None
+                if self.bias_model == 'anzu':
                     bias = None
                 else:
                     raise NotImplementedError("Can't do tSZ without"
@@ -477,6 +529,8 @@ class ClLike(Likelihood):
                 trs[name]['Profile'] = prof
                 trs[name]['Normed'] = normed
             if self.bias_model == 'BACCO':
+                trs[name]['bias'] = bias # if not galaxy tracer, this is None
+            if self.bias_model == 'anzu':
                 trs[name]['bias'] = bias # if not galaxy tracer, this is None
         return trs
 
@@ -541,9 +595,118 @@ class ClLike(Likelihood):
         elif self.bias_model == 'BACCO':
             pk2d_bacco, pkmm = self._compute_bacco(cosmo)
             return {'pk2d_bacco': pk2d_bacco, 'pk_mm': pkmm}
+        elif self.bias_model == 'anzu':
+            pk2d_anzu, pkmm = self._compute_anzu(cosmo)
+            return {'pk2d_anzu': pk2d_anzu, 'pk_mm': pkmm}
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
+
+    def _cosmo_to_anzu(self, cosmo):
+        # Initialize cosmology vector
+        cosmovec = np.zeros(8)
+        cosmovec[0] = cosmo['Omega_b'] * (cosmo['H0'] / 100)**2
+        cosmovec[1] = cosmo['Omega_c'] * (cosmo['H0'] / 100)**2
+        cosmovec[2] = cosmo['w0']
+        cosmovec[3] = cosmo['n_s']
+        cosmovec[4] = ccl.sigma8(cosmo) #np.log(cosmo['A_s'] * 1.e10)
+        cosmovec[5] = cosmo['H0']
+        cosmovec[6] = cosmo['Neff']
+        cosmovec[7] = 1. # random scale factor just to initialize
+                                    
+        # Vector of cosmological parameters
+        cosmovec = np.atleast_2d(cosmovec)
+
+        return cosmovec
+
+
+    def _compute_anzu_old(self, cosmo):
+        # 9 redshifts, 10 combinations between bias params, and the rest are the ks
+        num_comb = int(len(self.b_emu)*(len(self.b_emu)-1)/2 + len(self.b_emu))
+        emu_spec = np.zeros((len(self.a), num_comb, len(self.k_s)))
+        
+        # Get the emulator prediction for this cosmology
+        cosmovec = self._cosmo_to_anzu(cosmo) # tuks might need to do sigma8 rather than A_s
+
+        t1 = time.time()
+        for i in range(len(self.a)):
+            cosmovec[-1, -1] = self.a[i]
+            emu_spec[i] = self.emu.predict(self.k_s, cosmovec) # tuks might need to add another argument
+        print("time = ", time.time()-t1)
+        # tuks I convert the units in the P(k,a) function
+        
+        cosmo.compute_nonlin_power()
+        #cosmo.compute_sigma()
+        pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        return emu_spec, pkmm
+
+
+    def _compute_anzu(self, cosmo):
+        # 9 redshifts, 10 combinations between bias params, and the rest are the ks
+        num_comb = int(len(self.b_emu)*(len(self.b_emu)-1)/2 + len(self.b_emu))
+        lpt_spec = np.zeros((len(self.a_s), num_comb, len(self.k_lpt)))
+        
+        #if self.cleftobj is None:
+        # Do the full calculation again, as the cosmology changed.
+        pk = ccl.linear_matter_power(
+            cosmo, self.k_lpt * cosmo['h'], 1) * (cosmo['h'])**3 # Mpc/h^3
+            
+        # Function to obtain the no-wiggle spectrum.
+        # Not implemented yet, maybe Wallisch maybe B-Splines?
+        # pnw = p_nwify(pk)
+        # For now just use Stephen's standard savgol implementation.
+        cleftobj = RKECLEFT(self.k_lpt, pk)
+
+        # Adjust growth factors
+        Dz = ccl.background.growth_factor(cosmo, self.a_s)
+        for i, D in enumerate(Dz):
+
+            cleftobj.make_ptable(D=D, kmin=self.k_lpt[0], kmax=self.k_lpt[-1], nk=1000)
+            cleftpk = cleftobj.pktable.T # shape after transposing should be [10, k]
+    
+            # Adjust normalizations to match anzu measurements. B.H. Factors come from dividing anzu by cleft in the initialization comments
+            #cleftpk[3:, :] = cleftobj.pktable.T[3:, :] # B.H. TODO:  is this not meaningless?
+            cleftpk[2, :] /= 2. # dmd1
+            cleftpk[6, :] *= 4. # d2d2
+            cleftpk[7, :] /= 2. # dms2
+            cleftpk[8, :] /= 2. # d1s2
+            #Do we have to spline every time? nevertheless # B.H. TODO: I think unnecessary  but need to check make_ptable
+            cleftspline = interp1d(cleftpk[0], cleftpk, fill_value='extrapolate')
+            lpt_spec[i] = cleftspline(self.k_lpt)[1:num_comb+1, :]
+            
+        # Computed the relevant lpt predictions, plug into emu
+        # 1. Set up cosmovec for anzu from CCL cosmo object
+        # Final array should be [Nz, Nparam]
+        # Parameter order is as specified in anzu documentation.
+        # 2. Update ptc for units that are h-ful for anzu 
+        # 3. Compute emulator basis functions
+        # NOTE: Check ptc.lpt_table has the proper normalization for Anzu LPT spectra.
+
+        # Get the emulator prediction for this cosmology
+        cosmovec = self._cosmo_to_anzu(cosmo)
+        anzu_cosmo = np.tile(cosmovec, len(self.a_s)).reshape(-1, cosmovec.shape[-1]) # cause at least 2d;  becomes len(a_s), len(cosmovec)
+        anzu_cosmo[:, -1] = self.a_s
+
+        # Convert units back to Mpc^3
+        emu_spec = self.emu.predict(self.k_s, anzu_cosmo, spec_lpt=lpt_spec, k_lpt=self.k_lpt)
+        emu_spec /= cosmo['h']**3
+        # kinda dumb B.H. please change
+        self.h = cosmo['h']
+        #self.ks = k_emu*cosmo['h'] # we actually do this when getting the pk2d object
+        
+        # TODO: missing k^2 terms
+        
+        # normalize bacco following LPT convention (see Andrina)
+        for i in range(num_comb):
+            if i in [4, 5, 7, 8]: # dmd2, d1d2, dms2, d1s2
+                emu_spec[:, i, :] *= 0.5
+            elif i in [6, 9, 10]: # d2d2, d2s2, s2s2
+                emu_spec[:, i, :] *= 0.25
+        cosmo.compute_nonlin_power()
+        #cosmo.compute_sigma()
+        pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        return emu_spec, pkmm
+
 
     def _compute_bacco(self, cosmo):
         
@@ -551,7 +714,9 @@ class ClLike(Likelihood):
         pars = self._cosmo_to_bacco(cosmo)
 
         # convert k_s [Mpc^-1] into h Mpc^-1 units just for the calculation
-        k = self.k_s/pars['hubble']
+        #k = self.k_s/pars['hubble']
+        # self.k_s already in h/Mpc
+        k = self.k_s
         
         # 10 redshifts, 15 combinations between bias params, and the ks (added b0)
         num_comb = int((len(self.bias_labels))*(len(self.bias_labels)-1)/2 + len(self.bias_labels))
@@ -561,14 +726,26 @@ class ClLike(Likelihood):
         #t1 = time.time()
         for i in range(len(self.a_s)):
             pars['expfactor'] = self.a_s[i]
-            # call the emulator of the nonlinear 15 lagrangian bias expansion terms, shape is (15, len(k))
-            k, pnn = self.lbias.get_nonlinear_pnn(pars, k=k)
+            if self.a_s[i] >= 0.4: # if within BACCO, emulator
+                # call the emulator of the nonlinear 15 lagrangian bias expansion terms, shape is (15, len(k))
+                k, pnn = self.lbias.get_nonlinear_pnn(pars, k=k)
+            else: # if outside, normal lpt
+                pnn = self.lbias.get_lpt_pk(pars, k=k)
             pk2d_bacco[i, :, :] = pnn
+
+        # normalize bacco following LPT convention (see Andrina)
+        for i in range(num_comb):
+            if i in [2, 6, 3, 7, 4, 8]: #dmd2, d1d2, dms2, d1s2, dmn2, d1n2
+                pk2d_bacco[:, i, :] *= 0.5
+            elif i in [9, 10, 12, 14, 11, 13]: # d2d2, d2s2, s2s2, n2n2, d2n2, s2n2
+                pk2d_bacco[:, i, :] *= 0.25
         #print("time = ", time.time()-t1)
         
         # convert the spit out result from (Mpc/h)^3 to Mpc^3 (bacco uses h units, but pyccl doesn't)
         pk2d_bacco /= pars['hubble']**3
-    
+        # kinda dumb B.H. please change
+        self.h = cosmo['h']
+        
         # call the emulator of the LPT-predicted 15 lagrangian bias expansion terms
         #_, plpt = lbias.get_lpt_pk(pars, k=k) # TODO: check if both calls are necessary
 
@@ -673,12 +850,22 @@ class ClLike(Likelihood):
         elif self.bias_model == 'BACCO':
             if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')): # TODO: is this fine?
                 return pkd['pk_mm']  # matter-matter
-                #return pkd['pk2d_bacco'][:, 0, :]  # matter-matter from bacco emulator # tuks apparently this is not total matter but just CDM + baryons
+                #return pkd['pk2d_bacco'][:, 0, :]  # matter-matter from bacco emulator # apparently this is not total matter but just CDM + baryons
             else:
                 # bias is a dictionary holding the value for each bias parameter or None if not galaxy tracer
                 bias_eft1 = trs[clm['bin_1']]['bias']
                 bias_eft2 = trs[clm['bin_2']]['bias']
                 pk2d = self._get_pk_2d_bacco(pkd['pk2d_bacco'], bias_eft1, bias_eft2, q1, q2)
+                return pk2d
+            
+        elif self.bias_model == 'anzu':
+            if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')): # TODO: is this fine?
+                return pkd['pk_mm']  # matter-matter
+            else:
+                # bias is a dictionary holding the value for each bias parameter or None if not galaxy tracer
+                bias_eft1 = trs[clm['bin_1']]['bias']
+                bias_eft2 = trs[clm['bin_2']]['bias']
+                pk2d = self._get_pk_2d_anzu(pkd['pk2d_anzu'], bias_eft1, bias_eft2, q1, q2)
                 return pk2d
         
         else:
@@ -720,11 +907,54 @@ class ClLike(Likelihood):
                 bias2 = bias_eft2[key2]
                 comb = self.bacco_dict['b0'+'_'+key2]
                 Pk_a += bias2*pk2d_bacco[:, comb, :]
-        
+
+        # Convert ks from [Mpc/h]^-1 to [Mpc]^-1
+        lk_arr = np.log(self.k_s*self.h)
+                
         # Compute the 2D power spectrum
-        pk_2d_bacco = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.k_s), pk_arr=Pk_a, is_logp=False)
+        pk_2d_bacco = ccl.Pk2D(a_arr=self.a_s, lk_arr=lk_arr, pk_arr=Pk_a, is_logp=False)
         return pk_2d_bacco
 
+    def _get_pk_2d_anzu(self, pk2d_anzu, bias_eft1, bias_eft2, q1, q2):
+        
+        # Initialize power spectrum Pk_a(as, ks)
+        Pk_a = np.zeros_like(pk2d_anzu[:, 0, :])
+        
+        # If both tracers are galaxies, Pk^{tr1,tr2} = f_i^bin1 * f_j^bin2 * Pk_ij
+        if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
+            for key1 in bias_eft1.keys():
+                bias1 = bias_eft1[key1]
+                for key2 in bias_eft2.keys():
+                    bias2 = bias_eft2[key2]
+                    if key1+'_'+key2 in self.emu_dict.keys():
+                        comb = self.emu_dict[key1+'_'+key2]
+                    else:
+                        comb = self.emu_dict[key2+'_'+key1]
+                    Pk_a += bias1*bias2*pk2d_anzu[:, comb, :]
+
+        # If first tracer is galaxies and second is matter, Pk^{tr1,tr2} = f_i^bin1 * 1. * Pk_0i
+        elif (q1 == 'galaxy_density') and (q2 != 'galaxy_density'):
+            for key1 in bias_eft1.keys():
+                bias1 = bias_eft1[key1]
+                comb = self.emu_dict['b0'+'_'+key1]
+                Pk_a += bias1*pk2d_anzu[:, comb, :]
+
+        # If second tracer is galaxies and first is matter, Pk^{tr1,tr2} = f_j^bin2 * 1. * Pk_0j
+        elif (q1 != 'galaxy_density') and (q2 == 'galaxy_density'):
+            for key2 in bias_eft2.keys():
+                bias2 = bias_eft2[key2]
+                comb = self.emu_dict['b0'+'_'+key2]
+                Pk_a += bias2*pk2d_anzu[:, comb, :]
+
+        # Convert ks from [Mpc/h]^-1 to [Mpc]^-1
+        lk_arr = np.log(self.k_s*self.h)
+                          
+        # Already in Mpc^3 Same for the power spectrum: convert to Mpc^3
+        #Pk_a /= (cosmo['H0']/100.)**3.
+                
+        # Compute the 2D power spectrum
+        pk_2d_anzu = ccl.Pk2D(a_arr=self.a_s, lk_arr=lk_arr, pk_arr=Pk_a, is_logp=False)
+        return pk_2d_anzu
         
     def _get_pixel_window(self, clm):
         pix1 = self.pixwin[clm['bin_1']]
@@ -736,7 +966,7 @@ class ClLike(Likelihood):
         # Gather all tracers
         trs = self._get_tracers(cosmo, **pars)
 
-        # TESTING tuks
+        # baryon correction model should be oche
         if self.baryon_model == 'BCM':
             pk2d = pk['pk_mm']
             # kopele is for testing
@@ -837,10 +1067,11 @@ class ClLike(Likelihood):
         for clm, cl in zip(self.cl_meta, cls):
             cl_out[clm['inds']] = cl
             # B.H. saving file
-            #ell[clm['inds']] = clm['l_eff'] #
-            #bins.append(f"{clm['bin_1']:s}_!_{clm['bin_2']:s}") #
-        #return ell, cl_out, bins #
-        return cl_out # og
+            ell[clm['inds']] = clm['l_eff'] #
+            bins.append(f"{clm['bin_1']:s}_!_{clm['bin_2']:s}") #
+        #return cl_out # og
+        return ell, cl_out, bins #
+    #return cl_out # og
         
 
     def get_requirements(self):
@@ -853,13 +1084,15 @@ class ClLike(Likelihood):
         """
         Simple Gaussian likelihood.
         """
-        t = self._get_theory(**pars) # og
+        #t1 = time.time()
+        #t = self._get_theory(**pars) # og
         # B.H. saving file
-        #ell, t, bins = self._get_theory(**pars) #
+        ell, t, bins = self._get_theory(**pars) #
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r))
+        #print("time = ", time.time()-t1)
         # B.H. saving file
-        #np.savez_compressed(os.path.join('/users/boryanah/repos/xCell-likelihoods/analysis/data/', f'cl_cross_corr_{self.bias_model:s}.npz'), chi2=chi2, chi2_dof=chi2/self.ndata, cls=t, ells=ell, tracers=bins) # 
+        np.savez_compressed(os.path.join('/users/boryanah/repos/xCell-likelihoods/analysis/data/', f'cl_cross_corr_{self.bias_model:s}.npz'), chi2=chi2, chi2_dof=chi2/self.ndata, cls=t, ells=ell, tracers=bins) # 
         return -0.5*chi2
 
     
