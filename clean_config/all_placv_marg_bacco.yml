@@ -1,4 +1,6 @@
-debug: False #True
+#debug: True
+#stop_at_error: True 
+
 likelihood:
 #  planck_2018_lowl.TT: null
 #  planck_2018_lowl.EE: null
@@ -349,7 +351,7 @@ likelihood:
       - KiDS1000__4
       - PLAcv
 
-output: chains/all_placv_marg
+output: chains/all_placv_marg_bacco
 
 params:
   Omega_b:
@@ -381,7 +383,7 @@ params:
     ref:
       dist: norm
       loc: 0.7
-      scale: 0.001
+      scale: 0.002
     proposal: 0.001
     latex: h
   H0:
@@ -546,206 +548,206 @@ params:
 
   xcell_DESgc__0_b1:
     prior:
-      min: 0.000
+      min: -3.000
       max: 3.000
     ref:
       dist: norm
       loc: 0.41
       scale: 0.1
-    proposal: 0.13
+    proposal: 0.005
     
   xcell_DESgc__1_b1:
     prior:
-      min: 0.000
+      min: -3.000
       max: 3.000
     ref:
       dist: norm
       loc: 0.6
       scale: 0.1
-    proposal: 0.12
+    proposal: 0.005
    
   xcell_DESgc__2_b1:
     prior:
-      min: 0.000
+      min: -3.000
       max: 3.000
     ref:
       dist: norm
       loc: 0.6
       scale: 0.1
-    proposal: 0.11
+    proposal: 0.005
     
   xcell_DESgc__3_b1:
     prior:
-      min: 0.000
+      min: -3.000
       max: 3.000
     ref:
       dist: norm
       loc: 0.91
       scale: 0.1
-    proposal: 0.14
+    proposal: 0.005
     
   xcell_DESgc__4_b1:
     prior:
-      min: 0.000
+      min: -3.000
       max: 3.000
     ref:
       dist: norm
       loc: 0.96
       scale: 0.1
-    proposal: 0.14
+    proposal: 0.005
 
-#  xcell_DESgc__0_b2:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.13
+  xcell_DESgc__0_b2:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__1_b2:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.12
+  xcell_DESgc__1_b2:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__2_b2:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.11
+  xcell_DESgc__2_b2:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__3_b2:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DESgc__3_b2:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__4_b2:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DESgc__4_b2:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__0_bs:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.13
+  xcell_DESgc__0_bs:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.05
     
-#  xcell_DESgc__1_bs:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.12
+  xcell_DESgc__1_bs:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__2_bs:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.11
+  xcell_DESgc__2_bs:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__3_bs:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DESgc__3_bs:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__4_bs:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DESgc__4_bs:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DESgc__0_bn:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.13
+  xcell_DESgc__0_bn:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__1_bn:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.12
+  xcell_DESgc__1_bn:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__2_bn:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.11
+  xcell_DESgc__2_bn:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__3_bn:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DESgc__3_bn:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DESgc__4_bn:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DESgc__4_bn:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
   # marginalized multiplicative bias for DESwl!!!
-  
+
   xcell_DESgc__0_dz:
     prior:
       dist: norm
@@ -754,8 +756,8 @@ params:
     ref:
       dist: norm
       loc: 0.000
-      scale: 0.0007
-    proposal: 0.005
+      scale: 0.007
+    proposal: 0.0035
     
   xcell_DESgc__1_dz:
     prior:
@@ -765,8 +767,8 @@ params:
     ref:
       dist: norm
       loc: 0.000
-      scale: 0.0007
-    proposal: 0.005
+      scale: 0.007
+    proposal: 0.0035
     
   xcell_DESgc__2_dz:
     prior:
@@ -776,8 +778,8 @@ params:
     ref:
       dist: norm
       loc: 0.000
-      scale: 0.0006
-    proposal: 0.005
+      scale: 0.006
+    proposal: 0.003
     
   xcell_DESgc__3_dz:
     prior:
@@ -787,7 +789,7 @@ params:
     ref:
       dist: norm
       loc: 0.000
-      scale: 0.001
+      scale: 0.01
     proposal: 0.005
     
   xcell_DESgc__4_dz:
@@ -798,7 +800,7 @@ params:
     ref:
       dist: norm
       loc: 0.000
-      scale: 0.001
+      scale: 0.01
     proposal: 0.005
 
   xcell_DESwl__0_dz:
@@ -809,7 +811,7 @@ params:
     ref:
       dist: norm
       loc: -0.001
-      scale: 0.0016
+      scale: 0.016
     proposal: 0.005
     
   xcell_DESwl__1_dz:
@@ -820,7 +822,7 @@ params:
     ref:
       dist: norm
       loc: -0.019
-      scale: 0.0013
+      scale: 0.013
     proposal: 0.005
     
   xcell_DESwl__2_dz:
@@ -831,7 +833,7 @@ params:
     ref:
       dist: norm
       loc: 0.009
-      scale: 0.0011
+      scale: 0.011
     proposal: 0.005
     
   xcell_DESwl__3_dz:
@@ -842,7 +844,7 @@ params:
     ref:
       dist: norm
       loc: -0.018
-      scale: 0.0022
+      scale: 0.022
     proposal: 0.005
 
   xcell_eBOSS__0_b1:
@@ -851,9 +853,9 @@ params:
       max: 3.000
     ref:
       dist: norm
-      loc: 0.91
-      scale: 0.1
-    proposal: 0.14
+      loc: 1.1
+      scale: 0.01
+    proposal: 0.005
   
   xcell_eBOSS__1_b1:
     prior:
@@ -861,9 +863,9 @@ params:
       max: 3.000
     ref:
       dist: norm
-      loc: 0.91
-      scale: 0.1
-    proposal: 0.14
+      loc: 1.5
+      scale: 0.01
+    proposal: 0.005
 
   # fixed to s = 0.2
   xcell_eBOSS__0_s: 0.2
@@ -880,7 +882,7 @@ params:
     ref:
       dist: norm
       loc: 0.000
-      scale: 0.00106
+      scale: 0.0106
     proposal: 0.005
 
   xcell_KiDS1000__1_dz:
@@ -891,7 +893,7 @@ params:
     ref:
       dist: norm
       loc: 0.002
-      scale: 0.00113
+      scale: 0.0113
     proposal: 0.005
 
   xcell_KiDS1000__2_dz:
@@ -902,7 +904,7 @@ params:
     ref:
       dist: norm
       loc: 0.013
-      scale: 0.00118
+      scale: 0.0118
     proposal: 0.005
 
   xcell_KiDS1000__3_dz:
@@ -913,7 +915,7 @@ params:
     ref:
       dist: norm
       loc: 0.011
-      scale: 0.00087
+      scale: 0.0087
     proposal: 0.005
 
   xcell_KiDS1000__4_dz:
@@ -924,7 +926,7 @@ params:
     ref:
       dist: norm
       loc: -0.006
-      scale: 0.00097
+      scale: 0.0097
     proposal: 0.005
 
   xcell_DECALS__0_b1:
@@ -933,9 +935,9 @@ params:
       max: 3.000
     ref:
       dist: norm
-      loc: 0.91
+      loc: 0.13
       scale: 0.1
-    proposal: 0.14
+    proposal: 0.005
 
   xcell_DECALS__1_b1:
     prior:
@@ -943,9 +945,9 @@ params:
       max: 3.000
     ref:
       dist: norm
-      loc: 0.91
+      loc: 0.4
       scale: 0.1
-    proposal: 0.14
+    proposal: 0.005
 
   xcell_DECALS__2_b1:
     prior:
@@ -953,9 +955,9 @@ params:
       max: 3.000
     ref:
       dist: norm
-      loc: 0.91
+      loc: 0.35
       scale: 0.1
-    proposal: 0.14
+    proposal: 0.005
 
   xcell_DECALS__3_b1:
     prior:
@@ -963,172 +965,172 @@ params:
       max: 3.000
     ref:
       dist: norm
-      loc: 0.91
+      loc: 0.77
       scale: 0.1
-    proposal: 0.14
+    proposal: 0.005
 
-#  xcell_DECALS__0_b2:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__0_b2:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__1_b2:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__1_b2:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__2_b2:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__2_b2:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__3_b2:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__3_b2:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__0_bs:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__0_bs:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__1_bs:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__1_bs:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__2_bs:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__2_bs:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__3_bs:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__3_bs:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
     
-#  xcell_DECALS__0_bn:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__0_bn:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__1_bn:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__1_bn:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__2_bn:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__2_bn:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
-#  xcell_DECALS__3_bn:
-#    prior:
-#      min: -3.000
-#      max: 3.000
-#    ref:
-#      dist: norm
-#      loc: 1.91
-#      scale: 0.1
-#    proposal: 0.14
+  xcell_DECALS__3_bn:
+    prior:
+      min: -3.000
+      max: 3.000
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    proposal: 0.005
 
   xcell_DECALS__0_dz:
     prior:
       dist: norm
-      loc: -0.018
-      scale: 0.022
+      loc: 0.0
+      scale: 0.007
     ref:
       dist: norm
-      loc: -0.018
-      scale: 0.022
-    proposal: 0.005
+      loc: 0.0
+      scale: 0.007
+    proposal: 0.0035
 
   xcell_DECALS__1_dz:
     prior:
       dist: norm
-      loc: -0.018
-      scale: 0.022
+      loc: 0.0
+      scale: 0.007
     ref:
       dist: norm
-      loc: -0.018
-      scale: 0.022
-    proposal: 0.005
+      loc: 0.0
+      scale: 0.007
+    proposal: 0.0035
 
   xcell_DECALS__2_dz:
     prior:
       dist: norm
-      loc: -0.018
-      scale: 0.022
+      loc: 0.0
+      scale: 0.006
     ref:
       dist: norm
-      loc: -0.018
-      scale: 0.022
-    proposal: 0.005
+      loc: 0.0
+      scale: 0.006
+    proposal: 0.003
 
   xcell_DECALS__3_dz:
     prior:
       dist: norm
-      loc: -0.018
-      scale: 0.022
+      loc: 0.0
+      scale: 0.01
     ref:
       dist: norm
-      loc: -0.018
-      scale: 0.022
+      loc: 0.0
+      scale: 0.01
     proposal: 0.005
 
   xcell_DESwl_A_IA:
@@ -1140,7 +1142,7 @@ params:
       loc: 0.
       scale: 0.1
     latex: A_{IA}^{DESwl}
-    proposal: 0.1
+    proposal: 0.01
 
   xcell_DESwl_eta_IA: 
     prior: 
@@ -1151,7 +1153,7 @@ params:
       loc: 0.
       scale: 0.1
     latex: \eta_{IA}^{DESwl}
-    proposal: 0.1
+    proposal: 0.01
 
   xcell_KiDS1000_A_IA:
     prior: 
@@ -1162,7 +1164,7 @@ params:
       loc: 0.
       scale: 0.1
     latex: A_{IA}^{KiDS1000}
-    proposal: 0.1
+    proposal: 0.01
 
   xcell_KiDS1000_eta_IA: 
     prior: 
@@ -1173,16 +1175,18 @@ params:
       loc: 0.
       scale: 0.1
     latex: \eta_{IA}^{KiDS1000}
-    proposal: 0.1
+    proposal: 0.01
 
 sampler:
   mcmc:
     burn_in: 10
     learn_proposal: True
-    max_samples: 100000
+    #max_samples: 100000
+    Rminus1_stop: 0.01
     measure_speeds: True
-#    oversample_power: 1
-#    drag: True
+    oversample_power: 1
+    drag: True
+    max_tries: 20000 # TESTING
 
 theory:
   camb:
