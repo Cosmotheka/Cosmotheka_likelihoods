@@ -1,5 +1,6 @@
 import time
 import os
+import gc
 
 import numpy as np
 from scipy.interpolate import interp1d
@@ -134,23 +135,23 @@ class ClLike(Likelihood):
                 self.hmcorr = HalomodCorrection()
             else:
                 self.hmcorr = None
-                
+
         elif self.bias_model == 'BACCO':
             # load the emulators
             import baccoemu_beta as baccoemu
             self.lbias = baccoemu.Lbias_expansion()
             #labels = lbias.lb_term_labels # just so I don't forget this is an option
-            
+
             # set k values in units of h/Mpc; smoothing scale is 0.75 h/Mpc so between 0.45 and 0.675 for h = 0.6 and 0.9
             #self.k_s = np.logspace(self.l10k_min_pks, self.l10k_max_pks, self.nk_pks)
             self.k_s = np.logspace(-2, np.log10(0.75), 1000)
             self.k_s[0] += 1.e-18 # to silence the warning that this is less than 0.01 h/Mpc, which btw it isn't
-            
+
             # redshifts for creating the Pk-2d object
             z = np.array([3.0, 2.0, 1.5, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0]) # BACCO goes to z = 1.5, LPT after
             #z = np.array([1.5, 1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1, 0.0])
             self.a_s = 1./(1. + z)
-            
+
             # labels of the bias parameters
             self.bias_labels = ['b0', 'b1', 'b2', 'bs', 'bn']
 
@@ -164,10 +165,10 @@ class ClLike(Likelihood):
                     self.bacco_dict[self.bias_labels[j] + '_' + self.bias_labels[i]] = counter
                     counter += 1
             # bacco: 0: <1,1>, 1: <1,d>, 2: <1,d^2>, 3: <1,s^2>, 4: <1,nabla^2 d>, 5: <d,d>, 6: <d,d^2>, 7: <d,s^2>, 8: <d,nabla^2 d>, 9: <d^2,d^2> (!), 10: <d^2,s^2> (!), 11: <d^2,nabla^2 d>, 12: <s^2,s^2> (!), 13: <s^2,nabla^2 d>, 14: <nabla^2 d,nabla^2 d>
-            
+
         elif self.bias_model == 'anzu':
             from anzu.emu_funcs import LPTEmulator
-            
+
             # Initialize Hybrid EFT emulator
             self.emu = LPTEmulator(use_sigma_8=True, kecleft=True)
 
@@ -197,7 +198,7 @@ class ClLike(Likelihood):
             # original 
             # cleft: 0: k, 1: <1,1>, 2: 2*<1,d>, 3: <d,d>, 4: 2*<1,d^2/2>, 5: 2*<d,d^2/2>, 6: <d^2/2,d^2/2> (!), 7: 2*<1,s^2>, 8: 2*<d,s^2>, 9: 2*<d^2/2,s^2> (!), 10: <s^2,s^2> (!), 11: 2*<1, O3>, 12: 2*<d, O3>
             # anzu: 0: k, 1: <1,1>, 2: <1,d>, 3: <d,d>, 4: <1,d^2>, 5: <d,d^2>, 6: <d^2,d^2>, 7: <1,s^2>, 8: <d,s^2> (!), 9: <d^2,s^2> (!), 10: <s^2,s^2> (!),
-            
+
             # adding the nabla^2 terms
             self.b_emu.append('bn')
             for i in range(len(self.b_emu)):
@@ -207,7 +208,7 @@ class ClLike(Likelihood):
 
             # IDs for the <nabla^2, X> ~ -k^2 <1, X> approximation.
             self.nabla_idx = [0, 1, 3, 6] # correspond to anzu's <1,1>, <1,d>, <1,d^2>, <1,s^2> after adjusting by minus one
-                    
+
     def _read_data(self):
         """
         Reads sacc file
@@ -259,7 +260,6 @@ class ClLike(Likelihood):
                 self.defaults[b['name']] = {}
                 self.defaults[b['name']]['lmin'] = self.defaults['lmin']
 
-                
             # Give galaxy clustering an ell_max
             if t.quantity == 'galaxy_density':
                 # Get lmax from kmax for galaxy clustering
@@ -276,7 +276,7 @@ class ClLike(Likelihood):
                 # Make sure everything else has an ell_max
                 if 'lmax' not in self.defaults[b['name']]:
                     self.defaults[b['name']]['lmax'] = self.defaults['lmax']
-                
+
         # 2. Iterate through two-point functions and apply scale cuts
         indices = []
         for cl in self.twopoints:
@@ -297,7 +297,6 @@ class ClLike(Likelihood):
                                 ell__gt=lmin, ell__lt=lmax)
             indices += list(ind)
         s.keep_indices(np.array(indices))
-
 
         # 3. Iterate through two-point functions, collect information about
         # them (tracer names, bandpower windows etc.), and put all C_ells in
@@ -399,7 +398,7 @@ class ClLike(Likelihood):
             dz = pars.get(self.input_params_prefix + '_' + name + '_dz', 0.)
         if (self.nz_model == 'NzShiftWidth') or (self.nz_model == 'NzWidth'):
             wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
-        z = zm+dz+(z-zm)/wz
+        z = zm-dz+(z-zm)/wz # B.H. to match the MP notation (matters marginally)
         msk = z >= 0
         z = z[msk]
         nz = nz[msk]
@@ -560,7 +559,6 @@ class ClLike(Likelihood):
         }
         return pars
 
-        
     def _get_pk_data(self, cosmo):
         """ Get all cosmology-dependent ingredients to create the
         different P(k)s needed for the C_ell calculation.
@@ -635,18 +633,17 @@ class ClLike(Likelihood):
         cosmovec[5] = cosmo['H0']
         cosmovec[6] = cosmo['Neff']
         cosmovec[7] = 1. # random scale factor just to initialize
-                                    
+
         # Vector of cosmological parameters
         cosmovec = np.atleast_2d(cosmovec)
 
         return cosmovec
 
-
     def _compute_anzu_old(self, cosmo):
         # 9 redshifts, 10 combinations between bias params, and the rest are the ks
         num_comb = int(len(self.b_emu)*(len(self.b_emu)-1)/2 + len(self.b_emu)) # 10
         emu_spec = np.zeros((len(self.a), num_comb, len(self.k_s)))
-        
+
         # Get the emulator prediction for this cosmology
         cosmovec = self._cosmo_to_anzu(cosmo) # doing sigma8 rather than A_s
 
@@ -655,12 +652,11 @@ class ClLike(Likelihood):
             cosmovec[-1, -1] = self.a[i]
             emu_spec[i] = self.emu.predict(self.k_s, cosmovec)
         print("time = ", time.time()-t1)
-        
+
         cosmo.compute_nonlin_power()
         #cosmo.compute_sigma()
         pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
         return emu_spec, pkmm
-
 
     def _compute_anzu(self, cosmo):
         # 9 redshifts, 10/15 combinations between bias params, and the rest are the ks
@@ -668,12 +664,12 @@ class ClLike(Likelihood):
         num_comb_lpt = int((len(self.b_emu)-1)*(len(self.b_emu)-1-1)/2 + (len(self.b_emu)-1)) # 10 without nabla^2
         lpt_spec = np.zeros((len(self.a_s), num_comb_lpt, len(self.k_lpt)))
         emu_spec = np.zeros((len(self.a_s), num_comb, len(self.k_lpt)))
-        
+
         #if self.cleftobj is None:
         # Do the full calculation again, as the cosmology changed.
         pk = ccl.linear_matter_power(
             cosmo, self.k_lpt * cosmo['h'], 1) * (cosmo['h'])**3 # Mpc/h^3
-            
+
         # Function to obtain the no-wiggle spectrum.
         # Not implemented yet, maybe Wallisch maybe B-Splines?
         # pnw = p_nwify(pk)
@@ -686,7 +682,7 @@ class ClLike(Likelihood):
             # B.H. here is how the table is defined: self.kv = np.logspace(np.log10(kmin), np.log10(kmax), nk)
             cleftobj.make_ptable(D=D, kmin=self.k_lpt[0], kmax=self.k_lpt[-1], nk=len(self.k_lpt))
             cleftpk = cleftobj.pktable.T # B.H. shape after transposing should be (num_comb_lpt, k)
-    
+
             # Adjust normalizations to match anzu measurements. B.H. Factors come from dividing anzu by cleft (see initialization comments)
             #cleftpk[3:, :] = cleftobj.pktable.T[3:, :] # B.H. unnecessary
             cleftpk[2, :] /= 2. # dmd1
@@ -694,11 +690,10 @@ class ClLike(Likelihood):
             cleftpk[7, :] /= 2. # dms2
             cleftpk[8, :] /= 2. # d1s2
             #Do we have to spline every time? nevertheless # B.H. unnecessary because self.k_lpt is equivalent to cleftpk[0]
-            cleftspline = interp1d(cleftpk[0], cleftpk, fill_value='extrapolate')
-            lpt_spec[i] = cleftspline(self.k_lpt)[1:num_comb_lpt+1, :]
-            #lpt_spec[i, :, :] = cleftpk[1:num_comb_lpt+1, :]
+            #cleftspline = interp1d(cleftpk[0], cleftpk, fill_value='extrapolate')
+            #lpt_spec[i] = cleftspline(self.k_lpt)[1:num_comb_lpt+1, :]
+            lpt_spec[i, :, :] = cleftpk[1:num_comb_lpt+1, :]
 
-        print("difference = ", np.sum(cleftpk[0]-self.k_lpt))
         # Computed the relevant lpt predictions, plug into emu
         # 1. Set up cosmovec for anzu from CCL cosmo object
         # Final array should be [Nz, Nparam]
@@ -706,7 +701,7 @@ class ClLike(Likelihood):
         # 2. Update ptc for units that are h-ful for anzu 
         # 3. Compute emulator basis functions
         # NOTE: Check ptc.lpt_table has the proper normalization for Anzu LPT spectra.
-
+        
         # Get the emulator prediction for this cosmology
         cosmovec = self._cosmo_to_anzu(cosmo)
         anzu_cosmo = np.tile(cosmovec, len(self.a_s)).reshape(-1, cosmovec.shape[-1]) # cause at least 2d;  becomes len(a_s), len(cosmovec)
@@ -722,7 +717,7 @@ class ClLike(Likelihood):
         # kinda dumb B.H. please change
         self.h = cosmo['h']
         #self.k_s = self.k_s*cosmo['h'] # we actually do this when getting the pk2d object
-                
+
         # Normalize anzu following LPT convention (see Andrina, but subtract -1 cause we got rid of the k vector)
         for i in range(num_comb):
             if i in [3, 4, 6, 7]: # dmd2, d1d2, dms2, d1s2
@@ -734,11 +729,11 @@ class ClLike(Likelihood):
         cosmo.compute_nonlin_power()
         #cosmo.compute_sigma()
         pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+
         return emu_spec, pkmm
 
-
     def _compute_bacco(self, cosmo):
-        
+
         # translate the pyccl cosmology parameters into bacco notation
         pars = self._cosmo_to_bacco(cosmo)
 
@@ -746,7 +741,7 @@ class ClLike(Likelihood):
         #k = self.k_s/pars['hubble']
         # self.k_s already in h/Mpc
         k = self.k_s
-        
+
         # 10 redshifts, 15 combinations between bias params, and the ks (added b0)
         num_comb = int((len(self.bias_labels))*(len(self.bias_labels)-1)/2 + len(self.bias_labels))
         pk2d_bacco = np.zeros((len(self.a_s), num_comb, len(self.k_s)))
@@ -769,7 +764,7 @@ class ClLike(Likelihood):
             elif i in [9, 10, 12, 14, 11, 13]: # d2d2, d2s2, s2s2, n2n2, d2n2, s2n2
                 pk2d_bacco[:, i, :] *= 0.25
         #print("time = ", time.time()-t1)
-        
+
         # convert the spit out result from (Mpc/h)^3 to Mpc^3 (bacco uses h units, but pyccl doesn't)
         pk2d_bacco /= pars['hubble']**3
         # kinda dumb B.H. please change
@@ -784,14 +779,14 @@ class ClLike(Likelihood):
         #np.save("pkmm_ccl.npy", pkmm_ccl) # Mpc
         #np.save("pkmm_bacco.npy", pkmm_bacco) # Mpc
         #np.save("k_s.npy", self.k_s) # Mpc
-        
+
         return pk2d_bacco, pkmm
-        
+
     def _get_pkxy(self, cosmo, clm, pkd, trs, **pars):
         """ Get the P(k) between two tracers. """
         q1 = self.tracer_qs[clm['bin_1']]
         q2 = self.tracer_qs[clm['bin_2']]        
-        
+
         if (self.bias_model == 'Linear') or (self.bias_model == 'BzNone'):
             if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
                 return pkd['pk_mm']  # galaxy-galaxy
@@ -884,7 +879,7 @@ class ClLike(Likelihood):
                 pk_pt = get_bacco_pk2d(cosmo, ptt1, tracer2=ptt2, nonlin_pk_type='spt', # TESTING!!!!!!!!!!!!!!!!!!
                                      ptc=pkd['ptc'])
                 return pk_pt
-            
+
         elif self.bias_model == 'anzu':
             if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')): 
                 return pkd['pk_mm']  # matter-matter
@@ -894,7 +889,7 @@ class ClLike(Likelihood):
                 bias_eft2 = trs[clm['bin_2']]['bias']
                 pk2d = self._get_pk_2d_anzu(pkd['pk2d_anzu'], bias_eft1, bias_eft2, q1, q2)
                 return pk2d
-        
+
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
@@ -904,10 +899,10 @@ class ClLike(Likelihood):
         # TODO: the calculation could be sped up, but need to figure out how to do for two sets of biases
         #bias = [0.75, 0.25, 0.1, 1.4] # b1, b2, bs2, blaplacian
         #kgal, pgalauto, pgalcross = lbias.get_galaxy_real_pk(pars, bias, k=None)
-        
+
         # Initialize power spectrum Pk_a(as, ks)
         Pk_a = np.zeros_like(pk2d_bacco[:, 0, :])
-        
+
         # If both tracers are galaxies, Pk^{tr1,tr2} = f_i^bin1 * f_j^bin2 * Pk_ij
         if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
             for key1 in bias_eft1.keys():
@@ -933,7 +928,7 @@ class ClLike(Likelihood):
 
         # Convert ks from [Mpc/h]^-1 to [Mpc]^-1
         lk_arr = np.log(self.k_s*self.h)
-                
+
         # Compute the 2D power spectrum
         pk_2d_bacco = ccl.Pk2D(a_arr=self.a_s, lk_arr=lk_arr, pk_arr=Pk_a, is_logp=False)
         return pk_2d_bacco
@@ -942,7 +937,7 @@ class ClLike(Likelihood):
         
         # Initialize power spectrum Pk_a(as, ks)
         Pk_a = np.zeros_like(pk2d_anzu[:, 0, :])
-        
+
         # If both tracers are galaxies, Pk^{tr1,tr2} = f_i^bin1 * f_j^bin2 * Pk_ij
         if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
             for key1 in bias_eft1.keys():
@@ -968,14 +963,14 @@ class ClLike(Likelihood):
 
         # Convert ks from [Mpc/h]^-1 to [Mpc]^-1
         lk_arr = np.log(self.k_s*self.h)
-                          
+
         # Already in Mpc^3 Same for the power spectrum: convert to Mpc^3
         #Pk_a /= (cosmo['H0']/100.)**3.
-                
+
         # Compute the 2D power spectrum
         pk_2d_anzu = ccl.Pk2D(a_arr=self.a_s, lk_arr=lk_arr, pk_arr=Pk_a, is_logp=False)
         return pk_2d_anzu
-        
+
     def _get_pixel_window(self, clm):
         pix1 = self.pixwin[clm['bin_1']]
         pix2 = self.pixwin[clm['bin_2']]
@@ -995,7 +990,7 @@ class ClLike(Likelihood):
             #kopele2 = pk2d.eval(k_s, 1., cosmo)
             #print("fractional difference = ", (kopele1-kopele2)/kopele1) # on the order of 2% for smallest scales and tiny for larger scales
             pk['pk_mm'] = pk2d
-        
+
         # Correlate all needed pairs of tracers
         cls = []
         for clm in self.cl_meta:
@@ -1091,14 +1086,13 @@ class ClLike(Likelihood):
         #return cl_out # og
         #return ell, cl_out, bins #
         return cl_out # og
-        
 
     def get_requirements(self):
         # By selecting `self._get_pk_data` as a `method` of CCL here,
         # we make sure that this function is only run when the
         # cosmological parameters vary.
         return {'CCL': {'methods': {'pk_data': self._get_pk_data}}}
-        
+
     def logp(self, **pars):
         """
         Simple Gaussian likelihood.
