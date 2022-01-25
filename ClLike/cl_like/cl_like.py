@@ -303,7 +303,7 @@ class ClLike(Likelihood):
         if (self.nz_model == 'NzShiftParam'):
             A = pars.get(self.input_params_prefix + '_A_Nz', 0)
             alpha = pars.get(self.input_params_prefix + '_alpha_Nz', 0)
-            dz = A * zm ** alpha
+            dz = A * z ** alpha
         z = zm+dz+(z-zm)/wz
         msk = z >= 0
         z = z[msk]
