@@ -300,6 +300,10 @@ class ClLike(Likelihood):
             dz = pars.get(self.input_params_prefix + '_' + name + '_dz', 0.)
         if (self.nz_model == 'NzShiftWidth') or (self.nz_model == 'NzWidth'):
             wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
+        if (self.nz_model == 'NzShiftParam'):
+            A = pars.get(self.input_params_prefix + '_A_Nz', 0)
+            alpha = pars.get(self.input_params_prefix + '_alpha_Nz', 0)
+            dz = A * zm ** alpha
         z = zm+dz+(z-zm)/wz
         msk = z >= 0
         z = z[msk]
