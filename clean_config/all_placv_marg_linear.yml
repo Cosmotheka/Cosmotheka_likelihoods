@@ -337,7 +337,7 @@ likelihood:
       - KiDS1000__4
       - PLAcv
 
-output: chains/all_placv_marg_linear
+output: chains/poly_all_placv_marg_linear
 
 params:
   Omega_b:
@@ -372,9 +372,9 @@ params:
       scale: 0.002
     proposal: 0.001
     latex: h
-  H0:
-    value: 'lambda h: h*100.'
-    latex: H_0
+#  H0:
+#    value: 'lambda h: h*100.'
+#    latex: H_0
 
   n_s:
     prior:
@@ -409,28 +409,28 @@ params:
 
   mnu: 0.0
 
-  YHe:
-    latex: Y_\mathrm{P}
+#  YHe:
+#    latex: Y_\mathrm{P}
 
-  Y_p:
-    latex: Y_P^\mathrm{BBN}
+#  Y_p:
+#    latex: Y_P^\mathrm{BBN}
     
-  DHBBN:
-    derived: 'lambda DH: 10**5*DH'
-    latex: 10^5 \mathrm{D}/\mathrm{H}
+#  DHBBN:
+#    derived: 'lambda DH: 10**5*DH'
+#    latex: 10^5 \mathrm{D}/\mathrm{H}
 
-  tau: 0.08
+#  tau: 0.08
 
-  zrei:
-    latex: z_\mathrm{re}
+#  zrei:
+#    latex: z_\mathrm{re}
         
-  s8omegamp5:
-    derived: 'lambda sigma8, omegam: sigma8*omegam**0.5'
-    latex: \sigma_8 \Omega_\mathrm{m}^{0.5}
+#  s8omegamp5:
+#    derived: 'lambda sigma8, omegam: sigma8*omegam**0.5'
+#    latex: \sigma_8 \Omega_\mathrm{m}^{0.5}
     
-  s8omegamp25:
-    derived: 'lambda sigma8, omegam: sigma8*omegam**0.25'
-    latex: \sigma_8 \Omega_\mathrm{m}^{0.25}
+#  s8omegamp25:
+#    derived: 'lambda sigma8, omegam: sigma8*omegam**0.25'
+#    latex: \sigma_8 \Omega_\mathrm{m}^{0.25}
     
   m_nu:
     value: 'lambda mnu: mnu'
@@ -798,15 +798,16 @@ params:
     proposal: 0.05
 
 sampler:
-  mcmc:
-    burn_in: 10
-    learn_proposal: True
+#  mcmc:
+#    burn_in: 10
+#    learn_proposal: True
 #    max_samples: 100000
-    Rminus1_stop: 0.01
-    measure_speeds: True
-    oversample_power: 1
-    drag: True
-    max_tries: 20000
+#    Rminus1_stop: 0.01
+#    measure_speeds: True
+#    oversample_power: 1
+#    drag: True
+#    max_tries: 20000
+  polychord:
 
 theory:
   cl_like.CCL:

@@ -11,7 +11,7 @@ from .hm_extra import HalomodCorrection
 from .pixwin import beam_hpix
 from .lpt import LPTCalculator, get_lpt_pk2d
 from .ept import EPTCalculator, get_ept_pk2d
-from .bacco import BACCOCalculator, get_bacco_pk2d 
+#from .bacco import BACCOCalculator, get_bacco_pk2d  # andrina's version
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 
@@ -72,7 +72,9 @@ class ClLike(Likelihood):
         # Read SACC file
         self._read_data()
         # Ell sampling for interpolation
-        self._get_ell_sampling()
+        #self._get_ell_sampling()
+        # B.H. adjusting to see whether chi2 changes and timing tuks
+        self._get_ell_sampling(nl_per_decade=25)
         # Other global parameters
         self._init_globals()
 
@@ -208,6 +210,82 @@ class ClLike(Likelihood):
 
             # IDs for the <nabla^2, X> ~ -k^2 <1, X> approximation.
             self.nabla_idx = [0, 1, 3, 6] # correspond to anzu's <1,1>, <1,d>, <1,d^2>, <1,s^2> after adjusting by minus one
+            
+        elif self.bias_model == 'heft':
+            import asdf
+            from classy import Class
+            # B.H. names of the bias EFT parameters
+            self.bias_eft_names = ['b1', 'b2', 'bn', 'bs']
+
+            # load the fiducial template and the derivatives
+            R_smooth = 0.
+            self.want_ratio = True
+            data_dir = os.path.expanduser("~/repos/hybrid_eft_nbody/data/AbacusSummit_base_c000_ph000/z0.100/")
+            if self.want_ratio:
+                fid_file = os.path.join(data_dir, "fid_rat_Pk_dPk_templates_%d.asdf"%(int(R_smooth)))
+            else:
+                fid_file = os.path.join(data_dir, "fid_Pk_dPk_templates_%d.asdf"%(int(R_smooth)))
+            with asdf.open(fid_file, lazy_load=False, copy_arrays=True) as f:
+                self.fid_dPk_Pk_templates = f['data'] # in h units
+                self.k_s = f['data']['ks'] # in h units
+                header = f['header']
+
+            # get just the keys for the templates
+            template_comb_names = []
+            for i, bi in enumerate(self.bias_eft_names):
+                for j, bj in enumerate(self.bias_eft_names):
+                    if j < i: continue
+                    template_comb_names.append(bi+'_'+bj)
+            for bi in self.bias_eft_names:
+                template_comb_names.append('1'+'_'+bi)
+            template_comb_names.append('1'+'_'+'1')
+            self.template_comb_names = template_comb_names
+            
+            heft_dict = {}
+            counter = 0
+            for i in range(len(template_comb_names)):
+                heft_dict[template_comb_names[i]] = counter
+                counter += 1
+            self.heft_dict = heft_dict
+
+            # parameters used for the EFT approach: fid_deriv are used with the derivatives; other params are just to initialize CLASS
+            deriv_param_names = ['omega_b', 'omega_cdm', 'n_s', 'sigma8_cb']
+
+            # separate header items into cosmology parameters and redshift of the templates
+            fid_cosmo = {}
+            fid_deriv_params = {}
+            z_templates = {}
+            for key in header.keys():
+                if key in deriv_param_names:
+                    fid_cosmo[key] = header[key]
+                    fid_deriv_params[key] = header[key]
+                elif 'ztmp' in key:
+                    z_templates[key] = header[key]
+                elif 'A_s' == key:
+                    self.fid_A_s = header[key]
+                elif 'theta_s_100' == key:
+                    theta_s_100 = header[key]
+                else:
+                    fid_cosmo[key] = header[key]
+            self.fid_deriv_params = fid_deriv_params
+            self.z_templates = z_templates
+            
+            # remove the sigma8_cb parameter as CLASS uses A_s
+            fid_cosmo.pop('sigma8_cb')
+
+            # initilize  the fiducial cosmology to check that you recover the theta_s from the header
+            class_cosmo = Class()
+            class_cosmo.set(fid_cosmo)
+            class_cosmo.compute()
+            fid_theta = class_cosmo.theta_s_100()
+            assert np.abs(header['theta_s_100'] - fid_theta) < 1.e-6, "CLASS not initialized properly"
+            
+            # fiducial cosmology with all CLASS parameters
+            fid_cosmo['100*theta_s'] = fid_theta
+
+            # removing h since the parameter that is held fixed is 100*theta_s
+            fid_cosmo.pop('h')
+            self.fid_cosmo = fid_cosmo
 
     def _read_data(self):
         """
@@ -357,6 +435,9 @@ class ClLike(Likelihood):
         self.inv_cov = np.linalg.inv(self.cov)
         self.ndata = len(self.data_vec)
 
+        # B.H. ad hoc decreasing of the bandpower maximum (doesn't change the chi2 by much +/-2 but not necessarily faster)
+        self.l_max_sample = 2000
+
     def _get_ell_sampling(self, nl_per_decade=30):
         # Selects ell sampling.
         # Ell max/min are set by the bandpower window ells.
@@ -371,7 +452,7 @@ class ClLike(Likelihood):
         l_sample = np.unique(np.geomspace(l_min_sample_here,
                                           self.l_max_sample+1,
                                           nl_sample).astype(int)).astype(float)
-
+        # this is what you need to do
         if self.l_min_sample == 0:
             self.l_sample = np.concatenate((np.array([0.]), l_sample))
         else:
@@ -381,6 +462,9 @@ class ClLike(Likelihood):
         """ Interpolates C_ell, evaluates it at bandpower window
         ell values and convolves with window."""
         f = interp1d(self.l_sample, cl_in)
+        # B.H. reducing the number of ells for speed up
+        w_bpw = w_bpw[:, l_bpw < self.l_sample.max()]
+        l_bpw = l_bpw[l_bpw < self.l_sample.max()]
         cl_unbinned = f(l_bpw)
         cl_binned = np.dot(w_bpw, cl_unbinned)
         return cl_binned
@@ -414,9 +498,7 @@ class ClLike(Likelihood):
             b0 = pars[self.input_params_prefix + '_' + name + '_b0']
             bp = pars.get(self.input_params_prefix + '_' + name + '_b0p', 0.)
             bz = b0 + bp * (z - zmean)
-        elif self.bias_model == 'BACCO':
-            pass
-        elif self.bias_model == 'anzu':
+        elif self.bias_model in ['BACCO', 'anzu', 'heft']:
             pass
         return (z, bz)
 
@@ -497,24 +579,26 @@ class ClLike(Likelihood):
                     for b in self.b_emu:
                         bias[b] = pars.get(self.input_params_prefix + '_' + name + '_' + b, 0.)
                     bias['b0'] = 1. # TODO: can also just feed it as a fixed parameter in the yaml
+                if self.bias_model == 'heft':
+                    # note that heft is missing b0 = 1
+                    bias = {}
+                    for b in self.bias_eft_names:
+                        bias[b] = pars.get(self.input_params_prefix + '_' + name + '_' + b, 0.)
+
             elif q == 'galaxy_shear':
                 nz = self._get_nz(cosmo, name, **pars)
                 ia = self._get_ia_bias(cosmo, name, **pars)
                 t = ccl.WeakLensingTracer(cosmo, nz, ia_bias=ia)
                 if is_PT_bias:
                     ptt = pt.PTMatterTracer()
-                if self.bias_model == 'BACCO':
-                    bias = None
-                if self.bias_model == 'anzu':
+                if self.bias_model in ['BACCO', 'anzu', 'heft']:
                     bias = None
             elif q == 'cmb_convergence':
                 # B.H. TODO: pass z_source as parameter to the YAML file
                 t = ccl.CMBLensingTracer(cosmo, z_source=1100)
                 if is_PT_bias:
                     ptt = pt.PTMatterTracer()
-                if self.bias_model == 'BACCO':
-                    bias = None
-                if self.bias_model == 'anzu':
+                if self.bias_model in ['BACCO', 'anzu', 'heft']:
                     bias = None
             elif q == 'cmb_tSZ':
                 t = ccl.tSZTracer(cosmo, z_max=3.)
@@ -523,9 +607,7 @@ class ClLike(Likelihood):
                                      '_mass_bias', 1.)
                     prof.update_parameters(mass_bias=o_m_b)
                     normed = False
-                if self.bias_model == 'BACCO':
-                    bias = None
-                if self.bias_model == 'anzu':
+                if self.bias_model in ['BACCO', 'anzu', 'heft']:
                     bias = None
                 else:
                     raise NotImplementedError("Can't do tSZ without"
@@ -538,26 +620,9 @@ class ClLike(Likelihood):
             if self.bias_model == 'HaloModel':
                 trs[name]['Profile'] = prof
                 trs[name]['Normed'] = normed
-            if self.bias_model == 'BACCO':
-                trs[name]['bias'] = bias # if not galaxy tracer, this is None
-            if self.bias_model == 'anzu':
+            if self.bias_model in ['BACCO', 'anzu', 'heft']:
                 trs[name]['bias'] = bias # if not galaxy tracer, this is None
         return trs
-
-    def _cosmo_to_bacco(self, cosmo):
-        # TODO: add neutrinos to omega_matter
-        pars = {
-            'omega_matter' : cosmo['Omega_b']+cosmo['Omega_c'], # correct
-            'omega_baryon' : cosmo['Omega_b'],
-            'hubble' : cosmo['H0']/100.,
-            'ns' : cosmo['n_s'],
-            'sigma8' : ccl.sigma8(cosmo), # TODO: should be just CDM + baryons
-            'neutrino_mass' : np.sum(cosmo['m_nu']), # TODO: summing the masses of the neutrino species (should probs be selecting the single neutrino species in pyccl)
-            'w0' : cosmo['w0'],
-            'wa' : cosmo['wa'],
-            'expfactor' : 1.  # random scale factor just to initialize
-        }
-        return pars
 
     def _get_pk_data(self, cosmo):
         """ Get all cosmology-dependent ingredients to create the
@@ -618,10 +683,28 @@ class ClLike(Likelihood):
         elif self.bias_model == 'anzu':
             pk2d_anzu, pkmm = self._compute_anzu(cosmo)
             return {'pk2d_anzu': pk2d_anzu, 'pk_mm': pkmm}
+        elif self.bias_model == 'heft':
+            pk2d_heft, pkmm = self._compute_heft(cosmo)
+            return {'pk2d_heft': pk2d_heft, 'pk_mm': pkmm}
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
 
+    def _cosmo_to_bacco(self, cosmo):
+        # TODO: add neutrinos to omega_matter
+        pars = {
+            'omega_matter' : cosmo['Omega_b']+cosmo['Omega_c'], # correct
+            'omega_baryon' : cosmo['Omega_b'],
+            'hubble' : cosmo['H0']/100.,
+            'ns' : cosmo['n_s'],
+            'sigma8' : ccl.sigma8(cosmo), # TODO: should be just CDM + baryons
+            'neutrino_mass' : np.sum(cosmo['m_nu']), # TODO: summing the masses of the neutrino species (should probs be selecting the single neutrino species in pyccl)
+            'w0' : cosmo['w0'],
+            'wa' : cosmo['wa'],
+            'expfactor' : 1.  # random scale factor just to initialize
+        }
+        return pars
+        
     def _cosmo_to_anzu(self, cosmo):
         # Initialize cosmology vector
         cosmovec = np.zeros(8)
@@ -638,6 +721,66 @@ class ClLike(Likelihood):
         cosmovec = np.atleast_2d(cosmovec)
 
         return cosmovec
+
+    def _cosmo_to_heft(self, cosmo): 
+        # convert into needed format
+        pars = {}
+        pars['omega_b'] = cosmo['Omega_b'] * (cosmo['H0'] / 100)**2
+        pars['omega_cdm'] = cosmo['Omega_c'] * (cosmo['H0'] / 100)**2
+        pars['n_s'] = cosmo['n_s']
+        pars['sigma8_cb'] = ccl.sigma8(cosmo)
+        pars['h'] = (cosmo['H0'] / 100.)
+        return pars
+    
+    def _compute_bacco(self, cosmo):
+
+        # translate the pyccl cosmology parameters into bacco notation
+        pars = self._cosmo_to_bacco(cosmo)
+
+        # convert k_s [Mpc^-1] into h Mpc^-1 units just for the calculation
+        #k = self.k_s/pars['hubble']
+        # self.k_s already in h/Mpc
+        k = self.k_s
+
+        # 10 redshifts, 15 combinations between bias params, and the ks (added b0)
+        num_comb = int((len(self.bias_labels))*(len(self.bias_labels)-1)/2 + len(self.bias_labels))
+        pk2d_bacco = np.zeros((len(self.a_s), num_comb, len(self.k_s)))
+
+        # compute the power for each redshift
+        #t1 = time.time()
+        for i in range(len(self.a_s)):
+            pars['expfactor'] = self.a_s[i]
+            if self.a_s[i] >= 0.4: # if within BACCO, emulator
+                # call the emulator of the nonlinear 15 lagrangian bias expansion terms, shape is (15, len(k))
+                _, pnn = self.lbias.get_nonlinear_pnn(pars, k=k)
+            else: # if outside, normal lpt
+                _, pnn = self.lbias.get_lpt_pk(pars, k=k)
+            pk2d_bacco[i, :, :] = pnn
+
+        # normalize bacco following LPT convention (see Andrina)
+        for i in range(num_comb):
+            if i in [2, 6, 3, 7, 4, 8]: #dmd2, d1d2, dms2, d1s2, dmn2, d1n2
+                pk2d_bacco[:, i, :] *= 0.5
+            elif i in [9, 10, 12, 14, 11, 13]: # d2d2, d2s2, s2s2, n2n2, d2n2, s2n2
+                pk2d_bacco[:, i, :] *= 0.25
+        #print("time = ", time.time()-t1)
+
+        # convert the spit out result from (Mpc/h)^3 to Mpc^3 (bacco uses h units, but pyccl doesn't)
+        pk2d_bacco /= pars['hubble']**3
+        # kinda dumb B.H. please change
+        self.h = cosmo['h']
+
+        # TODO: is this the best way to handle the matter-matter power spectrum?
+        cosmo.compute_nonlin_power()
+        pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+
+        #pkmm_ccl = pkmm.eval(self.k_s, self.a_s[0], cosmo) # Mpc
+        #pkmm_bacco = pk2d_bacco[0, 0, :] # Mpc
+        #np.save("pkmm_ccl.npy", pkmm_ccl) # Mpc
+        #np.save("pkmm_bacco.npy", pkmm_bacco) # Mpc
+        #np.save("k_s.npy", self.k_s) # Mpc
+
+        return pk2d_bacco, pkmm
 
     def _compute_anzu_old(self, cosmo):
         # 9 redshifts, 10 combinations between bias params, and the rest are the ks
@@ -732,55 +875,45 @@ class ClLike(Likelihood):
 
         return emu_spec, pkmm
 
-    def _compute_bacco(self, cosmo):
+    def _compute_heft(self, cosmo):
 
-        # translate the pyccl cosmology parameters into bacco notation
-        pars = self._cosmo_to_bacco(cosmo)
+        # translate the pyccl cosmology parameters into heft notation
+        pars = self._cosmo_to_heft(cosmo)
+        
+        # interpolate for the cosmological parameters that are being deriv
+        num_comb = len(self.template_comb_names)
+        pk2d_heft = np.zeros((len(self.z_templates), num_comb, len(self.k_s)))
+        a_s = np.zeros(len(self.z_templates))
+        # for a given redshift
+        for combo in self.template_comb_names:
+            Pk_a = np.zeros((len(self.z_templates), len(self.k_s)))
+            for i in range(len(self.z_templates)):
+                z_str = 'ztmp%d'%i
+                a_s[i] = 1./(1+self.z_templates[z_str])
+                key = z_str+'_'+combo
+                
+                Pk = self.fid_dPk_Pk_templates[key] + \
+                     self.fid_dPk_Pk_templates[key+'_'+'omega_b'] * (pars['omega_b'] - self.fid_deriv_params['omega_b']) + \
+                     self.fid_dPk_Pk_templates[key+'_'+'omega_cdm'] * (pars['omega_cdm'] - self.fid_deriv_params['omega_cdm']) + \
+                     self.fid_dPk_Pk_templates[key+'_'+'n_s'] * (pars['n_s'] - self.fid_deriv_params['n_s']) + \
+                     self.fid_dPk_Pk_templates[key+'_'+'sigma8_cb'] * (pars['sigma8_cb'] - self.fid_deriv_params['sigma8_cb'])
 
-        # convert k_s [Mpc^-1] into h Mpc^-1 units just for the calculation
-        #k = self.k_s/pars['hubble']
-        # self.k_s already in h/Mpc
-        k = self.k_s
+                if self.want_ratio:
+                    Pk *= ccl.nonlin_matter_power(cosmo, self.k_s*pars['h'], a=a_s[i])
+                else:
+                    # convert to Mpc^3 rather than [Mpc/h]^3
+                    Pk /= h**3.
 
-        # 10 redshifts, 15 combinations between bias params, and the ks (added b0)
-        num_comb = int((len(self.bias_labels))*(len(self.bias_labels)-1)/2 + len(self.bias_labels))
-        pk2d_bacco = np.zeros((len(self.a_s), num_comb, len(self.k_s)))
-
-        # compute the power for each redshift
-        #t1 = time.time()
-        for i in range(len(self.a_s)):
-            pars['expfactor'] = self.a_s[i]
-            if self.a_s[i] >= 0.4: # if within BACCO, emulator
-                # call the emulator of the nonlinear 15 lagrangian bias expansion terms, shape is (15, len(k))
-                _, pnn = self.lbias.get_nonlinear_pnn(pars, k=k)
-            else: # if outside, normal lpt
-                _, pnn = self.lbias.get_lpt_pk(pars, k=k)
-            pk2d_bacco[i, :, :] = pnn
-
-        # normalize bacco following LPT convention (see Andrina)
-        for i in range(num_comb):
-            if i in [2, 6, 3, 7, 4, 8]: #dmd2, d1d2, dms2, d1s2, dmn2, d1n2
-                pk2d_bacco[:, i, :] *= 0.5
-            elif i in [9, 10, 12, 14, 11, 13]: # d2d2, d2s2, s2s2, n2n2, d2n2, s2n2
-                pk2d_bacco[:, i, :] *= 0.25
-        #print("time = ", time.time()-t1)
-
-        # convert the spit out result from (Mpc/h)^3 to Mpc^3 (bacco uses h units, but pyccl doesn't)
-        pk2d_bacco /= pars['hubble']**3
-        # kinda dumb B.H. please change
-        self.h = cosmo['h']
-
+                Pk_a[i, :] = Pk
+            pk2d_heft[:, self.heft_dict[combo], :] = Pk_a
+        self.a_s = a_s
+        self.h = cosmo['h']        
+        
         # TODO: is this the best way to handle the matter-matter power spectrum?
         cosmo.compute_nonlin_power()
         pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
 
-        #pkmm_ccl = pkmm.eval(self.k_s, self.a_s[0], cosmo) # Mpc
-        #pkmm_bacco = pk2d_bacco[0, 0, :] # Mpc
-        #np.save("pkmm_ccl.npy", pkmm_ccl) # Mpc
-        #np.save("pkmm_bacco.npy", pkmm_bacco) # Mpc
-        #np.save("k_s.npy", self.k_s) # Mpc
-
-        return pk2d_bacco, pkmm
+        return pk2d_heft, pkmm
 
     def _get_pkxy(self, cosmo, clm, pkd, trs, **pars):
         """ Get the P(k) between two tracers. """
@@ -890,6 +1023,16 @@ class ClLike(Likelihood):
                 pk2d = self._get_pk_2d_anzu(pkd['pk2d_anzu'], bias_eft1, bias_eft2, q1, q2)
                 return pk2d
 
+        elif self.bias_model == 'heft':
+            if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')): 
+                return pkd['pk_mm']  # matter-matter
+            else:
+                # bias is a dictionary holding the value for each bias parameter or None if not galaxy tracer
+                bias_eft1 = trs[clm['bin_1']]['bias']
+                bias_eft2 = trs[clm['bin_2']]['bias']
+                pk2d = self._get_pk_2d_heft(pkd['pk2d_heft'], bias_eft1, bias_eft2, q1, q2)
+                return pk2d
+
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
@@ -970,6 +1113,47 @@ class ClLike(Likelihood):
         # Compute the 2D power spectrum
         pk_2d_anzu = ccl.Pk2D(a_arr=self.a_s, lk_arr=lk_arr, pk_arr=Pk_a, is_logp=False)
         return pk_2d_anzu
+
+    def _get_pk_2d_heft(self, pk2d_heft, bias_eft1, bias_eft2, q1, q2):
+        # Initialize power spectrum Pk_a(as, ks)
+        Pk_a = np.zeros_like(pk2d_heft[:, 0, :])
+
+        # If both tracers are galaxies, Pk^{tr1,tr2} = f_i^bin1 * f_j^bin2 * Pk_ij
+        if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
+            for key1 in bias_eft1.keys():
+                bias1 = bias_eft1[key1]
+                for key2 in bias_eft2.keys():
+                    bias2 = bias_eft2[key2]
+                    try:
+                        comb = self.heft_dict[key1+'_'+key2]
+                    except:
+                        comb = self.heft_dict[key2+'_'+key1]
+                    Pk_a += bias1*bias2*pk2d_heft[:, comb, :]
+
+        # If first tracer is galaxies and second is matter, Pk^{tr1,tr2} = f_i^bin1 * 1. * Pk_0i
+        elif (q1 == 'galaxy_density') and (q2 != 'galaxy_density'):
+            for key1 in bias_eft1.keys():
+                bias1 = bias_eft1[key1]
+                comb = self.heft_dict['1'+'_'+key1]
+                Pk_a += bias1*pk2d_heft[:, comb, :]
+
+        # If second tracer is galaxies and first is matter, Pk^{tr1,tr2} = f_j^bin2 * 1. * Pk_0j
+        elif (q1 != 'galaxy_density') and (q2 == 'galaxy_density'):
+            for key2 in bias_eft2.keys():
+                bias2 = bias_eft2[key2]
+                comb = self.heft_dict['1'+'_'+key2]
+                Pk_a += bias2*pk2d_heft[:, comb, :]
+
+        # Convert ks from [Mpc/h]^-1 to [Mpc]^-1
+        lk_arr = np.log(self.k_s*self.h)
+
+        # Already in Mpc^3 Same for the power spectrum: convert to Mpc^3
+        #Pk_a /= (cosmo['H0']/100.)**3.
+
+        # Compute the 2D power spectrum
+        pk_2d_heft = ccl.Pk2D(a_arr=self.a_s, lk_arr=lk_arr, pk_arr=Pk_a, is_logp=False)
+
+        return pk_2d_heft
 
     def _get_pixel_window(self, clm):
         pix1 = self.pixwin[clm['bin_1']]
@@ -1103,7 +1287,6 @@ class ClLike(Likelihood):
         #ell, t, bins = self._get_theory(**pars) #
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r))
-        #print("time = ", time.time()-t1)
         # B.H. saving file
         #np.savez_compressed(os.path.join('/users/boryanah/repos/xCell-likelihoods/analysis/data/', f'cl_cross_corr_{self.bias_model:s}.npz'), chi2=chi2, chi2_dof=chi2/self.ndata, cls=t, ells=ell, tracers=bins) # 
         return -0.5*chi2
