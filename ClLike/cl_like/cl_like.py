@@ -461,18 +461,21 @@ class ClLike(Likelihood):
     def _eval_interp_cl(self, cl_in, l_bpw, w_bpw):
         """ Interpolates C_ell, evaluates it at bandpower window
         ell values and convolves with window."""
+        #t1 = time.time() # B.H.
         f = interp1d(self.l_sample, cl_in)
         # B.H. reducing the number of ells for speed up
         w_bpw = w_bpw[:, l_bpw < self.l_sample.max()]
         l_bpw = l_bpw[l_bpw < self.l_sample.max()]
         cl_unbinned = f(l_bpw)
         cl_binned = np.dot(w_bpw, cl_unbinned)
+        #print("_eval_interp_cl time = ", time.time() - t1)
         return cl_binned
 
     def _get_nz(self, cosmo, name, **pars):
         """ Get redshift distribution for a given tracer.
         Applies shift and width nuisance parameters if needed.
         """
+        #t1 = time.time() # B.H.
         z = self.bin_properties[name]['z_fid']
         nz = self.bin_properties[name]['nz_fid']
         zm = self.bin_properties[name]['zmean_fid']
@@ -486,11 +489,13 @@ class ClLike(Likelihood):
         msk = z >= 0
         z = z[msk]
         nz = nz[msk]
+        #print("_get_nz time = ", time.time() - t1)
         return (z, nz)
 
     def _get_bz(self, cosmo, name, **pars):
         """ Get linear galaxy bias. Unless we're using a linear bias,
         model this should be just 1."""
+        #t1 = time.time() # B.H.
         z = self.bin_properties[name]['z_fid']
         zmean = self.bin_properties[name]['zmean_fid']
         bz = np.ones_like(z)
@@ -500,11 +505,13 @@ class ClLike(Likelihood):
             bz = b0 + bp * (z - zmean)
         elif self.bias_model in ['BACCO', 'anzu', 'heft']:
             pass
+        #print("_get_bz time = ", time.time() - t1)
         return (z, bz)
 
     def _get_ia_bias(self, cosmo, name, **pars):
         """ Intrinsic alignment amplitude.
         """
+        #t1 = time.time() # B.H.
         if self.ia_model == 'IANone':
             return None
         else:
@@ -525,12 +532,14 @@ class ClLike(Likelihood):
             else:
                 raise LoggedError(self.log, "Unknown IA model %s" %
                                   self.ia_model)
+            #print("_get_ia_bias = ", time.time() - t1)
             return (z, A_IA)
 
     def _get_tracers(self, cosmo, **pars):
         """ Obtains CCL tracers (and perturbation theory tracers,
         and halo profiles where needed) for all used tracers given the
         current parameters."""
+        t1 = time.time() # B.H.
         trs = {}
         is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT', 'bacco_andrina']
         for name, q in self.tracer_qs.items():
@@ -622,6 +631,7 @@ class ClLike(Likelihood):
                 trs[name]['Normed'] = normed
             if self.bias_model in ['BACCO', 'anzu', 'heft']:
                 trs[name]['bias'] = bias # if not galaxy tracer, this is None
+        print("_get_tracers time calling get_nz,bz, weak lensing and biases = ", time.time() - t1)
         return trs
 
     def _get_pk_data(self, cosmo):
@@ -629,10 +639,12 @@ class ClLike(Likelihood):
         different P(k)s needed for the C_ell calculation.
         For linear bias, this is just the matter power spectrum.
         """
+        t1 = time.time()
         # Get P(k)s from CCL
         if self.bias_model == 'Linear':
             cosmo.compute_nonlin_power()
             pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+            print("_get_pk_data time calling emulators or nonlinear power = ", time.time() - t1)
             return {'pk_mm': pkmm}
         elif self.bias_model in ['EulerianPT', 'LagrangianPT']:
             if self.k_SN_suppress > 0:
@@ -668,6 +680,7 @@ class ClLike(Likelihood):
             return {'hmc': hmc, 'pk_mm': pkmm}
         elif self.bias_model == 'BACCO':
             pk2d_bacco, pkmm = self._compute_bacco(cosmo)
+            print("_get_pk_data time calling emulators or nonlinear power = ", time.time() - t1)
             return {'pk2d_bacco': pk2d_bacco, 'pk_mm': pkmm}
         elif self.bias_model == 'bacco_andrina':
             if self.k_pt_filter > 0:
@@ -685,10 +698,12 @@ class ClLike(Likelihood):
             return {'pk2d_anzu': pk2d_anzu, 'pk_mm': pkmm}
         elif self.bias_model == 'heft':
             pk2d_heft, pkmm = self._compute_heft(cosmo)
+            print("_get_pk_data time calling emulators or nonlinear power = ", time.time() - t1)
             return {'pk2d_heft': pk2d_heft, 'pk_mm': pkmm}
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
+        
 
     def _cosmo_to_bacco(self, cosmo):
         # TODO: add neutrinos to omega_matter
@@ -918,8 +933,9 @@ class ClLike(Likelihood):
     def _get_pkxy(self, cosmo, clm, pkd, trs, **pars):
         """ Get the P(k) between two tracers. """
         q1 = self.tracer_qs[clm['bin_1']]
-        q2 = self.tracer_qs[clm['bin_2']]        
-
+        q2 = self.tracer_qs[clm['bin_2']]
+        #t1 = time.time() # B.H.
+        
         if (self.bias_model == 'Linear') or (self.bias_model == 'BzNone'):
             if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
                 return pkd['pk_mm']  # galaxy-galaxy
@@ -1002,6 +1018,7 @@ class ClLike(Likelihood):
                 bias_eft1 = trs[clm['bin_1']]['bias']
                 bias_eft2 = trs[clm['bin_2']]['bias']
                 pk2d = self._get_pk_2d_bacco(pkd['pk2d_bacco'], bias_eft1, bias_eft2, q1, q2)
+                #print("_get_pkxy time calling _get_pk_2d_bacco = ", time.time() - t1)
                 return pk2d
         elif self.bias_model == 'bacco_andrina': # Andrina
             if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')):
@@ -1031,18 +1048,19 @@ class ClLike(Likelihood):
                 bias_eft1 = trs[clm['bin_1']]['bias']
                 bias_eft2 = trs[clm['bin_2']]['bias']
                 pk2d = self._get_pk_2d_heft(pkd['pk2d_heft'], bias_eft1, bias_eft2, q1, q2)
+                #print("_get_pkxy time calling _get_pk_2d_heft = ", time.time() - t1)
                 return pk2d
 
         else:
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
 
-
     def _get_pk_2d_bacco(self, pk2d_bacco, bias_eft1, bias_eft2, q1, q2):
         # TODO: the calculation could be sped up, but need to figure out how to do for two sets of biases
         #bias = [0.75, 0.25, 0.1, 1.4] # b1, b2, bs2, blaplacian
         #kgal, pgalauto, pgalcross = lbias.get_galaxy_real_pk(pars, bias, k=None)
-
+        #t1 = time.time() # B.H.
+        
         # Initialize power spectrum Pk_a(as, ks)
         Pk_a = np.zeros_like(pk2d_bacco[:, 0, :])
 
@@ -1074,6 +1092,7 @@ class ClLike(Likelihood):
 
         # Compute the 2D power spectrum
         pk_2d_bacco = ccl.Pk2D(a_arr=self.a_s, lk_arr=lk_arr, pk_arr=Pk_a, is_logp=False)
+        #print("_get_pk_2d_bacco time = ", time.time() - t1)
         return pk_2d_bacco
 
     def _get_pk_2d_anzu(self, pk2d_anzu, bias_eft1, bias_eft2, q1, q2):
@@ -1117,7 +1136,7 @@ class ClLike(Likelihood):
     def _get_pk_2d_heft(self, pk2d_heft, bias_eft1, bias_eft2, q1, q2):
         # Initialize power spectrum Pk_a(as, ks)
         Pk_a = np.zeros_like(pk2d_heft[:, 0, :])
-
+        #t1 = time.time() # B.H.
         # If both tracers are galaxies, Pk^{tr1,tr2} = f_i^bin1 * f_j^bin2 * Pk_ij
         if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
             for key1 in bias_eft1.keys():
@@ -1152,7 +1171,7 @@ class ClLike(Likelihood):
 
         # Compute the 2D power spectrum
         pk_2d_heft = ccl.Pk2D(a_arr=self.a_s, lk_arr=lk_arr, pk_arr=Pk_a, is_logp=False)
-
+        #print("_get_pk_2d_heft time = ", time.time() - t1)
         return pk_2d_heft
 
     def _get_pixel_window(self, clm):
@@ -1162,6 +1181,7 @@ class ClLike(Likelihood):
 
     def _get_cl_all(self, cosmo, pk, **pars):
         """ Compute all C_ells."""
+        t1 = time.time() # B.H.
         # Gather all tracers
         trs = self._get_tracers(cosmo, **pars)
 
@@ -1177,19 +1197,34 @@ class ClLike(Likelihood):
 
         # Correlate all needed pairs of tracers
         cls = []
+        t2 = 0
+        t3 = 0
+        t4 = 0
         for clm in self.cl_meta:
+            t0 = time.time()
             pkxy = self._get_pkxy(cosmo, clm, pk, trs, **pars)
+            t2 += time.time()-t0
+            t0 = time.time()
             cl = ccl.angular_cl(cosmo,
                                 trs[clm['bin_1']]['ccl_tracer'],
                                 trs[clm['bin_2']]['ccl_tracer'],
                                 self.l_sample, p_of_k_a=pkxy)
+            t3 += time.time()-t0
+            t0 = time.time()
             # Pixel window function
             cl *= self._get_pixel_window(clm)
             clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
+            t4 += time.time()-t0
+            t0 = time.time()
             cls.append(clb)
+        print("all _get_pkxy calls (_get_pk_2d_bacco,heft,linear) = ", t2)
+        print("all ccl.angular_cl calls = ", t3)
+        print("all _eval_interp_cl calls = ", t4)
+        print("_get_cl_all time calling _get_tracers, ccl.bcm_correct_pk2d(cosmo, pk2d),  _get_pkxy, ccl.angular_cl, _get_pixel_window and _eval_interp_cl = ", time.time() - t1)
         return cls
 
     def _apply_shape_systematics(self, cls, **pars):
+        t1 = time.time() # B.H.
         if self.shape_model == 'ShapeMultiplicative':
             # Multiplicative shear bias
             for i, clm in enumerate(self.cl_meta):
@@ -1207,8 +1242,10 @@ class ClLike(Likelihood):
                     m2 = 0.
                 prefac = (1+m1) * (1+m2)
                 cls[i] *= prefac
+        print("_apply_shape_systematics time = ", time.time() - t1)
 
     def get_cls_theory(self, **pars):
+        t1 = time.time() # B.H.
         # Get cosmological model
         res = self.provider.get_CCL()
         cosmo = res['cosmo']
@@ -1221,11 +1258,12 @@ class ClLike(Likelihood):
 
         # Multiplicative bias if needed
         self._apply_shape_systematics(cls, **pars)
+        print("get_cls_theory time calling _get_cl_all and _apply_shape_systematics = ", time.time() - t1)
         return cls
 
     def get_sacc_file(self, **pars):
         import sacc
-
+        t1 = time.time() # B.H.
         # Create empty file
         s = sacc.Sacc()
 
@@ -1252,6 +1290,7 @@ class ClLike(Likelihood):
                          clm['l_eff'], cl, window=bpw)
 
         s.add_covariance(self.cov)
+        print("get_sacc_file time = ", time.time() - t1)
         return s
 
     def _get_theory(self, **pars):
@@ -1281,12 +1320,13 @@ class ClLike(Likelihood):
         """
         Simple Gaussian likelihood.
         """
-        #t1 = time.time()
+        t1 = time.time()
         t = self._get_theory(**pars) # og
         # B.H. saving file
         #ell, t, bins = self._get_theory(**pars) #
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r))
+        print("total time to evaluate chi2 = ", time.time() - t1)
         # B.H. saving file
         #np.savez_compressed(os.path.join('/users/boryanah/repos/xCell-likelihoods/analysis/data/', f'cl_cross_corr_{self.bias_model:s}.npz'), chi2=chi2, chi2_dof=chi2/self.ndata, cls=t, ells=ell, tracers=bins) # 
         return -0.5*chi2
