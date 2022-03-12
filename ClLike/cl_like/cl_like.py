@@ -1197,6 +1197,7 @@ class ClLike(Likelihood):
 
         # Correlate all needed pairs of tracers
         cls = []
+        clfs = []
         t2 = 0
         t3 = 0
         t4 = 0
@@ -1210,12 +1211,13 @@ class ClLike(Likelihood):
                                 trs[clm['bin_2']]['ccl_tracer'],
                                 self.l_sample, p_of_k_a=pkxy)
             t3 += time.time()-t0
-            t0 = time.time()
             # Pixel window function
             cl *= self._get_pixel_window(clm)
+            clfs.append(cl)
+        for clm, cl in zip(self.cl_meta, clfs):
+            t0 = time.time()
             clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
             t4 += time.time()-t0
-            t0 = time.time()
             cls.append(clb)
         print("all _get_pkxy calls (_get_pk_2d_bacco,heft,linear) = ", t2)
         print("all ccl.angular_cl calls = ", t3)
