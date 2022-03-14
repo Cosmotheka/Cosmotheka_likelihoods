@@ -558,6 +558,7 @@ class ClLike(Likelihood):
 
         # Correlate all needed pairs of tracers
         cls = []
+        clfs = []
         for clm in self.cl_meta:
             pkxy = self._get_pkxy(cosmo, clm, pk, trs, **pars)
             cl = ccl.angular_cl(cosmo,
@@ -566,6 +567,10 @@ class ClLike(Likelihood):
                                 self.l_sample, p_of_k_a=pkxy)
             # Pixel window function
             cl *= self._get_pixel_window(clm)
+            clfs.append(cl)
+
+        # Done in two loops to take advantage of ccl paralelization
+        for clm, cl in zip(self.cl_meta, clfs):
             clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
             cls.append(clb)
         return cls
