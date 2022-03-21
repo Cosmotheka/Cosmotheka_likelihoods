@@ -292,23 +292,31 @@ class ClLike(Likelihood):
         Applies shift and width nuisance parameters if needed.
         """
         z = self.bin_properties[name]['z_fid']
-        nz = self.bin_properties[name]['nz_fid']
+        nz = interp1d(z, self.bin_properties[name]['nz_fid'], kind='cubic',
+                      bounds_error=False, fill_value=(0, 'extrapolate'))
         zm = self.bin_properties[name]['zmean_fid']
         dz = 0.
         wz = 1.
+        jacob = 1
         if (self.nz_model == 'NzShift') or (self.nz_model == 'NzShiftWidth'):
             dz = pars.get(self.input_params_prefix + '_' + name + '_dz', 0.)
         if (self.nz_model == 'NzShiftWidth') or (self.nz_model == 'NzWidth'):
             wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
-        if (self.nz_model == 'NzShiftParam'):
+        # NzShiftParam parametrized as z_true - z_false = f(z_true)
+        if (self.nz_model == 'NzShiftParamExp'):
             A = pars.get(self.input_params_prefix + '_A_Nz', 0)
             alpha = pars.get(self.input_params_prefix + '_alpha_Nz', 0)
             dz = A * z ** alpha
-        z = zm+dz+(z-zm)/wz
-        msk = z >= 0
-        z = z[msk]
-        nz = nz[msk]
-        return (z, nz)
+            jacob = 1 - A * alpha * z ** (alpha -1)
+        elif self.nz_model == 'NzShiftParamLinear':
+            A = pars.get(self.input_params_prefix + '_A_Nz', 0)
+            B = pars.get(self.input_params_prefix + '_B_Nz', 0)
+            dz = A + B * z
+            jacob = (1 - B)
+        z_out = zm+dz+(z-zm)/wz
+        # dn/dzt = dzf/dzt|_zt * dn/dzf|_zt
+        nz_out = jacob * nz(z_out)
+        return (z, nz_out)
 
     def _get_bz(self, cosmo, name, **pars):
         """ Get linear galaxy bias. Unless we're using a linear bias,
