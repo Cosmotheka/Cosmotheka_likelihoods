@@ -539,7 +539,7 @@ class ClLike(Likelihood):
         """ Obtains CCL tracers (and perturbation theory tracers,
         and halo profiles where needed) for all used tracers given the
         current parameters."""
-        t1 = time.time() # B.H.
+        #t1 = time.time() # B.H.
         trs = {}
         is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT', 'bacco_andrina']
         for name, q in self.tracer_qs.items():
@@ -631,7 +631,7 @@ class ClLike(Likelihood):
                 trs[name]['Normed'] = normed
             if self.bias_model in ['BACCO', 'anzu', 'heft']:
                 trs[name]['bias'] = bias # if not galaxy tracer, this is None
-        print("_get_tracers time calling get_nz,bz, weak lensing and biases = ", time.time() - t1)
+        #print("_get_tracers time calling get_nz,bz, weak lensing and biases = ", time.time() - t1)
         return trs
 
     def _get_pk_data(self, cosmo):
@@ -639,12 +639,12 @@ class ClLike(Likelihood):
         different P(k)s needed for the C_ell calculation.
         For linear bias, this is just the matter power spectrum.
         """
-        t1 = time.time()
+        #t1 = time.time()
         # Get P(k)s from CCL
         if self.bias_model == 'Linear':
             cosmo.compute_nonlin_power()
             pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-            print("_get_pk_data time calling emulators or nonlinear power = ", time.time() - t1)
+            #print("_get_pk_data time calling emulators or nonlinear power = ", time.time() - t1)
             return {'pk_mm': pkmm}
         elif self.bias_model in ['EulerianPT', 'LagrangianPT']:
             if self.k_SN_suppress > 0:
@@ -680,7 +680,7 @@ class ClLike(Likelihood):
             return {'hmc': hmc, 'pk_mm': pkmm}
         elif self.bias_model == 'BACCO':
             pk2d_bacco, pkmm = self._compute_bacco(cosmo)
-            print("_get_pk_data time calling emulators or nonlinear power = ", time.time() - t1)
+            #print("_get_pk_data time calling emulators or nonlinear power = ", time.time() - t1)
             return {'pk2d_bacco': pk2d_bacco, 'pk_mm': pkmm}
         elif self.bias_model == 'bacco_andrina':
             if self.k_pt_filter > 0:
@@ -698,7 +698,7 @@ class ClLike(Likelihood):
             return {'pk2d_anzu': pk2d_anzu, 'pk_mm': pkmm}
         elif self.bias_model == 'heft':
             pk2d_heft, pkmm = self._compute_heft(cosmo)
-            print("_get_pk_data time calling emulators or nonlinear power = ", time.time() - t1)
+            #print("_get_pk_data time calling emulators or nonlinear power = ", time.time() - t1)
             return {'pk2d_heft': pk2d_heft, 'pk_mm': pkmm}
         else:
             raise LoggedError(self.log,
@@ -805,11 +805,11 @@ class ClLike(Likelihood):
         # Get the emulator prediction for this cosmology
         cosmovec = self._cosmo_to_anzu(cosmo) # doing sigma8 rather than A_s
 
-        t1 = time.time()
+        #t1 = time.time()
         for i in range(len(self.a)):
             cosmovec[-1, -1] = self.a[i]
             emu_spec[i] = self.emu.predict(self.k_s, cosmovec)
-        print("time = ", time.time()-t1)
+        #print("time = ", time.time()-t1)
 
         cosmo.compute_nonlin_power()
         #cosmo.compute_sigma()
@@ -1181,7 +1181,7 @@ class ClLike(Likelihood):
 
     def _get_cl_all(self, cosmo, pk, **pars):
         """ Compute all C_ells."""
-        t1 = time.time() # B.H.
+        #t1 = time.time() # B.H.
         # Gather all tracers
         trs = self._get_tracers(cosmo, **pars)
 
@@ -1202,31 +1202,31 @@ class ClLike(Likelihood):
         t3 = 0
         t4 = 0
         for clm in self.cl_meta:
-            t0 = time.time()
+            #t0 = time.time()
             pkxy = self._get_pkxy(cosmo, clm, pk, trs, **pars)
-            t2 += time.time()-t0
-            t0 = time.time()
+            #t2 += time.time()-t0
+            #t0 = time.time()
             cl = ccl.angular_cl(cosmo,
                                 trs[clm['bin_1']]['ccl_tracer'],
                                 trs[clm['bin_2']]['ccl_tracer'],
                                 self.l_sample, p_of_k_a=pkxy)
-            t3 += time.time()-t0
+            #t3 += time.time()-t0
             # Pixel window function
             cl *= self._get_pixel_window(clm)
             clfs.append(cl)
         for clm, cl in zip(self.cl_meta, clfs):
-            t0 = time.time()
+            #t0 = time.time()
             clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
-            t4 += time.time()-t0
+            #t4 += time.time()-t0
             cls.append(clb)
-        print("all _get_pkxy calls (_get_pk_2d_bacco,heft,linear) = ", t2)
-        print("all ccl.angular_cl calls = ", t3)
-        print("all _eval_interp_cl calls = ", t4)
-        print("_get_cl_all time calling _get_tracers, ccl.bcm_correct_pk2d(cosmo, pk2d),  _get_pkxy, ccl.angular_cl, _get_pixel_window and _eval_interp_cl = ", time.time() - t1)
+        #print("all _get_pkxy calls (_get_pk_2d_bacco,heft,linear) = ", t2)
+        #print("all ccl.angular_cl calls = ", t3)
+        #print("all _eval_interp_cl calls = ", t4)
+        #print("_get_cl_all time calling _get_tracers, ccl.bcm_correct_pk2d(cosmo, pk2d),  _get_pkxy, ccl.angular_cl, _get_pixel_window and _eval_interp_cl = ", time.time() - t1)
         return cls
 
     def _apply_shape_systematics(self, cls, **pars):
-        t1 = time.time() # B.H.
+        #t1 = time.time() # B.H.
         if self.shape_model == 'ShapeMultiplicative':
             # Multiplicative shear bias
             for i, clm in enumerate(self.cl_meta):
@@ -1244,10 +1244,10 @@ class ClLike(Likelihood):
                     m2 = 0.
                 prefac = (1+m1) * (1+m2)
                 cls[i] *= prefac
-        print("_apply_shape_systematics time = ", time.time() - t1)
+        #print("_apply_shape_systematics time = ", time.time() - t1)
 
     def get_cls_theory(self, **pars):
-        t1 = time.time() # B.H.
+        #t1 = time.time() # B.H.
         # Get cosmological model
         res = self.provider.get_CCL()
         cosmo = res['cosmo']
@@ -1260,12 +1260,12 @@ class ClLike(Likelihood):
 
         # Multiplicative bias if needed
         self._apply_shape_systematics(cls, **pars)
-        print("get_cls_theory time calling _get_cl_all and _apply_shape_systematics = ", time.time() - t1)
+        #print("get_cls_theory time calling _get_cl_all and _apply_shape_systematics = ", time.time() - t1)
         return cls
 
     def get_sacc_file(self, **pars):
         import sacc
-        t1 = time.time() # B.H.
+        #t1 = time.time() # B.H.
         # Create empty file
         s = sacc.Sacc()
 
@@ -1292,7 +1292,7 @@ class ClLike(Likelihood):
                          clm['l_eff'], cl, window=bpw)
 
         s.add_covariance(self.cov)
-        print("get_sacc_file time = ", time.time() - t1)
+        #print("get_sacc_file time = ", time.time() - t1)
         return s
 
     def _get_theory(self, **pars):
@@ -1322,13 +1322,13 @@ class ClLike(Likelihood):
         """
         Simple Gaussian likelihood.
         """
-        t1 = time.time()
+        #t1 = time.time()
         t = self._get_theory(**pars) # og
         # B.H. saving file
         #ell, t, bins = self._get_theory(**pars) #
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r))
-        print("total time to evaluate chi2 = ", time.time() - t1)
+        #print("total time to evaluate chi2 = ", time.time() - t1)
         # B.H. saving file
         #np.savez_compressed(os.path.join('/users/boryanah/repos/xCell-likelihoods/analysis/data/', f'cl_cross_corr_{self.bias_model:s}.npz'), chi2=chi2, chi2_dof=chi2/self.ndata, cls=t, ells=ell, tracers=bins) # 
         return -0.5*chi2
