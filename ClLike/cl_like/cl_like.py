@@ -14,7 +14,6 @@ from .ept import EPTCalculator, get_ept_pk2d
 #from .bacco import BACCOCalculator, get_bacco_pk2d  # andrina's version
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
-import time
 
 from velocileptors.EPT.cleft_kexpanded_resummed_fftw import RKECLEFT
 
@@ -318,20 +317,15 @@ class ClLike(Likelihood):
         """
         import sacc
 
-        def get_cl_type(tr1, tr2):
-            cltyp = 'cl_'
-            for tr in [tr1, tr2]:
-                q = tr.quantity
-                if (q == 'galaxy_density') or (q == 'cmb_convergence'):
-                    cltyp += '0'
-                elif q == 'galaxy_shear':
-                    cltyp += 'e'
-                else:
-                    raise ValueError(f'dtype not found for quantity {q}')
-            if cltyp == 'cl_e0':  # sacc doesn't like this one
-                cltyp = 'cl_0e'
-            return cltyp
-
+        def get_suffix_for_tr(tr):
+            q = tr.quantity
+            if (q == 'galaxy_density') or (q == 'cmb_convergence'):
+                return '0'
+            elif q == 'galaxy_shear':
+                return 'e'
+            else:
+                raise ValueError(f'dtype not found for quantity {q}')
+        
         def get_lmax_from_kmax(cosmo, kmax, zmid):
             chi = ccl.comoving_radial_distance(cosmo, 1./(1+zmid))
             lmax = np.max([10., kmax * chi - 0.5])
@@ -1221,9 +1215,9 @@ class ClLike(Likelihood):
         """ Compute all C_ells."""
         #t1 = time.time() # B.H.
         # Gather all tracers
-        t0 = time.time()
+        #t0 = time.time()
         trs = self._get_tracers(cosmo, **pars)
-        print("Time for tracers: ", time.time()-t0)
+        #print("Time for tracers: ", time.time()-t0)
 
         # baryon correction model should be oche
         if self.baryon_model == 'BCM':
@@ -1236,7 +1230,7 @@ class ClLike(Likelihood):
             pk['pk_mm'] = pk2d
 
         # Correlate all needed pairs of tracers
-        t0 = time.time()
+        #t0 = time.time()
         cls = []
         clfs = []
         t2 = 0
@@ -1256,18 +1250,18 @@ class ClLike(Likelihood):
             # Pixel window function
             cl *= clm['pixbeam']
             cls.append(cl)
-        print("Time for Limber integrals: ", time.time()-t0)
+        #print("Time for Limber integrals: ", time.time()-t0)
 
         # Bandpower window convolution
         if self.sample_cen:
             clbs = cls
         elif self.sample_bpw:
-            t0 = time.time()
+            #t0 = time.time()
             clbs = []
             for clm, cl in zip(self.cl_meta, cls):
                 clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
                 clbs.append(clb)
-            print("Time for bpw convolution: ", time.time()-t0)
+            #print("Time for bpw convolution: ", time.time()-t0)
         return clbs
 
     def _apply_shape_systematics(self, cls, **pars):
@@ -1356,7 +1350,7 @@ class ClLike(Likelihood):
                 raise ValueError("There might be something wrong with "
                                  "the effective ell assignment.")
             clm['l_eff'] = lbfs
-
+            
     def get_sacc_file(self, **pars):
         import sacc
         #t1 = time.time() # B.H.
