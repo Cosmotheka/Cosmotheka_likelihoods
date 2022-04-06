@@ -624,7 +624,8 @@ class ClLike(Likelihood):
                     bias = {}
                     for b in self.bias_eft_names:
                         bias[b] = pars.get(self.input_params_prefix + '_' + name + '_' + b, 0.)
-
+                    bias['1'] = 1.
+                        
             elif q == 'galaxy_shear':
                 nz = self._get_nz(cosmo, name, **pars)
                 ia = self._get_ia_bias(cosmo, name, **pars)
@@ -989,7 +990,7 @@ class ClLike(Likelihood):
             else:
                 ptt1 = trs[clm['bin_1']]['PT_tracer']
                 ptt2 = trs[clm['bin_2']]['PT_tracer']
-                pk_pt = get_lpt_pk2d(cosmo, ptt1, tracer2=ptt2, nonlin_pk_type='spt', # TESTING!!!!!!!!!!!!!!!!!!
+                pk_pt = get_lpt_pk2d(cosmo, ptt1, tracer2=ptt2, nonlin_pk_type='spt', # 'spt' vs default makes the comparison to HEFT easier
                                      ptc=pkd['ptc'])
                 return pk_pt
         elif self.bias_model == 'HaloModel':
@@ -1057,7 +1058,7 @@ class ClLike(Likelihood):
             else:
                 ptt1 = trs[clm['bin_1']]['PT_tracer']
                 ptt2 = trs[clm['bin_2']]['PT_tracer']
-                pk_pt = get_bacco_pk2d(cosmo, ptt1, tracer2=ptt2, nonlin_pk_type='spt', # TESTING!!!!!!!!!!!!!!!!!!
+                pk_pt = get_bacco_pk2d(cosmo, ptt1, tracer2=ptt2, nonlin_pk_type='spt', # 'spt' vs default makes the comparison to HEFT easier
                                      ptc=pkd['ptc'])
                 return pk_pt
 
