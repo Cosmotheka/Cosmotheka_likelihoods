@@ -313,6 +313,11 @@ class ClLike(Likelihood):
             B = pars.get(self.input_params_prefix + '_B_Nz', 0)
             dz = A + B * z
             jacob = (1 - B)
+        elif self.nz_model == 'NzShiftParamLinearPerSurvey':
+            A = pars.get(self.input_params_prefix + '_' + name + '_A_Nz', 0)
+            B = pars.get(self.input_params_prefix + '_' + name + '_B_Nz', 0)
+            dz = A + B * z
+            jacob = (1 - B)
         z_out = zm-dz+(z-zm)/wz
         # dn/dzt = dzf/dzt|_zt * dn/dzf|_zt
         nz_out = jacob * nz(z_out)
