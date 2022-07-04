@@ -379,6 +379,7 @@ class ClLike(Likelihood):
         current parameters."""
         trs = {}
         is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT']
+        igal = 0
         for name, q in self.tracer_qs.items():
             prefix = self.input_params_prefix + '_' + name
             if self.bias_model == 'HaloModel':
@@ -390,6 +391,8 @@ class ClLike(Likelihood):
                 bz = self._get_bz(cosmo, name, **pars)
                 t = ccl.NumberCountsTracer(cosmo, dndz=nz,
                                            bias=bz, has_rsd=False)
+                quant = f'g{igal}'
+                igal += 1
                 if is_PT_bias:
                     z = self.bin_properties[name]['z_fid']
                     zmean = self.bin_properties[name]['zmean_fid']
@@ -414,17 +417,20 @@ class ClLike(Likelihood):
                     prof = ccl.halos.HaloProfileHOD(self.cm)
                     prof.update_parameters(**hod_pars)
             elif q == 'galaxy_shear':
+                quant = 'm'
                 nz = self._get_nz(cosmo, name, **pars)
                 ia = self._get_ia_bias(cosmo, name, **pars)
                 t = ccl.WeakLensingTracer(cosmo, nz, ia_bias=ia)
                 if is_PT_bias:
                     ptt = pt.PTMatterTracer()
             elif q == 'cmb_convergence':
+                quant = 'm'
                 # B.H. TODO: pass z_source as parameter to the YAML file
                 t = ccl.CMBLensingTracer(cosmo, z_source=1100)
                 if is_PT_bias:
                     ptt = pt.PTMatterTracer()
             elif q == 'cmb_tSZ':
+                quant = 'pe'
                 t = ccl.tSZTracer(cosmo, z_max=3.)
                 if self.bias_model == 'HaloModel':
                     o_m_b = pars.get(self.input_params_prefix +
@@ -437,6 +443,7 @@ class ClLike(Likelihood):
 
             trs[name] = {}
             trs[name]['ccl_tracer'] = t
+            trs[name]['quantity_3d'] = quant
             if is_PT_bias:
                 trs[name]['PT_tracer'] = ptt
             if self.bias_model == 'HaloModel':
@@ -490,10 +497,15 @@ class ClLike(Likelihood):
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
 
-    def _get_pkxy(self, cosmo, clm, pkd, trs, **pars):
+    def _get_pkxy(self, cosmo, clm, pkd, trs, pkdict, **pars):
         """ Get the P(k) between two tracers. """
         q1 = self.tracer_qs[clm['bin_1']]
         q2 = self.tracer_qs[clm['bin_2']]
+        quant1 = trs[clm['bin_1']]['quantity_3d']
+        quant2 = trs[clm['bin_2']]['quantity_3d']
+        pkname = f'pk_{quant1}_{quant2}'
+        if pkname in pkdict:
+            return pkdict[pkname]
 
         if (self.bias_model == 'Linear') or (self.bias_model == 'BzNone'):
             if (q1 == 'galaxy_density') and (q2 == 'galaxy_density'):
@@ -510,6 +522,7 @@ class ClLike(Likelihood):
                 ptt2 = trs[clm['bin_2']]['PT_tracer']
                 pk_pt = get_ept_pk2d(cosmo, ptt1, tracer2=ptt2,
                                      ptc=pkd['ptc'], sub_lowk=False)
+                pkdict[pkname] = pk_pt
                 return pk_pt
         elif (self.bias_model == 'LagrangianPT'):
             if ((q1 != 'galaxy_density') and (q2 != 'galaxy_density')):
@@ -519,6 +532,7 @@ class ClLike(Likelihood):
                 ptt2 = trs[clm['bin_2']]['PT_tracer']
                 pk_pt = get_lpt_pk2d(cosmo, ptt1, tracer2=ptt2,
                                      ptc=pkd['ptc'])
+                pkdict[pkname] = pk_pt
                 return pk_pt
         elif self.bias_model == 'HaloModel':
             k_s = np.logspace(self.l10k_min_pks,
@@ -567,6 +581,7 @@ class ClLike(Likelihood):
                           pk_arr=np.log(pkt),
                           extrap_order_lok=1, extrap_order_hik=2,
                           cosmo=cosmo, is_logp=True)
+            pkdict[pkname] = pk
             return pk
         else:
             raise LoggedError(self.log,
@@ -579,8 +594,9 @@ class ClLike(Likelihood):
 
         # Correlate all needed pairs of tracers
         cls = []
+        pkdict = {}
         for clm in self.cl_meta:
-            pkxy = self._get_pkxy(cosmo, clm, pk, trs, **pars)
+            pkxy = self._get_pkxy(cosmo, clm, pk, trs, pkdict, **pars)
             if self.sample_cen:
                 ls = clm['l_eff']
             elif self.sample_bpw:
@@ -645,8 +661,9 @@ class ClLike(Likelihood):
 
         # Compute all C_ells
         cls = []
+        pkdict = {}
         for clm in self.cl_meta:
-            pkxy = self._get_pkxy(cosmo, clm, pkd, trs, **pars)
+            pkxy = self._get_pkxy(cosmo, clm, pkd, trs, pkdict, **pars)
             ls = self.l_sample
             cl = ccl.angular_cl(cosmo,
                                 trs[clm['bin_1']]['ccl_tracer'],

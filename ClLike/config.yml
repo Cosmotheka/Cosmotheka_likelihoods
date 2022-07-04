@@ -1,0 +1,97 @@
+debug: True
+
+params:
+  # List all the likelihood parameters here.
+  # You need to include `prior`, `ref` and
+  # `proposal` for all parameters you want
+  # to vary.
+  sigma8:
+    prior:
+      min: 0.1
+      max: 1.2
+    ref:
+      dist: norm
+      loc: 0.81
+      scale: 0.01
+    latex: \sigma_8
+    proposal: 0.001
+  Omega_c: 0.25
+  Omega_b: 0.05
+  h: 0.7
+  n_s: 0.96
+  m_nu: 0.
+
+theory:
+  cl_like.CCL:
+    matter_pk: halofit
+    baryons_pk: nobaryons
+
+likelihood:
+  cl_like.ClLike:
+    # Input sacc file
+    input_file: cls_cov_all_theoCov.fits
+    # List all relevant bins. The clustering
+    # bins are clX, the shear bins are shX.
+    bins:
+      - name: KiDS1000__0
+      - name: KiDS1000__1
+      - name: KiDS1000__2
+      - name: KiDS1000__3
+      - name: KiDS1000__4
+    # List all 2-points that should go into the
+    # data vector. For now we only include
+    # galaxy-galaxy auto-correlations, but all
+    # galaxy-shear and shear-shear correlations.
+    twopoints:
+      - bins: [KiDS1000__0, KiDS1000__0]
+      - bins: [KiDS1000__0, KiDS1000__1]
+      - bins: [KiDS1000__0, KiDS1000__2]
+      - bins: [KiDS1000__0, KiDS1000__3]
+      - bins: [KiDS1000__0, KiDS1000__4]
+      - bins: [KiDS1000__1, KiDS1000__1]
+      - bins: [KiDS1000__1, KiDS1000__2]
+      - bins: [KiDS1000__1, KiDS1000__3]
+      - bins: [KiDS1000__1, KiDS1000__4]
+      - bins: [KiDS1000__2, KiDS1000__2]
+      - bins: [KiDS1000__2, KiDS1000__3]
+      - bins: [KiDS1000__2, KiDS1000__4]
+      - bins: [KiDS1000__3, KiDS1000__3]
+      - bins: [KiDS1000__3, KiDS1000__4]
+      - bins: [KiDS1000__4, KiDS1000__4]
+
+    defaults:
+      # Scale cut for galaxy clustering
+      # (ignored for shear-shear)
+      kmax: 0.15
+      # These one will apply to all power
+      # spectra (unless the lmax corresponding
+      # to the chosen kmax is smaller).
+      lmin: 0
+      lmax: 2000
+      KiDS1000__0:
+        lmin: 30
+      KiDS1000__1:
+        lmin: 30
+      KiDS1000__2:
+        lmin: 30
+      KiDS1000__3:
+        lmin: 30
+      KiDS1000__4:
+        lmin: 30
+
+    # Prefix associated to all nuisance params
+    input_params_prefix: clk
+    ia_model: IANone
+    nz_model: NzNone
+    shape_model: ShapeNone
+    bias_model: HaloModel
+
+    # Halo model parameters
+    mf_name: Tinker08
+    hb_name: Tinker10
+    cm_name: Duffy08
+    mass_def_str: 200c
+    HM_correction: halofit
+    
+
+output: "tests/"

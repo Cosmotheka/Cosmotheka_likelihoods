@@ -54,7 +54,8 @@ class CCL(Theory):
               'Omega_b': None,
               'h': None,
               'n_s': None,
-              'A_sE9': None,
+              'sigma8': None,
+              #'A_sE9': None,
               'm_nu': None}
 
     def initialize(self):
@@ -92,7 +93,8 @@ class CCL(Theory):
                               Omega_b=self.provider.get_param('Omega_b'),
                               h=self.provider.get_param('h'),
                               n_s=self.provider.get_param('n_s'),
-                              A_s=self.provider.get_param('A_sE9')*1E-9,
+                              sigma8=self.provider.get_param('sigma8'),
+                              #A_s=self.provider.get_param('A_sE9')*1E-9,
                               T_CMB=2.7255,
                               m_nu=self.provider.get_param('m_nu'),
                               transfer_function=self.transfer_function,
