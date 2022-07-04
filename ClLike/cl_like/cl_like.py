@@ -8,7 +8,6 @@ from .lpt import LPTCalculator, get_lpt_pk2d
 from .ept import EPTCalculator, get_ept_pk2d
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
-import time
 
 
 class ClLike(Likelihood):
@@ -570,12 +569,9 @@ class ClLike(Likelihood):
     def _get_cl_all(self, cosmo, pk, **pars):
         """ Compute all C_ells."""
         # Gather all tracers
-        t0 = time.time()
         trs = self._get_tracers(cosmo, **pars)
-        print("Time for tracers: ", time.time()-t0)
 
         # Correlate all needed pairs of tracers
-        t0 = time.time()
         cls = []
         for clm in self.cl_meta:
             pkxy = self._get_pkxy(cosmo, clm, pk, trs, **pars)
@@ -590,18 +586,15 @@ class ClLike(Likelihood):
             # Pixel window function
             cl *= clm['pixbeam']
             cls.append(cl)
-        print("Time for Limber integrals: ", time.time()-t0)
 
         # Bandpower window convolution
         if self.sample_cen:
             clbs = cls
         elif self.sample_bpw:
-            t0 = time.time()
             clbs = []
             for clm, cl in zip(self.cl_meta, cls):
                 clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
                 clbs.append(clb)
-            print("Time for bpw convolution: ", time.time()-t0)
         return clbs
 
     def _apply_shape_systematics(self, cls, **pars):
@@ -742,9 +735,7 @@ class ClLike(Likelihood):
         """
         Simple Gaussian likelihood.
         """
-        t0 = time.time()
         t = self._get_theory(**pars)
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r))
-        print("Time for full chi2: ", time.time()-t0)
         return -0.5*chi2
