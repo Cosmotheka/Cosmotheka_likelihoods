@@ -60,7 +60,7 @@ theory:
 likelihood:
   cl_like.ClLike:
     # Input sacc file
-    input_file: cls_cov_all_shearcross.fits
+    input_file: cls_cov_shearcross.fits
     # List all relevant bins. The clustering
     # bins are clX, the shear bins are shX.
     bins:

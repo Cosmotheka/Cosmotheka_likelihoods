@@ -13,7 +13,7 @@ from cobaya.log import LoggedError
 class ClLike(Likelihood):
     # All parameters starting with this will be
     # identified as belonging to this stage.
-    input_params_prefix: str = "clk"
+    input_params_prefix: str = ""
     # Input sacc file
     input_file: str = ""
     # IA model name. Currently all of these are
@@ -161,7 +161,7 @@ class ClLike(Likelihood):
             cltyp = 'cl_'
             for tr in [tr1, tr2]:
                 q = tr.quantity
-                if ['galaxy_density', 'cmb_convergence', 'cmb_tSZ', 'generic']:
+                if q in ['galaxy_density', 'cmb_convergence', 'cmb_tSZ', 'generic']:
                     cltyp += '0'
                 elif q == 'galaxy_shear':
                     cltyp += 'e'
