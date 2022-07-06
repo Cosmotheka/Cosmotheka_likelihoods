@@ -5,20 +5,51 @@ params:
   # You need to include `prior`, `ref` and
   # `proposal` for all parameters you want
   # to vary.
-  sigma8:
+  clk_log10meff:
     prior:
-      min: 0.1
-      max: 1.2
+      min: 11.5
+      max: 14
     ref:
       dist: norm
-      loc: 0.81
+      loc: 12.14
       scale: 0.01
-    latex: \sigma_8
+    latex: log_{10}(M_{peak})
     proposal: 0.001
-  Omega_c: 0.25
-  Omega_b: 0.05
-  h: 0.7
-  n_s: 0.96
+  clk_etamax:
+    prior:
+      min: 0.
+      max: 1.
+    ref:
+      dist: norm
+      loc: 0.41
+      scale: 0.01
+    latex: \eta_{max}
+    proposal: 0.001
+  clk_sigLM0:
+    prior:
+      min: 0.
+      max: 4.
+    ref:
+      dist: norm
+      loc: 2.11
+      scale: 0.01
+    latex: \sigma_{M,0}
+    proposal: 0.001
+  clk_tau:
+    prior:
+      min: 0.
+      max: 3.
+    ref:
+      dist: norm
+      loc: 1.05
+      scale: 0.01
+    latex: \tau
+    proposal: 0.001
+  sigma8: 0.8102
+  Omega_c: 0.26066676
+  Omega_b: 0.048974682
+  h: 0.6766
+  n_s: 0.9665
   m_nu: 0.
 
 theory:
@@ -33,31 +64,14 @@ likelihood:
     # List all relevant bins. The clustering
     # bins are clX, the shear bins are shX.
     bins:
-      - name: KiDS1000__0
-      - name: KiDS1000__1
-      - name: KiDS1000__2
-      - name: KiDS1000__3
       - name: KiDS1000__4
+      - name: CIBLenz__0
     # List all 2-points that should go into the
     # data vector. For now we only include
     # galaxy-galaxy auto-correlations, but all
     # galaxy-shear and shear-shear correlations.
     twopoints:
-      - bins: [KiDS1000__0, KiDS1000__0]
-      - bins: [KiDS1000__0, KiDS1000__1]
-      - bins: [KiDS1000__0, KiDS1000__2]
-      - bins: [KiDS1000__0, KiDS1000__3]
-      - bins: [KiDS1000__0, KiDS1000__4]
-      - bins: [KiDS1000__1, KiDS1000__1]
-      - bins: [KiDS1000__1, KiDS1000__2]
-      - bins: [KiDS1000__1, KiDS1000__3]
-      - bins: [KiDS1000__1, KiDS1000__4]
-      - bins: [KiDS1000__2, KiDS1000__2]
-      - bins: [KiDS1000__2, KiDS1000__3]
-      - bins: [KiDS1000__2, KiDS1000__4]
-      - bins: [KiDS1000__3, KiDS1000__3]
-      - bins: [KiDS1000__3, KiDS1000__4]
-      - bins: [KiDS1000__4, KiDS1000__4]
+      - bins: [KiDS1000__4, CIBLenz__0]
 
     defaults:
       # Scale cut for galaxy clustering
@@ -68,16 +82,10 @@ likelihood:
       # to the chosen kmax is smaller).
       lmin: 0
       lmax: 2000
-      KiDS1000__0:
-        lmin: 30
-      KiDS1000__1:
-        lmin: 30
-      KiDS1000__2:
-        lmin: 30
-      KiDS1000__3:
-        lmin: 30
       KiDS1000__4:
-        lmin: 30
+        lmin: 100
+      CIBLenz__0:
+        lmin: 100
 
     # Prefix associated to all nuisance params
     input_params_prefix: clk
