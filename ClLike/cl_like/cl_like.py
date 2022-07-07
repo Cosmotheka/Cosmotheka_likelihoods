@@ -446,10 +446,14 @@ class ClLike(Likelihood):
                 quant = 'sfrd'
                 z, snu = self._get_nz(cosmo, name, **pars)
                 t = IvTracer(cosmo, snu, z)
-                cib_pars = {k: pars[self.input_params_prefix + '_' + k]
+                if self.bias_model == 'HaloModel':
+                    cib_pars = {k: pars[self.input_params_prefix + '_' + k]
                                 for k in ['log10meff', 'etamax', 'sigLM0', 'tau']}
-                prof = HaloProfileCIBM21(self.cm)
-                prof.update_parameters(**cib_pars)
+                    prof.update_parameters(**cib_pars)
+                    normed = False
+                else:
+                    raise NotImplementedError("Can't do tSZ without"
+                                              " the halo model.")
 
             trs[name] = {}
             trs[name]['ccl_tracer'] = t
