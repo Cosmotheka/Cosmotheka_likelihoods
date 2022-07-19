@@ -5,6 +5,8 @@ params:
   # You need to include `prior`, `ref` and
   # `proposal` for all parameters you want
   # to vary.
+
+  # if emerge = False:
   clk_log10meff:
     prior:
       min: 11.5
@@ -12,9 +14,9 @@ params:
     ref:
       dist: norm
       loc: 12.14
-      scale: 0.01
+      scale: 0.001
     latex: log_{10}(M_{peak})
-    proposal: 0.001
+    proposal: 0.0001
   clk_etamax:
     prior:
       min: 0.
@@ -22,9 +24,9 @@ params:
     ref:
       dist: norm
       loc: 0.41
-      scale: 0.01
+      scale: 0.001
     latex: \eta_{max}
-    proposal: 0.001
+    proposal: 0.0001
   clk_sigLM0:
     prior:
       min: 0.
@@ -32,9 +34,9 @@ params:
     ref:
       dist: norm
       loc: 2.11
-      scale: 0.01
+      scale: 0.001
     latex: \sigma_{M,0}
-    proposal: 0.001
+    proposal: 0.0001
   clk_tau:
     prior:
       min: 0.
@@ -42,9 +44,92 @@ params:
     ref:
       dist: norm
       loc: 1.05
-      scale: 0.01
+      scale: 0.001
     latex: \tau
-    proposal: 0.001
+    proposal: 0.0001
+
+  #if emerge = True
+#  clk_log10M0:
+#    prior:
+#      min: 9.
+#      max: 14.
+#    ref:
+#      dist: norm
+#      loc: 11.34
+#      scale: 0.001
+#    latex: log_{10}(M_{0})
+#    proposal: 0.0001
+#  clk_log10Mz:
+#    prior:
+#      min: 0.
+#      max: 5.
+#    ref:
+#      dist: norm
+#      loc: 0.692
+#      scale: 0.001
+#    latex: log_{10}(M_{z})
+#    proposal: 0.0001
+#  clk_eps0:
+#    prior:
+#      min: 0.
+#      max: 0.5
+#    ref:
+#      dist: norm
+#      loc: 0.005
+#      scale: 0.001
+#    latex: \epsilon_{0}
+#    proposal: 0.0001
+#  clk_epsz:
+#    prior:
+#      min: 0.
+#      max: 1.5
+#    ref:
+#      dist: norm
+#      loc: 0.689
+#      scale: 0.001
+#    latex: \epsilon_{z}
+#    proposal: 0.0001
+#  clk_beta0: 3.344
+#    prior:
+#      min: 0.
+#      max: 5.
+#    ref:
+#      dist: norm
+#      loc: 3.344
+#      scale: 0.001
+#    latex: \beta_{0}
+#    proposal: 0.0001
+#  clk_betaz:
+#    prior:
+#      min: -3.
+#      max: 0.
+#    ref:
+#      dist: norm
+#      loc: -2.079
+#      scale: 0.001
+#    latex: \beta_{z}
+#    proposal: 0.0001
+#  clk_gamma0:
+#    prior:
+#      min: 0.5
+#      max: 1.5
+#    ref:
+#      dist: norm
+#      loc: 0.966
+#      scale: 0.001
+#    latex: \gamma_{0}
+#    proposal: 0.0001
+#  clk_gammaz:
+#    prior:
+#      min: -0.5
+#      max: 0.5
+#    ref:
+#      dist: norm
+#      loc: 0.
+#      scale: 0.001
+#    latex: \gamma_{z}
+#    proposal: 0.0001
+
   sigma8: 0.8102
   Omega_c: 0.26066676
   Omega_b: 0.048974682
@@ -64,14 +149,50 @@ likelihood:
     # List all relevant bins. The clustering
     # bins are clX, the shear bins are shX.
     bins:
+      - name: KiDS1000__0
+      - name: KiDS1000__1
+      - name: KiDS1000__2
+      - name: KiDS1000__3
       - name: KiDS1000__4
+      - name: DESY1wl__0
+      - name: DESY1wl__1
+      - name: DESY1wl__2
+      - name: DESY1wl__3
       - name: CIBLenz__0
+      - name: CIBLenz__1
+      - name: CIBLenz__2
     # List all 2-points that should go into the
     # data vector. For now we only include
     # galaxy-galaxy auto-correlations, but all
     # galaxy-shear and shear-shear correlations.
     twopoints:
+      - bins: [KiDS1000__0, CIBLenz__0]
+      - bins: [KiDS1000__0, CIBLenz__1]
+      - bins: [KiDS1000__0, CIBLenz__2]
+      - bins: [KiDS1000__1, CIBLenz__0]
+      - bins: [KiDS1000__1, CIBLenz__1]
+      - bins: [KiDS1000__1, CIBLenz__2]
+      - bins: [KiDS1000__2, CIBLenz__0]
+      - bins: [KiDS1000__2, CIBLenz__1]
+      - bins: [KiDS1000__2, CIBLenz__2]
+      - bins: [KiDS1000__3, CIBLenz__0]
+      - bins: [KiDS1000__3, CIBLenz__1]
+      - bins: [KiDS1000__3, CIBLenz__2]
       - bins: [KiDS1000__4, CIBLenz__0]
+      - bins: [KiDS1000__4, CIBLenz__1]
+      - bins: [KiDS1000__4, CIBLenz__2]
+      - bins: [DESY1wl__0, CIBLenz__0]
+      - bins: [DESY1wl__0, CIBLenz__1]
+      - bins: [DESY1wl__0, CIBLenz__2]
+      - bins: [DESY1wl__1, CIBLenz__0]
+      - bins: [DESY1wl__1, CIBLenz__1]
+      - bins: [DESY1wl__1, CIBLenz__2]
+      - bins: [DESY1wl__2, CIBLenz__0]
+      - bins: [DESY1wl__2, CIBLenz__1]
+      - bins: [DESY1wl__2, CIBLenz__2]
+      - bins: [DESY1wl__3, CIBLenz__0]
+      - bins: [DESY1wl__3, CIBLenz__1]
+      - bins: [DESY1wl__3, CIBLenz__2]
 
     defaults:
       # Scale cut for galaxy clustering
@@ -82,9 +203,29 @@ likelihood:
       # to the chosen kmax is smaller).
       lmin: 0
       lmax: 2000
+      KiDS1000__0:
+        lmin: 100
+      KiDS1000__1:
+        lmin: 100
+      KiDS1000__2:
+        lmin: 100
+      KiDS1000__3:
+        lmin: 100
       KiDS1000__4:
         lmin: 100
+      DESY1wl__0:
+        lmin: 100
+      DESY1wl__1:
+        lmin: 100
+      DESY1wl__2:
+        lmin: 100
+      DESY1wl__3:
+        lmin: 100
       CIBLenz__0:
+        lmin: 100
+      CIBLenz__1:
+        lmin: 100
+      CIBLenz__2:
         lmin: 100
 
     # Prefix associated to all nuisance params
@@ -100,6 +241,7 @@ likelihood:
     cm_name: Duffy08
     mass_def_str: 200c
     HM_correction: halofit
+    emerge: False
     
 
 output: "tests/"
