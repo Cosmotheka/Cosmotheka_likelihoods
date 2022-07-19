@@ -56,6 +56,8 @@ class ClLike(Likelihood):
     defaults: dict = {}
     # List of two-point functions that make up the data vector
     twopoints: list = []
+    # SFR Model to use
+    emerge: bool = False
 
     def initialize(self):
         # Read SACC file
@@ -138,7 +140,7 @@ class ClLike(Likelihood):
                           'galaxy_shear': ccl.halos.HaloProfileNFW(self.cm),
                           'cmb_convergence': ccl.halos.HaloProfileNFW(self.cm),
                           'cmb_tSZ': ccl.halos.HaloProfilePressureGNFW(),
-                          'generic': HaloProfileCIBM21(self.cm)}
+                          'generic': HaloProfileCIBM21(self.cm, emerge=self.emerge)}
             # Profile 2-point function for HOD
             self.p2pt_HOD = ccl.halos.Profile2ptHOD()
             # Halo model correction for the transition regime
@@ -447,8 +449,15 @@ class ClLike(Likelihood):
                 z, snu = self._get_nz(cosmo, name, **pars)
                 t = IvTracer(cosmo, snu, z)
                 if self.bias_model == 'HaloModel':
-                    cib_pars = {k: pars[self.input_params_prefix + '_' + k]
-                                for k in ['log10meff', 'etamax', 'sigLM0', 'tau']}
+                    if self.emerge:
+                        cib_pars = {k: pars[self.input_params_prefix + '_' + k]
+                                    for k in ['log10M0', 'log10Mz',
+                                              'eps0', 'epsz',
+                                              'beta0', 'betaz',
+                                              'gamma0', 'gammaz']}
+                    else:
+                        cib_pars = {k: pars[self.input_params_prefix + '_' + k]
+                                    for k in ['log10meff', 'etamax', 'sigLM0', 'tau']}
                     prof.update_parameters(**cib_pars)
                     normed = False
                 else:
