@@ -157,7 +157,6 @@ class HaloProfileCIBM21(ccl.halos.HaloProfile):
         Mmin (float): minimum subhalo mass.
         fsub (float): fraction of the mass of the halo that is in form of
             sub-halos.
-        fast_integ (bool): True to perform fater integration for SFRsat
         log10M0 (float): log10 of the most efficient mass base
         log10Mz (float): log10 of the most efficiency mass dependency in redshift
         eps0 (float): todo
@@ -172,7 +171,11 @@ class HaloProfileCIBM21(ccl.halos.HaloProfile):
     _lnten = 2.30258509299
 
     def __init__(self, c_M_relation, log10meff=12.7, etamax=0.42,
-                 sigLM0=1.75, tau=1.17, zc=1.5, Mmin=1E5, fsub=0.134):
+                 sigLM0=1.75, tau=1.17, zc=1.5, Mmin=1E5, fsub=0.134,
+                 fast_integ=True,
+                 log10M0=11.34, log10Mz=0.692,
+                 eps0=0.005, epsz=0.689, beta0=3.344, betaz=-2.079,
+                 gamma0=0.966, gammaz=0.0, emerge=False):
         if not isinstance(c_M_relation, ccl.halos.Concentration):
             raise TypeError("c_M_relation must be of type `Concentration`)")
 
@@ -224,7 +227,6 @@ class HaloProfileCIBM21(ccl.halos.HaloProfile):
             zc (float) : redshift below which :math:'\\sigma_{LM}' evolves with redshift.
             Mmin (float): minimum subhalo mass (in solar masses).
             fsub (float): fraction of the mass of the halo that is in form of sub-halos.
-            fast_integ (bool): True to perform fater integration for SFRsat
             log10M0 (float): log10 of the most efficient mass base
             log10Mz (float): log10 of the most efficiency mass dependency in redshift
             eps0 (float): todo

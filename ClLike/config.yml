@@ -1,5 +1,12 @@
 debug: True
 
+sampler:
+  mcmc:
+    learn_proposal: True
+    burn_in: 10
+    Rminus1_stop: 0.01
+    max_samples: 20000
+
 params:
   # List all the likelihood parameters here.
   # You need to include `prior`, `ref` and
