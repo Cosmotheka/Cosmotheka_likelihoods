@@ -10,3 +10,10 @@ This code has received contributions from multiple people, all of whom should re
 - Nick Koukoufilippas (Oxford)
 - Pablo Lemos (Sussex)
 - Antony Lewis (Sussex)
+
+# Installation
+
+python3 setup.py install --user
+pip3 install fast-pt --user
+# velocileptors/anzu/baccoemu
+# bao_like
