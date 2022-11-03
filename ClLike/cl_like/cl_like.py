@@ -380,7 +380,7 @@ class ClLike(Likelihood):
                 cls_00.append(cl00)
             else:
                 cls_00.append(None)
-            # 01: unibased x biased
+            # 01: unbiased x biased
             if t0_1 and t1_2:
                 cl01 = []
                 for t12 in t1_2:
@@ -412,9 +412,8 @@ class ClLike(Likelihood):
                         if autocorr and i2 < i1:
                             cl11[i1, i2] = cl11[i2, i1]
                         else:
-                            cl = ccl.angular_cl(cosmo, t11, t12, ls)
+                            cl = ccl.angular_cl(cosmo, t11, t12, ls) * clm['pixbeam']
                             cl11[i1, i2, :] = cl
-                        cl11[i1, i2, :] *= clm['pixbeam']
             else:
                 cl11 = None
             cls_11.append(cl11)
