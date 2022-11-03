@@ -374,34 +374,36 @@ class ClLike(Likelihood):
             t0_2 = trs0[n2]
             t1_1 = trs1[n1]
             t1_2 = trs1[n2]
-            # 00
+            # 00: unbiased x unbiased
             if t0_1 and t0_2:
-                cls_00.append(ccl.angular_cl(cosmo, t0_1, t0_2, ls))
+                cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls) * clm['pixbeam']
+                cls_00.append(cl00)
             else:
                 cls_00.append(None)
-            # 01
+            # 01: unibased x biased
             if t0_1 and t1_2:
                 cl01 = []
                 for t12 in t1_2:
-                    cl01.append(ccl.angular_cl(cosmo, t0_1, t12, ls))
+                    cl = ccl.angular_cl(cosmo, t0_1, t12, ls) * clm['pixbeam']
+                    cl01.append(cl)
                 cl01 = np.array(cl01)
             else:
                 cl01 = None
-                
             cls_01.append(cl01)
-            # 10
+            # 10: biased x unbiased
             if n1 == n2:
                 cls_10.append(cl01)
             else:
                 if t0_2 and t1_1:
                     cl10 = []
                     for t11 in t1_1:
-                        cl10.append(ccl.angular_cl(cosmo, t11, t0_2, ls))
+                        cl = ccl.angular_cl(cosmo, t11, t0_2, ls) * clm['pixbeam']
+                        cl10.append(cl)
                     cl10 = np.array(cl10)
                 else:
                     cl10 = None
                 cls_10.append(cl10)
-            # 11
+            # 11: biased x biased
             if t1_1 and t1_2:
                 cl11 = np.zeros([len(t1_1), len(t1_2), len(ls)])
                 autocorr = n1 == n2
@@ -412,26 +414,73 @@ class ClLike(Likelihood):
                         else:
                             cl = ccl.angular_cl(cosmo, t11, t12, ls)
                             cl11[i1, i2, :] = cl
+                        cl11[i1, i2, :] *= clm['pixbeam']
             else:
                 cl11 = None
             cls_11.append(cl11)
 
-            # Kevin continue here
-
-            # Pixel window function
-            cl *= clm['pixbeam']
-            cls.append(cl)
-
         # Bandpower window convolution
         if self.sample_cen:
-            clbs = cls
+            clbs_00 = cls_00
+            clbs_01 = cls_01
+            clbs_10 = cls_10
+            clbs_11 = cls_11
         elif self.sample_bpw:
-            clbs = []
-            for clm, cl in zip(self.cl_meta, cls):
-                clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
-                clbs.append(clb)
-        return clbs
+            clbs_00 = []
+            clbs_01 = []
+            clbs_10 = []
+            clbs_11 = []
+            # 00: unbiased x unbiased
+            for clm, cl00 in zip(self.cl_meta, cls_00):
+                if cl00:
+                    clb00 = self._eval_interp_cl(cl00, clm['l_bpw'], clm['w_bpw'])
+                else: 
+                    clb00 = None
+                clbs_00.append(clb00)
+            for clm, cl01, cl10 in zip(self.cl_meta, cls_01, cls_10):
+                # 01: unbiased x biased
+                if cl01:
+                    clb01 = []
+                    for cl in cl01:
+                        clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
+                        clb01.append(clb)
+                    clb01 = np.array(clb01)
+                else: 
+                    clb01 = None
+                clbs_01.append(clb01)
+                # 10: biased x unbiased
+                if clm['bin1'] == clm['bin2']:
+                    clbs_10.append(clb01)
+                else:
+                    if cl10:
+                        clb10 = []
+                        for cl in cl10:
+                            clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
+                            clb10.append(clb)
+                        clb10 = np.array(clb10)
+                    else: 
+                        clb10 = None
+                clbs_10.append(clb10)
+                # 11: biased x biased
+                for clm, cl11 in zip(self.cl_meta, cls_11):
+                    if cl11:
+                        clb11 = np.zeros_like(cl11)
+                        autocorr = clm['bin_1'] == clm['bin_2']
+                        for i1 in range(np.shape(cl11)[0]):
+                            for i2 in range(np.shape(cl11)[1]):
+                                if autocorr and i2 < i1:
+                                    clb11[i1, i2] = clb11[i2, i1]
+                                else:
+                                    cl = cl11[i1,i2,:]
+                                    clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
+                                    clb11[i1,i2,:] = clb 
+                    else: 
+                        clb11 = None
+                clbs_11.append(clb11)
+                
+        return clbs_00, clbs_01, clbs_10, clbs_11
 
+    
     def get_cls_theory(self, **pars):
         # Get cosmological model
         res = self.provider.get_CCL()
@@ -540,7 +589,7 @@ class ClLike(Likelihood):
         return cl_out
 
     def get_requirements(self):
-        # By selecting `self._get_pk_data` as a `method` of CCL here,
+        # By selecting `self._get_cl_data` as a `method` of CCL here,
         # we make sure that this function is only run when the
         # cosmological parameters vary.
         return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
