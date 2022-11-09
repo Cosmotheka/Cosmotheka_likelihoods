@@ -466,7 +466,7 @@ class ClLike(Likelihood):
             if e2 and (b1 is not None):
                 cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
             if (b1 is not None) and (b2 is not None):
-                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) , (nbias1, nbias2, nell) , (nbias2)
+                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1), (nbias2), (nbias1, nbias2, nell)
             cls.append(cl_this)
             
         return cls 
@@ -533,7 +533,6 @@ class ClLike(Likelihood):
         # By selecting `self._get_cl_data` as a `method` of CCL here,
         # we make sure that this function is only run when the
         # cosmological parameters vary.
-        # KW: CCL doesn't expect **pars argument. TODO: pass them consistently
         return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
 
     def logp(self, **pars):
