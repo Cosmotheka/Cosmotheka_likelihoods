@@ -88,6 +88,7 @@ class CCL(Theory):
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
+        # KW: I feel here I have to pass the nuisance params
         cosmo = ccl.Cosmology(Omega_c=self.provider.get_param('Omega_c'),
                               Omega_b=self.provider.get_param('Omega_b'),
                               h=self.provider.get_param('h'),

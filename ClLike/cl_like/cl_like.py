@@ -62,22 +62,6 @@ class ClLike(Likelihood):
         self.nk_pks = int((self.l10k_max_pks - self.l10k_min_pks) *
                           self.nk_per_dex_pks)
 
-        # Cl sampling
-        if self.sample_type == 'best':
-            import yaml
-
-            # Read parameters
-            with open(self.defaults['params_fid'], "r") as fpar:
-                info = yaml.load(fpar, Loader=yaml.FullLoader)
-            p0 = {}
-            for p in info['params']:
-                if isinstance(info['params'][p], dict):
-                    if 'ref' in info['params'][p]:
-                        p0[p] = info['params'][p]['ref']['loc']
-            # Get best ells
-            cosmo = ccl.CosmologyVanillaLCDM()
-            self.get_best_ells(cosmo, **p0)
-
         # Pixel window function product for each power spectrum
         nsides = {b['name']: b.get('nside', None)
                   for b in self.bins}
@@ -264,63 +248,68 @@ class ClLike(Likelihood):
         cl_binned = np.dot(w_bpw, cl_unbinned)
         return cl_binned
 
-    def _get_nz(self, cosmo, name, **pars):
+    def _get_nz(self, cosmo, name):
         """ Get redshift distribution for a given tracer.
         Applies shift and width nuisance parameters if needed.
         """
         z = self.bin_properties[name]['z_fid']
         nz = self.bin_properties[name]['nz_fid']
-        zm = self.bin_properties[name]['zmean_fid']
-        dz = 0.
-        wz = 1.
-        if (self.nz_model == 'NzShift') or (self.nz_model == 'NzShiftWidth'):
-            dz = pars.get(self.input_params_prefix + '_' + name + '_dz', 0.)
-        if (self.nz_model == 'NzShiftWidth') or (self.nz_model == 'NzWidth'):
-            wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
-        z = zm+dz+(z-zm)/wz
-        msk = z >= 0
-        z = z[msk]
-        nz = nz[msk]
         return (z, nz)
 
-    def _get_bz(self, cosmo, name, **pars):
+    def _get_bz(self, cosmo, name):
         """ Get linear galaxy bias. Unless we're using a linear bias,
         model this should be just 1."""
         z = self.bin_properties[name]['z_fid']
-        zmean = self.bin_properties[name]['zmean_fid']
-        b0 = pars[self.input_params_prefix + '_' + name + '_b1']
-        bz = b0*np.ones_like(z)
+        bz = np.ones_like(z)
         return (z, bz)
 
-    def _get_ia_bias(self, cosmo, name, **pars):
+    def _get_ia_bias(self, cosmo, name):
         """ Intrinsic alignment amplitude.
         """
         if self.ia_model == 'IANone':
             return None
         else:
             z = self.bin_properties[name]['z_fid']
-            A = pars[self.input_params_prefix + '_' + name + '_A_IA']
-            A_IA = np.ones_like(z) * A
+            A_IA = np.ones_like(z)
             return (z, A_IA)
 
-    def _get_tracers(self, cosmo, **pars):
+    def _get_bias_params(self, **pars):
+        eps = {}
+        bias = {}
+        for name, q in self.tracer_qs.items():
+            prefix = self.input_params_prefix + '_' + name
+
+            # if contains eps
+            if q == 'galaxy_density':
+                eps[name] = False
+                bias[name] = np.array([pars[prefix + '_b1']])
+            elif q == 'galaxy_shear':
+                eps[name] = True
+                bias[name] = np.array([pars['clk_A_IA']])
+                #bias[name] = np.array([pars[prefix + '_A_IA']])
+            elif q == 'cmb_convergence':
+                eps[name] = True
+                bias[name] = None
+        return eps, bias
+                
+                
+    def _get_tracers(self, cosmo):
         """ Obtains CCL tracers (and perturbation theory tracers,
         and halo profiles where needed) for all used tracers given the
         current parameters."""
         trs0 = {}
         trs1 = {}
         for name, q in self.tracer_qs.items():
-            prefix = self.input_params_prefix + '_' + name
 
             if q == 'galaxy_density':
-                nz = self._get_nz(cosmo, name, **pars)
-                bz = self._get_bz(cosmo, name, **pars)
+                nz = self._get_nz(cosmo, name)
+                bz = self._get_bz(cosmo, name)
                 t0 = None
                 t1 = [ccl.NumberCountsTracer(cosmo, dndz=nz,
                                              bias=bz, has_rsd=False)]
             elif q == 'galaxy_shear':
-                nz = self._get_nz(cosmo, name, **pars)
-                ia = self._get_ia_bias(cosmo, name, **pars)
+                nz = self._get_nz(cosmo, name)
+                ia = self._get_ia_bias(cosmo, name)
                 t0 = ccl.WeakLensingTracer(cosmo, nz)
                 t1 = [ccl.WeakLensingTracer(cosmo, nz, has_shear=False, ia_bias=ia)]
             elif q == 'cmb_convergence':
@@ -332,30 +321,10 @@ class ClLike(Likelihood):
             trs1[name] = t1
         return trs0, trs1
 
-    def _get_pk_data(self, cosmo):
-        """ Get all cosmology-dependent ingredients to create the
-        different P(k)s needed for the C_ell calculation.
-        For linear bias, this is just the matter power spectrum.
-        """
-        # Get P(k)s from CCL
-        if self.bias_model == 'Linear':
-            cosmo.compute_nonlin_power()
-            pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-            return {'pk_mm': pkmm}
-        else:
-            raise NotImplementedError(f"Bias model {self.bias_model} not implemented")
-
-    def _get_pkxy(self, cosmo, clm, pkd, trs, **pars):
-        """ Get the P(k) between two tracers. """
-        q1 = self.tracer_qs[clm['bin_1']]
-        q2 = self.tracer_qs[clm['bin_2']]
-
-        return pkd['pk_mm']
-
-    def _get_cl_data(self, cosmo, **pars):
+    def _get_cl_data(self, cosmo):
         """ Compute all C_ells."""
         # Gather all tracers
-        trs0, trs1 = self._get_tracers(cosmo, **pars)
+        trs0, trs1 = self._get_tracers(cosmo)
 
         # Correlate all needed pairs of tracers
         cls_00 = []
@@ -381,7 +350,7 @@ class ClLike(Likelihood):
             else:
                 cls_00.append(None)
             # 01: unbiased x biased
-            if t0_1 and t1_2:
+            if t0_1 and (t1_2 is not None):
                 cl01 = []
                 for t12 in t1_2:
                     cl = ccl.angular_cl(cosmo, t0_1, t12, ls) * clm['pixbeam']
@@ -394,7 +363,7 @@ class ClLike(Likelihood):
             if n1 == n2:
                 cls_10.append(cl01)
             else:
-                if t0_2 and t1_1:
+                if t0_2 and (t1_1 is not None):
                     cl10 = []
                     for t11 in t1_1:
                         cl = ccl.angular_cl(cosmo, t11, t0_2, ls) * clm['pixbeam']
@@ -404,7 +373,7 @@ class ClLike(Likelihood):
                     cl10 = None
                 cls_10.append(cl10)
             # 11: biased x biased
-            if t1_1 and t1_2:
+            if (t1_1 is not None) and (t1_2 is not None):
                 cl11 = np.zeros([len(t1_1), len(t1_2), len(ls)])
                 autocorr = n1 == n2
                 for i1, t11 in enumerate(t1_1):
@@ -431,14 +400,14 @@ class ClLike(Likelihood):
             clbs_11 = []
             # 00: unbiased x unbiased
             for clm, cl00 in zip(self.cl_meta, cls_00):
-                if cl00:
+                if (cl00 is not None):
                     clb00 = self._eval_interp_cl(cl00, clm['l_bpw'], clm['w_bpw'])
                 else: 
                     clb00 = None
                 clbs_00.append(clb00)
             for clm, cl01, cl10 in zip(self.cl_meta, cls_01, cls_10):
                 # 01: unbiased x biased
-                if cl01:
+                if (cl01 is not None):
                     clb01 = []
                     for cl in cl01:
                         clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
@@ -448,10 +417,10 @@ class ClLike(Likelihood):
                     clb01 = None
                 clbs_01.append(clb01)
                 # 10: biased x unbiased
-                if clm['bin1'] == clm['bin2']:
+                if clm['bin_1'] == clm['bin_2']:
                     clbs_10.append(clb01)
                 else:
-                    if cl10:
+                    if (cl10 is not None):
                         clb10 = []
                         for cl in cl10:
                             clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
@@ -459,11 +428,11 @@ class ClLike(Likelihood):
                         clb10 = np.array(clb10)
                     else: 
                         clb10 = None
-                clbs_10.append(clb10)
+                    clbs_10.append(clb10)
                 # 11: biased x biased
                 for clm, cl11 in zip(self.cl_meta, cls_11):
-                    if cl11:
-                        clb11 = np.zeros_like(cl11)
+                    if (cl11 is not None):
+                        clb11 = np.zeros((cl11.shape[0], cl11.shape[1], len(clm['l_eff'])))
                         autocorr = clm['bin_1'] == clm['bin_2']
                         for i1 in range(np.shape(cl11)[0]):
                             for i2 in range(np.shape(cl11)[1]):
@@ -475,10 +444,32 @@ class ClLike(Likelihood):
                                     clb11[i1,i2,:] = clb 
                     else: 
                         clb11 = None
-                clbs_11.append(clb11)
+                    clbs_11.append(clb11)
                 
-        return clbs_00, clbs_01, clbs_10, clbs_11
+        return {'cl00': clbs_00, 'cl01': clbs_01, 'cl10': clbs_10, 'cl11': clbs_11}
 
+    def _get_cl_all(self, cld, **pars):
+        eps, bias = self._get_bias_params(**pars)
+        cls = []
+        for icl, clm in enumerate(self.cl_meta):
+            cl_this = np.zeros_like(clm['l_eff'])
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            e1 = eps[n1]
+            e2 = eps[n2]
+            b1 = bias[n1]
+            b2 = bias[n2]
+            if e1 and e2:
+                cl_this += cld['cl00'][icl]
+            if e1 and (b2 is not None):
+                cl_this += np.dot(b2, cld['cl01'][icl]) # (nbias) , (nbias, nell)
+            if e2 and (b1 is not None):
+                cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
+            if (b1 is not None) and (b2 is not None):
+                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) , (nbias1, nbias2, nell) , (nbias2)
+            cls.append(cl_this)
+            
+        return cls 
     
     def get_cls_theory(self, **pars):
         # Get cosmological model
@@ -486,61 +477,12 @@ class ClLike(Likelihood):
         cosmo = res['cosmo']
 
         # First, gather all the necessary ingredients for the different P(k)
-        pkd = res['pk_data']
+        cld = res['cl_data']
 
         # Then pass them on to convert them into C_ells
-        cls = self._get_cl_all(cosmo, pkd, **pars)
+        cls = self._get_cl_all(cld, **pars)
 
         return cls
-
-    def get_best_ells(self, cosmo, **pars):
-        nsides = {b['name']: b.get('nside', None)
-                  for b in self.bins}
-        pkd = self._get_pk_data(cosmo)
-        trs = self._get_tracers(cosmo, **pars)
-
-        # Compute all C_ells
-        cls = []
-        for clm in self.cl_meta:
-            pkxy = self._get_pkxy(cosmo, clm, pkd, trs, **pars)
-            ls = self.l_sample
-            cl = ccl.angular_cl(cosmo,
-                                trs[clm['bin_1']]['ccl_tracer'],
-                                trs[clm['bin_2']]['ccl_tracer'],
-                                ls, p_of_k_a=pkxy)
-            # Pixel window function
-            beam = np.ones(ls.size)
-            for n in [clm['bin_1'], clm['bin_2']]:
-                if nsides[n]:
-                    beam *= beam_hpix(ls, nsides[n])
-            cl *= beam
-            f = interp1d(np.log(1E-3+self.l_sample), cl)
-            cls.append(f(np.log(1E-3+clm['l_bpw'])))
-
-        # Bandpower window convolution
-        clbs = []
-        for clm, cl in zip(self.cl_meta, cls):
-            clb = np.dot(clm['w_bpw'], cl)
-            clbs.append(clb)
-
-        # Find best ells and replace 'l_eff'
-        for clm, cl, clb in zip(self.cl_meta, cls, clbs):
-            lbfs = []
-            for i, ll in enumerate(clm['l_eff']):
-                l0 = ll*0.5
-                l1 = ll*1.5
-                ids = (clm['l_bpw'] >= l0) & (clm['l_bpw'] <= l1)
-                ibf = np.argmin(np.fabs(clb[i]-cl[ids]))
-                lbf = clm['l_bpw'][ids][ibf]
-                lbfs.append(lbf)
-            lbfs = np.array(lbfs)
-            if np.any(np.fabs(lbfs/clm['l_eff']-1) > 0.2):
-                print(clm['bin_1'], clm['bin_1'])
-                print(lbfs)
-                print(clm['l_eff'])
-                raise ValueError("There might be something wrong with "
-                                 "the effective ell assignment.")
-            clm['l_eff'] = lbfs
 
     def get_sacc_file(self, **pars):
         import sacc
@@ -591,6 +533,7 @@ class ClLike(Likelihood):
         # By selecting `self._get_cl_data` as a `method` of CCL here,
         # we make sure that this function is only run when the
         # cosmological parameters vary.
+        # KW: CCL doesn't expect **pars argument. TODO: pass them consistently
         return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
 
     def logp(self, **pars):
