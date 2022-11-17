@@ -448,6 +448,7 @@ class ClLike(Likelihood):
                 
         return {'cl00': clbs_00, 'cl01': clbs_01, 'cl10': clbs_10, 'cl11': clbs_11}
 
+    # OLD: DEPRECATED
     def _get_cl_all(self, cld, **pars):
         eps, bias = self._get_bias_params(**pars)
         cls = []
@@ -469,8 +470,144 @@ class ClLike(Likelihood):
                 cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1), (nbias2), (nbias1, nbias2, nell)
             cls.append(cl_this)
             
-        return cls 
+        return cls
+
     
+    # NEW
+    def _model(self, cld, bias_vec, **pars):
+        eps, bias_fix = self._get_bias_params(**pars)
+        bias = {}
+        for i,k in enumerate(bias_fix):
+            # TODO: 
+            bias[k] = bias_vec[i] # KW:  vec -> dict
+        
+        cls = []
+        for icl, clm in enumerate(self.cl_meta):
+            cl_this = np.zeros_like(clm['l_eff'])
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            e1 = eps[n1]
+            e2 = eps[n2]
+            b1 = bias[n1]
+            b2 = bias[n2]
+            if e1 and e2:
+                cl_this += cld['cl00'][icl]
+            if e1 and (b2 is not None):
+                cl_this += np.dot(b2, cld['cl01'][icl]) # (nbias) , (nbias, nell)
+            if e2 and (b1 is not None):
+                cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
+            if (b1 is not None) and (b2 is not None):
+                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl]))
+            cls.append(cl_this)
+            
+        return cls
+
+    # NEW: TODO
+    def _model_deriv(self, cld, bias_vec, **pars):
+        nbias = len(bias_vec)
+        eps, bias_fix = self._get_bias_params(**pars)
+        bias = {}
+        for i,k in enumerate(bias_fix):
+            bias[k] = bias_vec[i] # KW:  vec -> dict
+        
+        cls_deriv = np.zeros((ndata, nbias))
+        for icl, clm in enumerate(self.cl_meta):
+            cl_grad = np.zeros_like(clm['l_eff'])
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            e1 = eps[n1]
+            e2 = eps[n2]
+            b1 = bias[n1]
+            b2 = bias[n2]
+            # 1: loop over n1 where (b1 is not None) and e2
+            
+            # 2: loop over n2 where (b2 is not None) and e1
+            
+            # 3: loop
+            
+            # term where 
+            
+            if e1 and (b2 is not None):
+                cl_this += np.dot(b2, cld['cl01'][icl]) # (nbias) , (nbias, nell)
+            if e2 and (b1 is not None):
+                cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
+            if (b1 is not None) and (b2 is not None):
+                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl]))
+            cls_deriv[:,] = cl_grad
+            
+        return cls
+        # TODO
+        return cls_deriv # (ndata, nbias)
+    
+    # NEW
+    def _get_fisher(self, cld, bias_vec, **pars):
+        # Compute fisher_marg = - Hessian of log(posterior) w.r.t. the bias parameters,
+        hessian = np.zeros((len(bias_vec), len(bias_vec)))
+        gradt = self._model_deriv(cld, bias_vec, **pars) # (ndata, nbias)
+        # TODO: In general, do this numerically
+        if self.general_chi2:
+            raise NotImplementedError('This has not yet been implemented.')
+        # In the GLM+noprior limit, we can do it analytically
+        else:
+            mat = np.dot(gradt.T, np.dot(self.inv_cov, gradt)) # (nbias, ndata) (ndata, ndata) (ndata, nbias)
+            hessian = - np.linalg.inv(mat)
+            
+            return -1.0 * hessian
+    
+    # NEW
+    def _chi2(self, cld, bias_vec, **pars):
+        # Compute the chi^2 at a given theta (cosmo) and bias
+        t = self._model(cld, bias_vec) # (ndata,)
+        # TODO: In general, we would have an arbitrary likelihood and prior
+        if self.general_chi2:
+            raise NotImplementedError('This has not yet been implemented.')
+        # In the GLM+noprior limit, we only need the covariance matrix, model and data.
+        else:
+            r =  self.data_vec - t
+            
+            return np.dot(r, np.dot(self.inv_cov, r)) # (ndata) (ndata, ndata) (ndata)
+    
+    # NEW: TODO
+    def _minimizer(self, func):
+        min_vec = []
+        # TODO: Susanna
+        # min_vec <- argmin(func)
+        return np.array(min_vec)
+    
+    # NEW
+    def _get_cl_all_fisher(self, cld, **pars):
+        def chisq(bias_vec):
+            return self._chi2(cld, bias_vec, **pars)
+        
+        eps, bias_fix = self._get_bias_params(**pars)
+        bias_best_vec = self._minimizer(chisq) # KW: fast bias
+        fisher = self._get_fisher(cld, bias_best_vec, **pars) # KW: fisher
+        bias_best = {}
+        for i,k in enumerate(bias_fix):
+            bias_best[k] = bias_best_vec[i] # KW:  vec -> dict
+            
+        cls = []
+        for icl, clm in enumerate(self.cl_meta):
+            cl_this = np.zeros_like(clm['l_eff'])
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            e1 = eps[n1]
+            e2 = eps[n2]
+            b1 = bias_best[n1]
+            b2 = bias_best[n2]
+            if e1 and e2:
+                cl_this += cld['cl00'][icl]
+            if e1 and (b2 is not None):
+                cl_this += np.dot(b2, cld['cl01'][icl]) # (nbias) , (nbias, nell)
+            if e2 and (b1 is not None):
+                cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
+            if (b1 is not None) and (b2 is not None):
+                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1), (nbias2), (nbias1, nbias2, nell)
+            cls.append(cl_this)
+            
+        return cls, fisher
+    
+    # OLD: DEPRECATED
     def get_cls_theory(self, **pars):
         # Get cosmological model
         res = self.provider.get_CCL()
@@ -483,7 +620,22 @@ class ClLike(Likelihood):
         cls = self._get_cl_all(cld, **pars)
 
         return cls
+    
+    # NEW
+    def get_cls_theory_fisher(self, **pars):
+        # Get cosmological model
+        res = self.provider.get_CCL()
+        cosmo = res['cosmo']
 
+        # First, gather all the necessary ingredients for the different P(k)
+        cld = res['cl_data']
+
+        # Then pass them on to convert them into C_ells
+        cls, fisher = self._get_cl_all_fisher(cld, **pars) # KW: added fisher
+
+        return cls, fisher # KW: added fisher
+
+    # SLIGHT MOD
     def get_sacc_file(self, **pars):
         import sacc
 
@@ -504,7 +656,8 @@ class ClLike(Likelihood):
                              ell=np.arange(10), beam=np.ones(10))
 
         # Calculate power spectra
-        cls = self.get_cls_theory(**pars)
+        #cls = self.get_cls_theory(**pars)
+        cls, _ = self.get_cls_theory_fisher(**pars) # KW: added , _
         for clm, cl in zip(self.cl_meta, cls):
             p1 = 'e' if self.tracer_qs[clm['bin_1']] == 'galaxy_shear' else '0'
             p2 = 'e' if self.tracer_qs[clm['bin_2']] == 'galaxy_shear' else '0'
@@ -518,6 +671,7 @@ class ClLike(Likelihood):
         s.add_covariance(self.cov)
         return s
 
+    # OLD
     def _get_theory(self, **pars):
         """ Computes theory vector."""
         cls = self.get_cls_theory(**pars)
@@ -528,6 +682,18 @@ class ClLike(Likelihood):
             cl_out[clm['inds']] = cl
 
         return cl_out
+    
+    # NEW
+    def _get_theory_fisher(self, **pars):
+        """ Computes theory vector and Fisher matrix."""
+        cls, fisher = self.get_cls_theory_fisher(**pars) # KW: added fisher
+
+        # Flattening into a 1D array
+        cl_out = np.zeros(self.ndata)
+        for clm, cl in zip(self.cl_meta, cls):
+            cl_out[clm['inds']] = cl
+
+        return cl_out, fisher # KW: added Fisher
 
     def get_requirements(self):
         # By selecting `self._get_cl_data` as a `method` of CCL here,
@@ -535,6 +701,7 @@ class ClLike(Likelihood):
         # cosmological parameters vary.
         return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
 
+    # OLD
     def logp(self, **pars):
         """
         Simple Gaussian likelihood.
@@ -543,3 +710,16 @@ class ClLike(Likelihood):
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r))
         return -0.5*chi2
+    
+    # NEW
+    def logp_fastbias(self, **pars):
+        """
+        Approximate marginal likelihood.
+        Note: to not wastefully sample over bias parameters, we have to fix them in the config.
+        """
+        t, f = self._get_theory_fisher(**pars)
+        r = t - self.data_vec
+        chi2 = np.dot(r, np.dot(self.inv_cov, r))
+        logdet = np.log(np.linalg.det(f))
+        
+        return -0.5*chi2 - 0.5*logdet
