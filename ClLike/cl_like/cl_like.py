@@ -8,6 +8,7 @@ from .lpt import LPTCalculator, get_lpt_pk2d
 from .ept import EPTCalculator, get_ept_pk2d
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
+from scipy.optimize import minimize
 
 
 class ClLike(Likelihood):
@@ -42,6 +43,8 @@ class ClLike(Likelihood):
     defaults: dict = {}
     # List of two-point functions that make up the data vector
     twopoints: list = []
+    # Bias parameters
+    bias_params: dict = {}
 
     def initialize(self):
         # Read SACC file
@@ -129,14 +132,17 @@ class ClLike(Likelihood):
                 self.bin_properties[b['name']] = {}
 
             if t.quantity == 'galaxy_density':
-                self.bin_properties[b['name']]['bias_ind'] = [ind_bias]
+                self.bin_properties[b['name']]['bias_ind'] = [ind_bias] # for now, just <=1 bias param per tracer
+                self.bin_properties[b['name']]['eps'] = False
+                self.bias0.append(self.bias_params[b['name']+'_b1'])
                 ind_bias += 1
             if t.quantity == 'galaxy_shear':
                 if ind_IA is None:
-                    ind_IA = ind_bias.copy()
+                    ind_IA = ind_bias
                     self.bias0.append(self.bias_params['A_IA'])
                     ind_bias += 1
                 self.bin_properties[b['name']]['bias_ind'] = [ind_IA]
+                self.bin_properties[b['name']]['eps'] = True
                
             # Scale cuts
             # Ensure all tracers have ell_min
@@ -158,6 +164,7 @@ class ClLike(Likelihood):
                 # Make sure everything else has an ell_max
                 if 'lmax' not in self.defaults[b['name']]:
                     self.defaults[b['name']]['lmax'] = self.defaults['lmax']
+        self.bias0 = np.array(self.bias0)
 
         # 2. Iterate through two-point functions and apply scale cuts
         indices = []
@@ -285,26 +292,6 @@ class ClLike(Likelihood):
             z = self.bin_properties[name]['z_fid']
             A_IA = np.ones_like(z)
             return (z, A_IA)
-
-    def _get_bias_params(self, **pars):
-        eps = {}
-        bias = {}
-        for name, q in self.tracer_qs.items():
-            prefix = self.input_params_prefix + '_' + name
-
-            # if contains eps
-            if q == 'galaxy_density':
-                eps[name] = False
-                bias[name] = np.array([pars[prefix + '_b1']])
-            elif q == 'galaxy_shear':
-                eps[name] = True
-                bias[name] = np.array([pars['clk_A_IA']])
-                #bias[name] = np.array([pars[prefix + '_A_IA']])
-            elif q == 'cmb_convergence':
-                eps[name] = True
-                bias[name] = None
-        return eps, bias
-                
                 
     def _get_tracers(self, cosmo):
         """ Obtains CCL tracers (and perturbation theory tracers,
@@ -463,15 +450,16 @@ class ClLike(Likelihood):
     
     # NEW
     def _model(self, cld, bias_vec):
-        cls = []
+        cls = np.zeros(self.ndata)
         for icl, clm in enumerate(self.cl_meta):
             cl_this = np.zeros_like(clm['l_eff'])
             n1 = clm['bin_1']
             n2 = clm['bin_2']
-            e1 = eps[n1]
-            e2 = eps[n2]
+            e1 = self.bin_properties[n1]['eps']
+            e2 = self.bin_properties[n2]['eps']
             b1 = bias_vec[self.bin_properties[n1]['bias_ind']]
             b2 = bias_vec[self.bin_properties[n2]['bias_ind']]
+            inds = clm['inds']
             if e1 and e2:
                 cl_this += cld['cl00'][icl]
             if e1 and (b2 is not None):
@@ -479,8 +467,8 @@ class ClLike(Likelihood):
             if e2 and (b1 is not None):
                 cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
             if (b1 is not None) and (b2 is not None):
-                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl]))
-            cls.append(cl_this)
+                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) * ((nbias2), (nbias1,nbias2,nell))
+            cls[inds] = cl_this
             
         return cls
 
@@ -493,32 +481,90 @@ class ClLike(Likelihood):
             cl_grad = np.zeros_like(clm['l_eff'])
             n1 = clm['bin_1']
             n2 = clm['bin_2']
-            e1 = eps[n1]
-            e2 = eps[n2]
+            e1 = self.bin_properties[n1]['eps']
+            e2 = self.bin_properties[n2]['eps']
             ind1 = self.bin_properties[n1]['bias_ind']
             ind2 = self.bin_properties[n2]['bias_ind']
             b1 = bias_vec[ind1]
             b2 = bias_vec[ind2]
-            # 1: loop over n1 where (b1 is not None) and e2
-            
-            # 2: loop over n2 where (b2 is not None) and e1
-            
-            # 3: loop
-            
-            # term where 
-            
+            inds = clm['inds']
+
             if e1 and (b2 is not None):
-                cl_this += np.dot(b2, cld['cl01'][icl]) # (nbias) , (nbias, nell)
+                cls_deriv[inds][:, ind2] += cld['cl01'][icl].T # (ndata, nbias2) , (ndata, nbias2)
             if e2 and (b1 is not None):
-                cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
+                cls_deriv[inds][:, ind1] += cld['cl10'][icl].T # (ndata, nbias1) , (ndata, nbias1)
+
             if (b1 is not None) and (b2 is not None):
-                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl]))
-            cls_deriv[:,] = cl_grad
-            
-        return cls
-        # TODO
+                
+                cl_b2 = np.dot(b2, cld['cl11'][icl]) # (nbias2) , (nbias1, nbias2, ndata) -> (nbias1, ndata)
+                cl_b1 = np.sum(b1[:, None, None] * cld['cl11'][icl], axis=0) # (nbias1) , (nbias1, nbias2, ndata) -> (nbias2, ndata)
+                cls_deriv[inds][:, ind1] += cl_b2.T
+                cls_deriv[inds][:, ind2] += cl_b1.T
+
         return cls_deriv # (ndata, nbias)
-    
+
+    # OLD: DEPRECATED
+    def get_cls_theory(self, **pars):
+        # Get cosmological model
+        res = self.provider.get_CCL()
+        cosmo = res['cosmo']
+
+        # First, gather all the necessary ingredients for the different P(k)
+        cld = res['cl_data']
+
+        # Then pass them on to convert them into C_ells
+        cls = self._model(cld, self.bias0)
+
+        return cls
+
+    def get_requirements(self):
+        # By selecting `self._get_cl_data` as a `method` of CCL here,
+        # we make sure that this function is only run when the
+        # cosmological parameters vary.
+        return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
+
+    def _get_BF_chi2_and_F(self, **pars):
+        # Get cosmological model
+        res = self.provider.get_CCL()
+        cosmo = res['cosmo']
+
+        # First, gather all the necessary ingredients for the Cls without bias parameters
+        cld = res['cl_data']
+
+        def chi2(bias):
+            t = self._model(cld, bias)
+            r = t - self.data_vec
+            chi2 = np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata) 
+            g = self._model_deriv(cld, bias) 
+            dchi2 = 2*np.dot(np.dot(self.inv_cov, r), g) # (ndata, ndata) , (ndata) , (ndata, nbias)
+            return chi2, dchi2
+
+        def hessian_chi2(bias):
+            g = self._model_deriv(cld, bias)
+            ic_g = np.dot(self.inv_cov, g) # (ndata, ndata) , (ndata, nbias)
+            return 2*np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
+
+        # KW: TODO: 
+        # * hessian is evaluated at self.bias0 --> change this!
+        # * self.bias0 appears to be a local minimum so hess is a zero matrix --> not good.
+        p = minimize(chi2, self.bias0, method='trust-ncg', jac=True, hess=hessian_chi2)
+        return p.fun, p.hess
+
+    def logp(self, **pars):
+        chi2, F = self._get_BF_chi2_and_F(**pars)
+        return -0.5*(chi2 + np.log(np.linalg.det(F)))
+
+    # OLD
+    def logp_old(self, **pars):
+        """
+        Simple Gaussian likelihood.
+        """
+        t = self.get_cls_theory(**pars)
+        r = t - self.data_vec
+        chi2 = np.dot(r, np.dot(self.inv_cov, r))
+        return -0.5*chi2
+
+    '''
     # NEW
     def _get_fisher(self, cld, bias_vec, **pars):
         # Compute fisher_marg = - Hessian of log(posterior) w.r.t. the bias parameters,
@@ -587,20 +633,6 @@ class ClLike(Likelihood):
             
         return cls, fisher
     
-    # OLD: DEPRECATED
-    def get_cls_theory(self, **pars):
-        # Get cosmological model
-        res = self.provider.get_CCL()
-        cosmo = res['cosmo']
-
-        # First, gather all the necessary ingredients for the different P(k)
-        cld = res['cl_data']
-
-        # Then pass them on to convert them into C_ells
-        cls = self._get_cl_all(cld, **pars)
-
-        return cls
-    
     # NEW
     def get_cls_theory_fisher(self, **pars):
         # Get cosmological model
@@ -650,18 +682,6 @@ class ClLike(Likelihood):
 
         s.add_covariance(self.cov)
         return s
-
-    # OLD
-    def _get_theory(self, **pars):
-        """ Computes theory vector."""
-        cls = self.get_cls_theory(**pars)
-
-        # Flattening into a 1D array
-        cl_out = np.zeros(self.ndata)
-        for clm, cl in zip(self.cl_meta, cls):
-            cl_out[clm['inds']] = cl
-
-        return cl_out
     
     # NEW
     def _get_theory_fisher(self, **pars):
@@ -674,22 +694,6 @@ class ClLike(Likelihood):
             cl_out[clm['inds']] = cl
 
         return cl_out, fisher # KW: added Fisher
-
-    def get_requirements(self):
-        # By selecting `self._get_cl_data` as a `method` of CCL here,
-        # we make sure that this function is only run when the
-        # cosmological parameters vary.
-        return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
-
-    # OLD
-    def logp(self, **pars):
-        """
-        Simple Gaussian likelihood.
-        """
-        t = self._get_theory(**pars)
-        r = t - self.data_vec
-        chi2 = np.dot(r, np.dot(self.inv_cov, r))
-        return -0.5*chi2
     
     # NEW
     def logp_fastbias(self, **pars):
@@ -703,3 +707,4 @@ class ClLike(Likelihood):
         logdet = np.log(np.linalg.det(f))
         
         return -0.5*chi2 - 0.5*logdet
+    '''
