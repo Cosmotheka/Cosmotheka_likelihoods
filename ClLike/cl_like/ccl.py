@@ -34,7 +34,7 @@ the cosmo object itself between different likelihoods.
 Also note lots of things still cannot be done consistently
 in CCL, so this is far from general.
 """
-
+import numpy as np
 import pyccl as ccl
 from cobaya.theory import Theory
 
@@ -50,11 +50,11 @@ class CCL(Theory):
     matter_pk: str = 'halofit'
     baryons_pk: str = 'nobaryons'
     # Params it can accept
-    params = {'Omega_c': None,
+    params = {'Omega_m': None,
               'Omega_b': None,
               'h': None,
               'n_s': None,
-              'A_sE9': None,
+              'sigma8': None,
               'm_nu': None}
 
     def initialize(self):
@@ -80,7 +80,7 @@ class CCL(Theory):
 
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
-        return ['sigma8']
+        return ['S8']
 
     def get_can_support_params(self):
         # return any nuisance parameters that CCL can support
@@ -88,11 +88,13 @@ class CCL(Theory):
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
-        cosmo = ccl.Cosmology(Omega_c=self.provider.get_param('Omega_c'),
-                              Omega_b=self.provider.get_param('Omega_b'),
+        Ob = self.provider.get_param('Omega_b')
+        Om = self.provider.get_param('Omega_m')
+        cosmo = ccl.Cosmology(Omega_c=Om-Ob,
+                              Omega_b=Ob,
                               h=self.provider.get_param('h'),
                               n_s=self.provider.get_param('n_s'),
-                              A_s=self.provider.get_param('A_sE9')*1E-9,
+                              sigma8=self.provider.get_param('sigma8'),
                               T_CMB=2.7255,
                               m_nu=self.provider.get_param('m_nu'),
                               transfer_function=self.transfer_function,
@@ -100,8 +102,8 @@ class CCL(Theory):
                               baryons_power_spectrum=self.baryons_pk)
 
         state['CCL'] = {'cosmo': cosmo}
-        # Compute sigma8 (we should actually only do this if required -- TODO)
-        state['derived'] = {'sigma8': ccl.sigma8(cosmo)}
+        # Compute S8
+        state['derived'] = {'S8': cosmo['sigma8']*np.sqrt(Om/0.3)}
         for req_res, method in self._required_results.items():
             state['CCL'][req_res] = method(cosmo)
 
