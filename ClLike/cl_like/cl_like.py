@@ -45,6 +45,8 @@ class ClLike(Likelihood):
     twopoints: list = []
     # Bias parameters
     bias_params: dict = {}
+    # 2nd order term in bias marginalization?
+    bias_fisher: bool = True
 
     def initialize(self):
         # Read SACC file
@@ -574,7 +576,10 @@ class ClLike(Likelihood):
         chi2, F, p = self._get_BF_chi2_and_F(**pars)
 
         # Compute log_like
-        state['logp'] = -0.5*(chi2 + np.log(np.linalg.det(F)))
+        if self.bias_fisher:
+            state['logp'] = -0.5*(chi2 + np.log(np.linalg.det(F)))
+        else:
+            state['logp'] = -0.5*chi2
 
         # Add derived parameters
         # - Best-fit biases
