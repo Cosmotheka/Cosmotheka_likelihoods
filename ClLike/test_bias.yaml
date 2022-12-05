@@ -4,7 +4,7 @@ theory:
     matter_pk: halofit
     baryons_pk: nobaryons
 likelihood:
-  cl_like.ClLike:
+  cl_like.ClLikeFastBias:
     input_file: ../../cls_test.fits
     bins:
     - name: gc
@@ -27,6 +27,7 @@ likelihood:
     ia_model: IADESY1
     nz_model: NzNone
     bias_model: Linear
+    bias_fisher: True
     bias_params:
       gc_b1:
         value: 1.1
@@ -54,6 +55,7 @@ params:
   S8:
     latex: S_8
   nfev:
+  dchi2_marg:
   gc_b1:
   A_IA:
 sampler:

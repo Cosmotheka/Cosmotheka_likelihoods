@@ -43,10 +43,6 @@ class ClLike(Likelihood):
     defaults: dict = {}
     # List of two-point functions that make up the data vector
     twopoints: list = []
-    # Bias parameters
-    bias_params: dict = {}
-    # 2nd order term in bias marginalization?
-    bias_fisher: bool = True
 
     def initialize(self):
         # Read SACC file
@@ -119,10 +115,7 @@ class ClLike(Likelihood):
         kmax_default = self.defaults.get('kmax', 0.1)
         ind_bias = 0
         ind_IA = None
-        self.bias0 = []
         self.bias_names = []
-        self.bias_pr_mean = []
-        self.bias_pr_isigma2 = []
         for b in self.bins:
             if b['name'] not in s.tracers:
                 raise LoggedError(self.log, "Unknown tracer %s" % b['name'])
@@ -135,37 +128,6 @@ class ClLike(Likelihood):
                                                   'zmean_fid': zmid}
             else:
                 self.bin_properties[b['name']] = {}
-
-            self.bin_properties[b['name']]['bias_ind'] = None # No biases by default
-            if t.quantity == 'galaxy_density':
-                self.bin_properties[b['name']]['bias_ind'] = [ind_bias] # for now, just <=1 bias param per tracer
-                self.bin_properties[b['name']]['eps'] = False
-                self.bias0.append(self.bias_params[b['name']+'_b1']['value'])
-                self.bias_names.append(b['name']+'_b1')
-                pr = self.bias_params[b['name']+'_b1'].get('prior', None)
-                if pr is not None:
-                    self.bias_pr_mean.append(pr['mean'])
-                    self.bias_pr_isigma2.append(1./pr['sigma']**2)
-                else:
-                    self.bias_pr_mean.append(self.bias_params[b['name']+'_b1']['value'])
-                    self.bias_pr_isigma2.append(0.0)
-                ind_bias += 1
-            if t.quantity == 'galaxy_shear':
-                if self.ia_model != 'IANone':
-                    if ind_IA is None:
-                        ind_IA = ind_bias
-                        self.bias0.append(self.bias_params['A_IA']['value'])
-                        self.bias_names.append('A_IA')
-                        pr = self.bias_params['A_IA'].get('prior', None)
-                        if pr is not None:
-                            self.bias_pr_mean.append(pr['mean'])
-                            self.bias_pr_isigma2.append(1./pr['sigma']**2)
-                        else:
-                            self.bias_pr_mean.append(self.bias_params['A_IA']['value'])
-                            self.bias_pr_isigma2.append(0.0)
-                        ind_bias += 1
-                    self.bin_properties[b['name']]['bias_ind'] = [ind_IA]
-                self.bin_properties[b['name']]['eps'] = True
 
             # Scale cuts
             # Ensure all tracers have ell_min
@@ -187,9 +149,9 @@ class ClLike(Likelihood):
                 # Make sure everything else has an ell_max
                 if 'lmax' not in self.defaults[b['name']]:
                     self.defaults[b['name']]['lmax'] = self.defaults['lmax']
-        self.bias0 = np.array(self.bias0)
-        self.bias_pr_mean = np.array(self.bias_pr_mean)
-        self.bias_pr_isigma2 = np.array(self.bias_pr_isigma2)
+
+        # Additional information specific for this likelihood
+        self._get_bin_info_extra(s)
 
         # 2. Iterate through two-point functions and apply scale cuts
         indices = []
@@ -265,6 +227,32 @@ class ClLike(Likelihood):
         self.inv_cov = np.linalg.inv(self.cov)
         self.ndata = len(self.data_vec)
 
+    def _get_bin_info_extra(self, s):
+        # Extract additional per-sample information from the sacc
+        # file needed for this likelihood.
+        ind_bias = 0
+        ind_IA = None
+        self.bias_names = []
+        for b in self.bins:
+            if b['name'] not in s.tracers:
+                raise LoggedError(self.log, "Unknown tracer %s" % b['name'])
+            t = s.tracers[b['name']]
+
+            self.bin_properties[b['name']]['bias_ind'] = None # No biases by default
+            if t.quantity == 'galaxy_density':
+                self.bin_properties[b['name']]['bias_ind'] = [ind_bias] # for now, just <=1 bias param per tracer
+                self.bin_properties[b['name']]['eps'] = False
+                self.bias_names.append(self.input_params_prefix + '_'+b['name']+'_b1')
+                ind_bias += 1
+            if t.quantity == 'galaxy_shear':
+                if self.ia_model != 'IANone':
+                    if ind_IA is None:
+                        ind_IA = ind_bias
+                        self.bias_names.append(self.input_params_prefix + '_A_IA')
+                        ind_bias += 1
+                    self.bin_properties[b['name']]['bias_ind'] = [ind_IA]
+                self.bin_properties[b['name']]['eps'] = True
+       
     def _get_ell_sampling(self, nl_per_decade=30):
         # Selects ell sampling.
         # Ell max/min are set by the bandpower window ells.
@@ -501,6 +489,113 @@ class ClLike(Likelihood):
             
         return cls
 
+    def get_requirements(self):
+        # By selecting `self._get_cl_data` as a `method` of CCL here,
+        # we make sure that this function is only run when the
+        # cosmological parameters vary.
+        return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
+
+    def _get_chi2(self, **pars):
+        # Get cosmological model
+        res = self.provider.get_CCL()
+        cosmo = res['cosmo']
+
+        # First, gather all the necessary ingredients for the Cls without bias parameters
+        cld = res['cl_data']
+
+        # Construct bias vector
+        bias = np.array([pars[k] for k in self.bias_names])
+
+        # Theory model
+        t = self._model(cld, bias)
+        r = t - self.data_vec
+        return np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata)
+
+    def calculate(self, state, want_derived=True, **pars):
+        # Calculate chi2
+        chi2 = self._get_chi2(**pars)
+        state['logp'] = -0.5*chi2
+
+
+class ClLikeFastBias(ClLike):
+    # Bias parameters
+    bias_params: dict = {}
+    # 2nd order term in bias marginalization?
+    bias_fisher: bool = True
+
+    def _get_bin_info_extra(self, s):
+        # Extract additional per-sample information from the sacc
+        # file needed for this likelihood.
+        ind_bias = 0
+        ind_IA = None
+        self.bias0 = []
+        self.bias_names = []
+        self.bias_pr_mean = []
+        self.bias_pr_isigma2 = []
+        for b in self.bins:
+            if b['name'] not in s.tracers:
+                raise LoggedError(self.log, "Unknown tracer %s" % b['name'])
+            t = s.tracers[b['name']]
+
+            self.bin_properties[b['name']]['bias_ind'] = None # No biases by default
+            if t.quantity == 'galaxy_density':
+                self.bin_properties[b['name']]['bias_ind'] = [ind_bias] # for now, just <=1 bias param per tracer
+                self.bin_properties[b['name']]['eps'] = False
+                self.bias0.append(self.bias_params[b['name']+'_b1']['value'])
+                self.bias_names.append(b['name']+'_b1')
+                pr = self.bias_params[b['name']+'_b1'].get('prior', None)
+                if pr is not None:
+                    self.bias_pr_mean.append(pr['mean'])
+                    self.bias_pr_isigma2.append(1./pr['sigma']**2)
+                else:
+                    self.bias_pr_mean.append(self.bias_params[b['name']+'_b1']['value'])
+                    self.bias_pr_isigma2.append(0.0)
+                ind_bias += 1
+            if t.quantity == 'galaxy_shear':
+                if self.ia_model != 'IANone':
+                    if ind_IA is None:
+                        ind_IA = ind_bias
+                        self.bias0.append(self.bias_params['A_IA']['value'])
+                        self.bias_names.append('A_IA')
+                        pr = self.bias_params['A_IA'].get('prior', None)
+                        if pr is not None:
+                            self.bias_pr_mean.append(pr['mean'])
+                            self.bias_pr_isigma2.append(1./pr['sigma']**2)
+                        else:
+                            self.bias_pr_mean.append(self.bias_params['A_IA']['value'])
+                            self.bias_pr_isigma2.append(0.0)
+                        ind_bias += 1
+                    self.bin_properties[b['name']]['bias_ind'] = [ind_IA]
+                self.bin_properties[b['name']]['eps'] = True
+        self.bias0 = np.array(self.bias0)
+        self.bias_pr_mean = np.array(self.bias_pr_mean)
+        self.bias_pr_isigma2 = np.array(self.bias_pr_isigma2)
+
+    def _model(self, cld, bias_vec):
+        cls = np.zeros(self.ndata)
+        for icl, clm in enumerate(self.cl_meta):
+            cl_this = np.zeros_like(clm['l_eff'])
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            e1 = self.bin_properties[n1]['eps']
+            e2 = self.bin_properties[n2]['eps']
+            ind1 = self.bin_properties[n1]['bias_ind']
+            ind2 = self.bin_properties[n2]['bias_ind']
+            b1 = bias_vec[ind1] if ind1 is not None else None
+            b2 = bias_vec[ind2] if ind2 is not None else None
+            inds = clm['inds']
+            if e1 and e2:
+                cl_this += cld['cl00'][icl]
+            if e1 and (b2 is not None):
+                cl_this += np.dot(b2, cld['cl01'][icl]) # (nbias) , (nbias, nell)
+            if e2 and (b1 is not None):
+                cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
+            if (b1 is not None) and (b2 is not None):
+                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) * ((nbias2), (nbias1,nbias2,nell))
+            cls[inds] = cl_this
+            
+        return cls
+
     def _model_deriv(self, cld, bias_vec):
         nbias = len(bias_vec)
         cls_deriv = np.zeros((self.ndata, nbias))
@@ -569,7 +664,7 @@ class ClLike(Likelihood):
         return p.fun, hessian_chi2(p.x), p
 
     def get_can_provide_params(self):
-        return self.bias_names + ['nfev']
+        return self.bias_names + ['nfev', 'dchi2_marg']
 
     def calculate(self, state, want_derived=True, **pars):
         # Calculate chi2
@@ -577,12 +672,15 @@ class ClLike(Likelihood):
 
         # Compute log_like
         if self.bias_fisher:
-            state['logp'] = -0.5*(chi2 + np.log(np.linalg.det(F)))
+            dchi2 = np.log(np.linalg.det(F))
         else:
-            state['logp'] = -0.5*chi2
+            dchi2 = 0.0
+        state['logp'] = -0.5*(chi2 + dchi2)
 
         # Add derived parameters
         # - Best-fit biases
         state['derived'] = dict(zip(self.bias_names, p.x))
         # - Number of function evaluations
         state['derived']['nfev'] = p.nfev
+        # - Contribution from Laplace marginalization
+        state['derived']['dchi2_marg'] = dchi2
