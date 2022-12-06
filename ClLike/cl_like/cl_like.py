@@ -549,11 +549,8 @@ class ClLike(Likelihood):
         return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
 
     def _get_chi2(self, **pars):
-        # Get cosmological model
-        res = self.provider.get_CCL()
-        cosmo = res['cosmo']
-
         # First, gather all the necessary ingredients for the Cls without bias parameters
+        res = self.provider.get_CCL()
         cld = res['cl_data']
 
         # Construct bias vector
@@ -633,30 +630,6 @@ class ClLikeFastBias(ClLike):
         self.bias_pr_mean = np.array(self.bias_pr_mean)
         self.bias_pr_isigma2 = np.array(self.bias_pr_isigma2)
 
-    def _model(self, cld, bias_vec):
-        cls = np.zeros(self.ndata)
-        for icl, clm in enumerate(self.cl_meta):
-            cl_this = np.zeros_like(clm['l_eff'])
-            n1 = clm['bin_1']
-            n2 = clm['bin_2']
-            e1 = self.bin_properties[n1]['eps']
-            e2 = self.bin_properties[n2]['eps']
-            ind1 = self.bin_properties[n1]['bias_ind']
-            ind2 = self.bin_properties[n2]['bias_ind']
-            b1 = bias_vec[ind1] if ind1 is not None else None
-            b2 = bias_vec[ind2] if ind2 is not None else None
-            inds = clm['inds']
-            if e1 and e2:
-                cl_this += cld['cl00'][icl]
-            if e1 and (b2 is not None):
-                cl_this += np.dot(b2, cld['cl01'][icl]) # (nbias) , (nbias, nell)
-            if e2 and (b1 is not None):
-                cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
-            if (b1 is not None) and (b2 is not None):
-                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) * ((nbias2), (nbias1,nbias2,nell))
-            cls[inds] = cl_this
-        return cls
-
     def _model_deriv(self, cld, bias_vec):
         nbias = len(bias_vec)
         cls_deriv = np.zeros((self.ndata, nbias))
@@ -687,18 +660,9 @@ class ClLikeFastBias(ClLike):
             cls_deriv[inds] = cls_grad.T
         return cls_deriv # (ndata, nbias)
 
-    def get_requirements(self):
-        # By selecting `self._get_cl_data` as a `method` of CCL here,
-        # we make sure that this function is only run when the
-        # cosmological parameters vary.
-        return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
-
     def _get_BF_chi2_and_F(self, **pars):
-        # Get cosmological model
-        res = self.provider.get_CCL()
-        cosmo = res['cosmo']
-
         # First, gather all the necessary ingredients for the Cls without bias parameters
+        res = self.provider.get_CCL()
         cld = res['cl_data']
 
         def chi2(bias):
