@@ -35,6 +35,8 @@ class ClLike(Likelihood):
     l10k_min_pks: float = -4.0
     # max k 3D power spectra
     l10k_max_pks: float = 2.0
+    # k shot noise suppression scale
+    k_SN_suppress: float = 0.01
     # Angular resolution
     nside: int = -1
     # List of bin names
@@ -45,6 +47,8 @@ class ClLike(Likelihood):
     twopoints: list = []
 
     def initialize(self):
+        # Bias model
+        self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT']
         # Read SACC file
         self._read_data()
         # Ell sampling for interpolation
@@ -113,9 +117,6 @@ class ClLike(Likelihood):
         # We use a default cosmology to map k_max into ell_max
         cosmo_lcdm = ccl.CosmologyVanillaLCDM()
         kmax_default = self.defaults.get('kmax', 0.1)
-        ind_bias = 0
-        ind_IA = None
-        self.bias_names = []
         for b in self.bins:
             if b['name'] not in s.tracers:
                 raise LoggedError(self.log, "Unknown tracer %s" % b['name'])
@@ -240,10 +241,21 @@ class ClLike(Likelihood):
 
             self.bin_properties[b['name']]['bias_ind'] = None # No biases by default
             if t.quantity == 'galaxy_density':
-                self.bin_properties[b['name']]['bias_ind'] = [ind_bias] # for now, just <=1 bias param per tracer
-                self.bin_properties[b['name']]['eps'] = False
-                self.bias_names.append(self.input_params_prefix + '_'+b['name']+'_b1')
+                # Linear bias
+                inds = [ind_bias]
+                self.bias_names.append(self.input_params_prefix +
+                                       '_'+b['name']+'_b1')
                 ind_bias += 1
+                # Higher-order biases
+                if self.is_PT_bias:
+                    for bn in ['b2', 'bs', 'bk2']:
+                        self.bias_names.append(self.input_params_prefix +
+                                               '_'+b['name']+'_'+bn)
+                        inds.append(ind_bias)
+                        ind_bias += 1
+                self.bin_properties[b['name']]['bias_ind'] = inds
+                # No magnification bias yet
+                self.bin_properties[b['name']]['eps'] = False
             if t.quantity == 'galaxy_shear':
                 if self.ia_model != 'IANone':
                     if ind_IA is None:
@@ -280,31 +292,6 @@ class ClLike(Likelihood):
         cl_unbinned = f(np.log(1E-3+l_bpw))
         cl_binned = np.dot(w_bpw, cl_unbinned)
         return cl_binned
-
-    def _get_nz(self, cosmo, name):
-        """ Get redshift distribution for a given tracer.
-        Applies shift and width nuisance parameters if needed.
-        """
-        z = self.bin_properties[name]['z_fid']
-        nz = self.bin_properties[name]['nz_fid']
-        return (z, nz)
-
-    def _get_bz(self, cosmo, name):
-        """ Get linear galaxy bias. Unless we're using a linear bias,
-        model this should be just 1."""
-        z = self.bin_properties[name]['z_fid']
-        bz = np.ones_like(z)
-        return (z, bz)
-
-    def _get_ia_bias(self, cosmo, name):
-        """ Intrinsic alignment amplitude.
-        """
-        if self.ia_model == 'IANone':
-            return None
-        else:
-            z = self.bin_properties[name]['z_fid']
-            A_IA = np.ones_like(z)
-            return (z, A_IA)
                 
     def _get_tracers(self, cosmo):
         """ Obtains CCL tracers (and perturbation theory tracers,
@@ -312,35 +299,86 @@ class ClLike(Likelihood):
         current parameters."""
         trs0 = {}
         trs1 = {}
+        trs1_dnames = {}
         for name, q in self.tracer_qs.items():
+            z = self.bin_properties[name]['z_fid']
+            nz = self.bin_properties[name]['nz_fid']
+            oz = np.ones_like(z)
 
             if q == 'galaxy_density':
-                nz = self._get_nz(cosmo, name)
-                bz = self._get_bz(cosmo, name)
                 t0 = None
-                t1 = [ccl.NumberCountsTracer(cosmo, dndz=nz,
-                                             bias=bz, has_rsd=False)]
+                tr = ccl.NumberCountsTracer(cosmo, dndz=(z, nz),
+                                            bias=(z, oz), has_rsd=False)
+                t1 = [tr]
+                t1n = ['d1']
+                if self.is_PT_bias:
+                    for bn, dn in zip(['b2', 'bs', 'bk2'], ['d2', 's2', 'k2']):
+                        t1.append(tr)
+                        t1n.append(dn)
             elif q == 'galaxy_shear':
-                nz = self._get_nz(cosmo, name)
-                ia = self._get_ia_bias(cosmo, name)
-                t0 = ccl.WeakLensingTracer(cosmo, nz)
+                t0 = ccl.WeakLensingTracer(cosmo, dndz=(z, nz))
                 if self.ia_model == 'IANone':
                     t1 = None
                 else:
-                    t1 = [ccl.WeakLensingTracer(cosmo, nz, has_shear=False, ia_bias=ia)]
+                    t1 = [ccl.WeakLensingTracer(cosmo, dndz=(z, nz),
+                                                has_shear=False, ia_bias=(z, oz))]
+                    t1n = ['m']
             elif q == 'cmb_convergence':
                 # B.H. TODO: pass z_source as parameter to the YAML file
                 t0 = ccl.CMBLensingTracer(cosmo, z_source=1100)
                 t1 = None
+                t1n = None
 
             trs0[name] = t0
             trs1[name] = t1
-        return trs0, trs1
+            trs1_dnames[name] = t1n
+        return trs0, trs1, trs1_dnames
+
+    def _get_pk_data(self, cosmo):
+        cosmo.compute_nonlin_power()
+        pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        if self.bias_model == 'Linear':
+            pkd = {}
+            pkd['pk_mm'] = pkmm
+            pkd['pk_md1'] = pkmm
+            pkd['pk_d1m'] = pkmm
+            pkd['pk_d1d1'] = pkmm
+        elif self.is_PT_bias:
+            pkd = {}
+            pkd['pk_mm'] = pkmm
+            pkd['pk_md1'] = pkmm
+            pkd['pk_md2'] = None
+            pkd['pk_ms2'] = None
+            pkd['pk_mk2'] = None
+            pkd['pk_d1m'] = pkd['pk_md1']
+            pkd['pk_d1d1'] = pkmm
+            pkd['pk_d1d2'] = None
+            pkd['pk_d1s2'] = None
+            pkd['pk_d1k2'] = None
+            pkd['pk_d2m'] = pkd['pk_md2']
+            pkd['pk_d2d1'] = pkd['pk_d1d2']
+            pkd['pk_d2d2'] = None
+            pkd['pk_d2s2'] = None
+            pkd['pk_d2k2'] = None
+            pkd['pk_s2m'] = pkd['pk_ms2']
+            pkd['pk_s2d1'] = pkd['pk_d1s2']
+            pkd['pk_s2d2'] = pkd['pk_d2s2']
+            pkd['pk_s2s2'] = None
+            pkd['pk_s2k2'] = None
+            pkd['pk_k2m'] = pkd['pk_mk2']
+            pkd['pk_k2d1'] = pkd['pk_d1k2']
+            pkd['pk_k2d2'] = pkd['pk_d2k2']
+            pkd['pk_k2s2'] = pkd['pk_s2k2']
+            pkd['pk_k2k2'] = None
+        return pkd            
 
     def _get_cl_data(self, cosmo):
         """ Compute all C_ells."""
+        # Get P(k)s
+        pkd = self._get_pk_data(cosmo)
+
         # Gather all tracers
-        trs0, trs1 = self._get_tracers(cosmo)
+        trs0, trs1, dnames = self._get_tracers(cosmo)
 
         # Correlate all needed pairs of tracers
         cls_00 = []
@@ -359,17 +397,24 @@ class ClLike(Likelihood):
             t0_2 = trs0[n2]
             t1_1 = trs1[n1]
             t1_2 = trs1[n2]
+            dn_1 = dnames[n1]
+            dn_2 = dnames[n2]
             # 00: unbiased x unbiased
             if t0_1 and t0_2:
-                cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls) * clm['pixbeam']
+                pk = pkd['pk_mm']
+                cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
                 cls_00.append(cl00)
             else:
                 cls_00.append(None)
             # 01: unbiased x biased
             if t0_1 and (t1_2 is not None):
                 cl01 = []
-                for t12 in t1_2:
-                    cl = ccl.angular_cl(cosmo, t0_1, t12, ls) * clm['pixbeam']
+                for t12, dn in zip(t1_2, dn_2):
+                    pk = pkd[f'pk_m{dn}']
+                    if pk is not None:
+                        cl = ccl.angular_cl(cosmo, t0_1, t12, ls, p_of_k_a=pk) * clm['pixbeam']
+                    else:
+                        cl = np.zeros_like(ls)
                     cl01.append(cl)
                 cl01 = np.array(cl01)
             else:
@@ -381,8 +426,12 @@ class ClLike(Likelihood):
             else:
                 if t0_2 and (t1_1 is not None):
                     cl10 = []
-                    for t11 in t1_1:
-                        cl = ccl.angular_cl(cosmo, t11, t0_2, ls) * clm['pixbeam']
+                    for t11, dn in zip(t1_1, dn_1):
+                        pk = pkd[f'pk_m{dn}']
+                        if pk is not None:
+                            cl = ccl.angular_cl(cosmo, t11, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
+                        else:
+                            cl = np.zeros_like(ls)
                         cl10.append(cl)
                     cl10 = np.array(cl10)
                 else:
@@ -392,12 +441,16 @@ class ClLike(Likelihood):
             if (t1_1 is not None) and (t1_2 is not None):
                 cl11 = np.zeros([len(t1_1), len(t1_2), len(ls)])
                 autocorr = n1 == n2
-                for i1, t11 in enumerate(t1_1):
-                    for i2, t12 in enumerate(t1_2):
+                for i1, (t11, dn1) in enumerate(zip(t1_1, dn_1)):
+                    for i2, (t12, dn2) in enumerate(zip(t1_2, dn_2)):
                         if autocorr and i2 < i1:
                             cl11[i1, i2] = cl11[i2, i1]
                         else:
-                            cl = ccl.angular_cl(cosmo, t11, t12, ls) * clm['pixbeam']
+                            pk = pkd[f'pk_{dn1}{dn2}']
+                            if pk is not None:
+                                cl = ccl.angular_cl(cosmo, t11, t12, ls, p_of_k_a=pk) * clm['pixbeam']
+                            else:
+                                cl = np.zeros_like(ls)
                             cl11[i1, i2, :] = cl
             else:
                 cl11 = None
@@ -539,18 +592,27 @@ class ClLikeFastBias(ClLike):
 
             self.bin_properties[b['name']]['bias_ind'] = None # No biases by default
             if t.quantity == 'galaxy_density':
-                self.bin_properties[b['name']]['bias_ind'] = [ind_bias] # for now, just <=1 bias param per tracer
-                self.bin_properties[b['name']]['eps'] = False
-                self.bias0.append(self.bias_params[b['name']+'_b1']['value'])
-                self.bias_names.append(b['name']+'_b1')
-                pr = self.bias_params[b['name']+'_b1'].get('prior', None)
-                if pr is not None:
-                    self.bias_pr_mean.append(pr['mean'])
-                    self.bias_pr_isigma2.append(1./pr['sigma']**2)
+                inds = []
+                if self.is_PT_bias:
+                    bnames = ['b1', 'b2', 'bs', 'bk2']
                 else:
-                    self.bias_pr_mean.append(self.bias_params[b['name']+'_b1']['value'])
-                    self.bias_pr_isigma2.append(0.0)
-                ind_bias += 1
+                    bnames = ['b1']
+                for bn in bnames:
+                    bname = b['name'] + '_' + bn
+                    self.bias0.append(self.bias_params[bname]['value'])
+                    self.bias_names.append(bname)
+                    pr = self.bias_params[bname].get('prior', None)
+                    if pr is not None:
+                        self.bias_pr_mean.append(pr['mean'])
+                        self.bias_pr_isigma2.append(1./pr['sigma']**2)
+                    else:
+                        self.bias_pr_mean.append(self.bias_params[bname]['value'])
+                        self.bias_pr_isigma2.append(0.0)
+                    inds.append(ind_bias)
+                    ind_bias += 1
+                self.bin_properties[b['name']]['bias_ind'] = inds
+                # No magnification bias yet
+                self.bin_properties[b['name']]['eps'] = False
             if t.quantity == 'galaxy_shear':
                 if self.ia_model != 'IANone':
                     if ind_IA is None:
@@ -593,7 +655,6 @@ class ClLikeFastBias(ClLike):
             if (b1 is not None) and (b2 is not None):
                 cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) * ((nbias2), (nbias1,nbias2,nell))
             cls[inds] = cl_this
-            
         return cls
 
     def _model_deriv(self, cld, bias_vec):
