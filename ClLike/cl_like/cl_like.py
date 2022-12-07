@@ -710,6 +710,9 @@ class ClLikeFastBias(ClLike):
         # Calculate chi2
         chi2, F, p = self._get_BF_chi2_and_F(**pars)
 
+        # Update starting point
+        self.bias0 = p.x.copy()
+
         # Compute log_like
         if self.bias_fisher:
             dchi2 = np.log(np.linalg.det(F))
