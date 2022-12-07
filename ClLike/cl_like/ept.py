@@ -131,6 +131,42 @@ class EPTCalculator(object):
                                      P_window=self.P_window,
                                      C_window=self.C_window)
 
+    def get_pk(self, kind, pgrad=None, cosmo=None, sub_lowk=False):
+        if kind == 'd1k2':
+            pk = np.array([pgrad.eval(self.ks, a, cosmo)*self.ks**2*0.5
+                           for a in self.a_s])
+            return ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
+                            pk_arr=pk, is_logp=False)
+
+        inds = {'d1d2': 2,
+                'd1s2': 4,
+                'd2d2': 3,
+                'd2s2': 5,
+                's2s2': 6}
+        filt = {'d1d2': 1.,
+                'd1s2': 1.,
+                'd2d2': self.wk_low,
+                'd2s2': self.wk_low,
+                's2s2': self.wk_low}
+        sfac = {'d1d2': 0.,
+                'd1s2': 0.,
+                'd2d2': 2.,
+                'd2s2': 4./3.,
+                's2s2': 8./9.}
+        pfac = {'d1d2': 0.5,
+                'd1s2': 0.5,
+                'd2d2': 0.25,
+                'd2s2': 0.25,
+                's2s2': 0.25}
+        s4 = 0.
+        if sub_lowk:
+            s4 = self.g4*self.dd_bias[7]
+            s4 = s4[:, None]
+        pk = pfac[kind]*self.g4[:, None]*((filt[kind]*self.dd_bias[inds[kind]])[None, :] -
+                                          sfac[kind]*s4)
+        return ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
+                        pk_arr=pk, is_logp=False)
+
     def get_pgg(self, Pnl,
                 b11, b21, bs1, b12, b22, bs2,
                 sub_lowk):
