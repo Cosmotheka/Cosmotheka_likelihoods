@@ -587,6 +587,8 @@ class ClLikeFastBias(ClLike):
     bias_params: dict = {}
     # 2nd order term in bias marginalization?
     bias_fisher: bool = True
+    # Update start point every time?
+    bias_update_every: bool = False
 
     def _get_bin_info_extra(self, s):
         # Extract additional per-sample information from the sacc
@@ -610,7 +612,7 @@ class ClLikeFastBias(ClLike):
                 else:
                     bnames = ['b1']
                 for bn in bnames:
-                    bname = b['name'] + '_' + bn
+                    bname = self.input_params_prefix + '_' + b['name'] + '_' + bn
                     self.bias0.append(self.bias_params[bname]['value'])
                     self.bias_names.append(bname)
                     pr = self.bias_params[bname].get('prior', None)
@@ -629,14 +631,15 @@ class ClLikeFastBias(ClLike):
                 if self.ia_model != 'IANone':
                     if ind_IA is None:
                         ind_IA = ind_bias
-                        self.bias0.append(self.bias_params['A_IA']['value'])
-                        self.bias_names.append('A_IA')
-                        pr = self.bias_params['A_IA'].get('prior', None)
+                        pname = self.input_params_prefix + '_A_IA'
+                        self.bias0.append(self.bias_params[pname]['value'])
+                        self.bias_names.append(pname)
+                        pr = self.bias_params[pname].get('prior', None)
                         if pr is not None:
                             self.bias_pr_mean.append(pr['mean'])
                             self.bias_pr_isigma2.append(1./pr['sigma']**2)
                         else:
-                            self.bias_pr_mean.append(self.bias_params['A_IA']['value'])
+                            self.bias_pr_mean.append(self.bias_params[pname]['value'])
                             self.bias_pr_isigma2.append(0.0)
                         ind_bias += 1
                     self.bin_properties[b['name']]['bias_ind'] = [ind_IA]
@@ -644,6 +647,7 @@ class ClLikeFastBias(ClLike):
         self.bias0 = np.array(self.bias0)
         self.bias_pr_mean = np.array(self.bias_pr_mean)
         self.bias_pr_isigma2 = np.array(self.bias_pr_isigma2)
+        self.updated_bias0 = False
 
     def _model_deriv(self, cld, bias_vec):
         nbias = len(bias_vec)
@@ -711,7 +715,8 @@ class ClLikeFastBias(ClLike):
         chi2, F, p = self._get_BF_chi2_and_F(**pars)
 
         # Update starting point
-        self.bias0 = p.x.copy()
+        if self.bias_update_every or (not self.updated_bias0):
+            self.bias0 = p.x.copy()
 
         # Compute log_like
         if self.bias_fisher:
