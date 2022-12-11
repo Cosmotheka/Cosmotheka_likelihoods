@@ -587,6 +587,8 @@ class ClLikeFastBias(ClLike):
     bias_params: dict = {}
     # 2nd order term in bias marginalization?
     bias_fisher: bool = True
+    # 2nd derivative in Fisher term?
+    bias_fisher_deriv2: bool = False
     # Update start point every time?
     bias_update_every: bool = False
 
@@ -679,6 +681,39 @@ class ClLikeFastBias(ClLike):
             cls_deriv[inds] = cls_grad.T
         return cls_deriv # (ndata, nbias)
 
+    def _model_dderiv(self, cld, bias_vec):
+        nbias = len(bias_vec)
+        cls_dderiv = np.zeros((self.ndata, nbias, nbias))
+
+        for icl, clm in enumerate(self.cl_meta):
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            ind1 = self.bin_properties[n1]['bias_ind']
+            ind2 = self.bin_properties[n2]['bias_ind']
+            inds = clm['inds']
+
+            if (ind1 is not None) and (ind2 is not None):
+                cls_hess = np.zeros([nbias, nbias, len(clm['l_eff'])])
+                cls_hess[np.ix_(ind1, ind2)] += cld['cl11'][icl]
+                cls_hess[np.ix_(ind2, ind1)] += np.transpose(cld['cl11'][icl], axes=(1, 0, 2))
+                cls_dderiv[inds] = np.transpose(cls_grad, axes=(2, 0, 1))
+        return cls_dderiv # (ndata, nbias)
+
+    def hessian_chi2(self, bias, cld, include_DF=False):
+        g = self._model_deriv(cld, bias)
+        ic_g = np.dot(self.inv_cov, g) # (ndata, ndata) , (ndata, nbias)
+        ddchi2 = 2*np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
+        # Bias prior
+        ddchi2 += 2*np.diag(self.bias_pr_isigma2)
+        # Second derivative term
+        if include_DF:
+            t = self._model(cld, bias)
+            ddt = self._model_dderiv(cld, bias)
+            r = t - self.data_vec
+            ic_r = np.dot(self.inv_cov, r)
+            ddchi2 += 2*np.sum(ic_r[:, None, None]*ddt, axis=0) # (ndata), (ndata, nbias, nbias)
+        return ddchi2
+
     def _get_BF_chi2_and_F(self, **pars):
         # First, gather all the necessary ingredients for the Cls without bias parameters
         res = self.provider.get_CCL()
@@ -687,25 +722,22 @@ class ClLikeFastBias(ClLike):
         def chi2(bias):
             t = self._model(cld, bias)
             r = t - self.data_vec
-            chi2 = np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata)
+            ic_r = np.dot(self.inv_cov, r)
+            chi2 = np.dot(r, ic_r) # (ndata) , (ndata, ndata) , (ndata)
             g = self._model_deriv(cld, bias)
-            dchi2 = 2*np.dot(np.dot(self.inv_cov, r), g) # (ndata, ndata) , (ndata) , (ndata, nbias)
+            dchi2 = 2*np.dot(ic_r, g) # (ndata, ndata) , (ndata) , (ndata, nbias)
             # Bias prior
             rb = bias - self.bias_pr_mean
             chi2 += np.sum(rb**2*self.bias_pr_isigma2)
             dchi2 += 2*rb*self.bias_pr_isigma2
             return chi2, dchi2
 
-        def hessian_chi2(bias):
-            g = self._model_deriv(cld, bias)
-            ic_g = np.dot(self.inv_cov, g) # (ndata, ndata) , (ndata, nbias)
-            ddchi2 = 2*np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
-            # Bias prior
-            ddchi2 += 2*np.diag(self.bias_pr_isigma2)
-            return ddchi2
-
-        p = minimize(chi2, self.bias0, method='Newton-CG', jac=True, hess=hessian_chi2)
-        return p.fun, hessian_chi2(p.x), p
+        p = minimize(chi2, self.bias0, method='Newton-CG', jac=True,
+                     hess=lambda b: self.hessian_chi2(b, cld))
+        H = self.hessian_chi2(p.x, cld,
+                              include_DF=self.bias_fisher_deriv2)
+                              
+        return p.fun, 0.5*H, p
 
     def get_can_provide_params(self):
         return self.bias_names + ['nfev', 'dchi2_marg']
