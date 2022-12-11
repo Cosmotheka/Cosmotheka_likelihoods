@@ -696,7 +696,7 @@ class ClLikeFastBias(ClLike):
                 cls_hess = np.zeros([nbias, nbias, len(clm['l_eff'])])
                 cls_hess[np.ix_(ind1, ind2)] += cld['cl11'][icl]
                 cls_hess[np.ix_(ind2, ind1)] += np.transpose(cld['cl11'][icl], axes=(1, 0, 2))
-                cls_dderiv[inds] = np.transpose(cls_grad, axes=(2, 0, 1))
+                cls_dderiv[inds] = np.transpose(cls_hess, axes=(2, 0, 1))
         return cls_dderiv # (ndata, nbias)
 
     def hessian_chi2(self, bias, cld, include_DF=False):
@@ -749,6 +749,74 @@ class ClLikeFastBias(ClLike):
         # Update starting point
         if self.bias_update_every or (not self.updated_bias0):
             self.bias0 = p.x.copy()
+
+        # Plotting test
+        #import matplotlib.pyplot as plt
+        #res = self.provider.get_CCL()
+        #cld = res['cl_data']
+        #
+        ## Theory
+        #t = self._model(cld, self.bias0)
+        #plt.figure()
+        #plt.plot(t)
+        #
+        ## Derivative
+        #dt = self._model_deriv(cld, self.bias0)
+        #for ind_b in range(4):
+        #    plt.figure()
+        #    plt.title(f'{ind_b}')
+        #    colors = ['r', 'g', 'b', 'y', 'k']
+        #    for i, c in enumerate(colors):
+        #        ibias = ind_b+i*4
+        #        db = 0.01
+        #        b = self.bias0.copy()
+        #        b[ibias] += db
+        #        tp = self._model(cld, b)
+        #        b = self.bias0.copy()
+        #        b[ibias] -= db
+        #        tm = self._model(cld, b)
+        #        dtb = (tp-tm)/(2*db)
+        #
+        #        plt.plot(np.fabs(dt[:, ibias]), c=c, label=f'{i}')
+        #        plt.plot(np.fabs(dtb), '.', c=c)
+        #    plt.legend()
+        #
+        ## Second derivative
+        #ddt = self._model_dderiv(cld, self.bias0)
+        #print(ddt.shape)
+        #for ind_b1 in range(4):
+        #    for ind_b2 in range(ind_b1, 4):
+        #        plt.figure()
+        #        plt.title(f'{ind_b1}-{ind_b2}')
+        #        colors = ['r', 'g', 'b', 'y', 'k']
+        #        for i, c in enumerate(colors):
+        #            ibias1 = ind_b1+i*4
+        #            ibias2 = ind_b2+i*4
+        #            db = 0.01
+        #            bpp = self.bias0.copy()
+        #            bpp[ibias1] += db
+        #            bpp[ibias2] += db
+        #            tpp = self._model(cld, bpp)
+        #            bpm = self.bias0.copy()
+        #            bpm[ibias1] += db
+        #            bpm[ibias2] -= db
+        #            tpm = self._model(cld, bpm)
+        #            bmp = self.bias0.copy()
+        #            bmp[ibias1] -= db
+        #            bmp[ibias2] += db
+        #            tmp = self._model(cld, bmp)
+        #            bmm = self.bias0.copy()
+        #            bmm[ibias1] -= db
+        #            bmm[ibias2] -= db
+        #            tmm = self._model(cld, bmm)
+        #            ddtb = (tpp-tpm-tmp+tmm)/(4*db**2)
+        #
+        #            print(ind_b1, ind_b2, i, ddt[:, ibias1, ibias2])
+        #            plt.plot(np.fabs(ddt[:, ibias1, ibias2]), c=c, label=f'{i}')
+        #            plt.plot(np.fabs(ddtb), '.', c=c)
+        #        plt.legend()
+        #plt.show()
+        #exit(1)
 
         # Compute log_like
         if self.bias_fisher:
