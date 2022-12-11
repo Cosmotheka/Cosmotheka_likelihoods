@@ -45,6 +45,8 @@ class ClLike(Likelihood):
     defaults: dict = {}
     # List of two-point functions that make up the data vector
     twopoints: list = []
+    # Jeffreys prior for bias params?
+    jeffrey_bias: bool = False
 
     def initialize(self):
         # Bias model
@@ -557,6 +559,42 @@ class ClLike(Likelihood):
             
         return cls
 
+    def _model_deriv(self, cld, bias_vec):
+        nbias = len(bias_vec)
+        cls_deriv = np.zeros((self.ndata, nbias))
+
+        for icl, clm in enumerate(self.cl_meta):
+            cls_grad = np.zeros([nbias, len(clm['l_eff'])])
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            e1 = self.bin_properties[n1]['eps']
+            e2 = self.bin_properties[n2]['eps']
+            ind1 = self.bin_properties[n1]['bias_ind']
+            ind2 = self.bin_properties[n2]['bias_ind']
+            b1 = bias_vec[ind1] if ind1 is not None else None
+            b2 = bias_vec[ind2] if ind2 is not None else None
+            inds = clm['inds']
+
+            if e1 and (b2 is not None):
+                cls_grad[ind2] += cld['cl01'][icl] # (nbias2, ndata) , (nbias2, ndata)
+            if e2 and (b1 is not None):
+                cls_grad[ind1] += cld['cl10'][icl] # (nbias1, ndata) , (nbias1, ndat)
+
+            if (b1 is not None) and (b2 is not None):
+                cl_b2 = np.dot(b2, cld['cl11'][icl]) # (nbias2) , (nbias1, nbias2, ndata) -> (nbias1, ndata)
+                cl_b1 = np.sum(b1[:, None, None] * cld['cl11'][icl], axis=0) # (nbias1) , (nbias1, nbias2, ndata) -> (nbias2, ndata)
+                cls_grad[ind1] += cl_b2
+                cls_grad[ind2] += cl_b1
+
+            cls_deriv[inds] = cls_grad.T
+        return cls_deriv # (ndata, nbias)
+
+    def _get_jeffrey_bias_dchi2(self, bias, cld):
+        g = self._model_deriv(cld, bias)
+        ic_g = np.dot(self.inv_cov, g) # (ndata, ndata) , (ndata, nbias)
+        F = np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
+        return -np.log(np.linalg.det(F))
+
     def get_requirements(self):
         # By selecting `self._get_cl_data` as a `method` of CCL here,
         # we make sure that this function is only run when the
@@ -574,12 +612,22 @@ class ClLike(Likelihood):
         # Theory model
         t = self._model(cld, bias)
         r = t - self.data_vec
-        return np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata)
+        chi2 = np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata)
+
+        # Jeffreys prior for bias?
+        dchi2_jeffrey = 0
+        if self.jeffrey_bias:
+            dchi2_jeffrey = self._get_jeffrey_bias_dchi2(bias, cld)
+        return chi2, dchi2_jeffrey
+
+    def get_can_provide_params(self):
+        return ['dchi2_jeffrey']
 
     def calculate(self, state, want_derived=True, **pars):
         # Calculate chi2
-        chi2 = self._get_chi2(**pars)
-        state['logp'] = -0.5*chi2
+        chi2, dchi2_jeffrey = self._get_chi2(**pars)
+        state['logp'] = -0.5*(chi2+dchi2_jeffrey)
+        state['derived'] = {'dchi2_jeffrey': dchi2_jeffrey}
 
 
 class ClLikeFastBias(ClLike):
@@ -650,36 +698,6 @@ class ClLikeFastBias(ClLike):
         self.bias_pr_mean = np.array(self.bias_pr_mean)
         self.bias_pr_isigma2 = np.array(self.bias_pr_isigma2)
         self.updated_bias0 = False
-
-    def _model_deriv(self, cld, bias_vec):
-        nbias = len(bias_vec)
-        cls_deriv = np.zeros((self.ndata, nbias))
-
-        for icl, clm in enumerate(self.cl_meta):
-            cls_grad = np.zeros([nbias, len(clm['l_eff'])])
-            n1 = clm['bin_1']
-            n2 = clm['bin_2']
-            e1 = self.bin_properties[n1]['eps']
-            e2 = self.bin_properties[n2]['eps']
-            ind1 = self.bin_properties[n1]['bias_ind']
-            ind2 = self.bin_properties[n2]['bias_ind']
-            b1 = bias_vec[ind1] if ind1 is not None else None
-            b2 = bias_vec[ind2] if ind2 is not None else None
-            inds = clm['inds']
-
-            if e1 and (b2 is not None):
-                cls_grad[ind2] += cld['cl01'][icl] # (nbias2, ndata) , (nbias2, ndata)
-            if e2 and (b1 is not None):
-                cls_grad[ind1] += cld['cl10'][icl] # (nbias1, ndata) , (nbias1, ndat)
-
-            if (b1 is not None) and (b2 is not None):
-                cl_b2 = np.dot(b2, cld['cl11'][icl]) # (nbias2) , (nbias1, nbias2, ndata) -> (nbias1, ndata)
-                cl_b1 = np.sum(b1[:, None, None] * cld['cl11'][icl], axis=0) # (nbias1) , (nbias1, nbias2, ndata) -> (nbias2, ndata)
-                cls_grad[ind1] += cl_b2
-                cls_grad[ind2] += cl_b1
-
-            cls_deriv[inds] = cls_grad.T
-        return cls_deriv # (ndata, nbias)
 
     def _model_dderiv(self, cld, bias_vec):
         nbias = len(bias_vec)
