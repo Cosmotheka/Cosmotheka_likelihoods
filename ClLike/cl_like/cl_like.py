@@ -302,6 +302,7 @@ class ClLike(Likelihood):
             dz = pars.get(self.input_params_prefix + '_' + name + '_dz', 0.)
         if (self.nz_model == 'NzShiftWidth') or (self.nz_model == 'NzWidth'):
             wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
+            jacob = wz
         # NzShiftParam parametrized as z_true - z_false = f(z_true)
         if (self.nz_model == 'NzShiftParamExp'):
             A = pars.get(self.input_params_prefix + '_A_Nz', 0)
@@ -319,7 +320,7 @@ class ClLike(Likelihood):
             B = pars.get(self.input_params_prefix + '_' + survey + '_B_Nz', 0)
             dz = A + B * z
             jacob = (1 - B)
-        z_out = zm-dz+(z-zm)/wz
+        z_out = (z - dz - zm) * wz + zm
         # dn/dzt = dzf/dzt|_zt * dn/dzf|_zt
         nz_out = jacob * nz(z_out)
         return (z, nz_out)
