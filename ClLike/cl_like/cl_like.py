@@ -2,12 +2,27 @@ import numpy as np
 from scipy.interpolate import interp1d
 import pyccl as ccl
 import pyccl.nl_pt as pt
-from .hm_extra import HalomodCorrection
 from .pixwin import beam_hpix
-from .lpt import LPTCalculator, get_lpt_pk2d
-from .ept import EPTCalculator, get_ept_pk2d
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
+
+# Try to import LPT and EPT. If it fails due to some missing library. Raise an
+# error when checking the bias_model requested
+try:
+    from .lpt import LPTCalculator, get_lpt_pk2d
+    HAVE_LPT = True
+    LPT_exception = None
+except ImportError as e:
+    LPT_exception = e
+    HAVE_LPT = False
+
+try:
+    from .ept import EPTCalculator, get_ept_pk2d
+    HAVE_EPT = True
+    EPT_exception = None
+except ImportError as e:
+    EPT_exception = e
+    HAVE_EPT = False
 
 
 class ClLike(Likelihood):
@@ -141,9 +156,14 @@ class ClLike(Likelihood):
             self.p2pt_HOD = ccl.halos.Profile2ptHOD()
             # Halo model correction for the transition regime
             if self.HM_correction == 'halofit':
+                from .hm_extra import HalomodCorrection
                 self.hmcorr = HalomodCorrection()
             else:
                 self.hmcorr = None
+        elif self.bias_model == 'LagrangianPT' and not HAVE_LPT:
+            raise LPT_exception
+        elif self.bias_model == 'EulerianPT' and not HAVE_EPT:
+            raise EPT_exception
 
     def _read_data(self):
         """
@@ -322,19 +342,34 @@ class ClLike(Likelihood):
         Applies shift and width nuisance parameters if needed.
         """
         z = self.bin_properties[name]['z_fid']
-        nz = self.bin_properties[name]['nz_fid']
+        nz = interp1d(z, self.bin_properties[name]['nz_fid'], kind='cubic',
+                      bounds_error=False, fill_value=(0, 'extrapolate'))
         zm = self.bin_properties[name]['zmean_fid']
         dz = 0.
         wz = 1.
+        jacob = 1
         if (self.nz_model == 'NzShift') or (self.nz_model == 'NzShiftWidth'):
             dz = pars.get(self.input_params_prefix + '_' + name + '_dz', 0.)
         if (self.nz_model == 'NzShiftWidth') or (self.nz_model == 'NzWidth'):
             wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
-        z = zm+dz+(z-zm)/wz
-        msk = z >= 0
-        z = z[msk]
-        nz = nz[msk]
-        return (z, nz)
+            jacob = wz
+        # NzShiftParam parametrized as z_true - z_false = f(z_true)
+        # These were used in 2210.13434
+        if self.nz_model == 'NzShiftParamLinear':
+            A = pars.get(self.input_params_prefix + '_A_Nz', 0)
+            B = pars.get(self.input_params_prefix + '_B_Nz', 0)
+            dz = A + B * z
+            jacob = (1 - B)
+        elif self.nz_model == 'NzShiftParamLinearPerSurvey':
+            survey = name.split('__')[0]
+            A = pars.get(self.input_params_prefix + '_' + survey + '_A_Nz', 0)
+            B = pars.get(self.input_params_prefix + '_' + survey + '_B_Nz', 0)
+            dz = A + B * z
+            jacob = (1 - B)
+        z_out = (z - dz - zm) * wz + zm
+        # dn/dzt = dzf/dzt|_zt * dn/dzf|_zt
+        nz_out = jacob * nz(z_out)
+        return (z, nz_out)
 
     def _get_bz(self, cosmo, name, **pars):
         """ Get linear galaxy bias. Unless we're using a linear bias,
