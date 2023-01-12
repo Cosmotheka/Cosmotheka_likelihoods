@@ -336,12 +336,8 @@ class ClLike(Likelihood):
             wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
             jacob = wz
         # NzShiftParam parametrized as z_true - z_false = f(z_true)
-        if (self.nz_model == 'NzShiftParamExp'):
-            A = pars.get(self.input_params_prefix + '_A_Nz', 0)
-            alpha = pars.get(self.input_params_prefix + '_alpha_Nz', 0)
-            dz = A * z ** alpha
-            jacob = 1 - A * alpha * z ** (alpha -1)
-        elif self.nz_model == 'NzShiftParamLinear':
+        # These were used in 2210.13434
+        if self.nz_model == 'NzShiftParamLinear':
             A = pars.get(self.input_params_prefix + '_A_Nz', 0)
             B = pars.get(self.input_params_prefix + '_B_Nz', 0)
             dz = A + B * z
