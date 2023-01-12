@@ -600,7 +600,6 @@ class ClLike(Likelihood):
 
         # Correlate all needed pairs of tracers
         cls = []
-        clfs = []
         for clm in self.cl_meta:
             pkxy = self._get_pkxy(cosmo, clm, pk, trs, **pars)
             if self.sample_cen:
