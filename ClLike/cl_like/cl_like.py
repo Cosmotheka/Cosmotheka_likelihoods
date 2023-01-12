@@ -6,6 +6,24 @@ from .pixwin import beam_hpix
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 
+# Try to import LPT and EPT. If it fails due to some missing library. Raise an
+# error when checking the bias_model requested
+try:
+    from .lpt import LPTCalculator, get_lpt_pk2d
+    HAVE_LPT = True
+    LPT_exception = None
+except ImportError as e:
+    LPT_exception = e
+    HAVE_LPT = False
+
+try:
+    from .ept import EPTCalculator, get_ept_pk2d
+    HAVE_EPT = True
+    EPT_exception = None
+except ImportError as e:
+    EPT_exception = e
+    HAVE_EPT = False
+
 
 class ClLike(Likelihood):
     # All parameters starting with this will be
@@ -142,10 +160,10 @@ class ClLike(Likelihood):
                 self.hmcorr = HalomodCorrection()
             else:
                 self.hmcorr = None
-        elif self.bias_model == 'LagrangianPT':
-            from .lpt import LPTCalculator, get_lpt_pk2d
-        elif self.bias_model == 'EulerianPT':
-            from .ept import EPTCalculator, get_ept_pk2d
+        elif self.bias_model == 'LagrangianPT' and not HAVE_LPT:
+            raise LPT_exception
+        elif self.bias_model == 'EulerianPT' and not HAVE_EPT:
+            raise EPT_exception
 
     def _read_data(self):
         """
