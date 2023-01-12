@@ -74,15 +74,35 @@ class ClLike(Likelihood):
         self.nk_pks = int((self.l10k_max_pks - self.l10k_min_pks) *
                           self.nk_per_dex_pks)
 
-        # Pixel window function for each tracer
-        self.pixwin = {}
-        for b in self.bins:
-            nside = b.get('nside', None)
-            if nside:
-                pixwin = beam_hpix(self.l_sample, nside)
-            else:
-                pixwin = np.ones(self.l_sample.size)
-            self.pixwin[b['name']] = pixwin
+        # Cl sampling
+        if self.sample_type == 'best':
+            import yaml
+
+            # Read parameters
+            with open(self.defaults['params_fid'], "r") as fpar:
+                info = yaml.load(fpar, Loader=yaml.FullLoader)
+            p0 = {}
+            for p in info['params']:
+                if isinstance(info['params'][p], dict):
+                    if 'ref' in info['params'][p]:
+                        p0[p] = info['params'][p]['ref']['loc']
+            # Get best ells
+            cosmo = ccl.CosmologyVanillaLCDM()
+            self.get_best_ells(cosmo, **p0)
+
+        # Pixel window function product for each power spectrum
+        nsides = {b['name']: b.get('nside', None)
+                  for b in self.bins}
+        for clm in self.cl_meta:
+            if self.sample_cen:
+                ls = clm['l_eff']
+            elif self.sample_bpw:
+                ls = self.l_sample
+            beam = np.ones(ls.size)
+            for n in [clm['bin_1'], clm['bin_2']]:
+                if nsides[n]:
+                    beam *= beam_hpix(ls, nsides[n])
+            clm['pixbeam'] = beam
 
         # Initialize parameterless Halo model stuff
         if self.bias_model == 'HaloModel':
@@ -137,14 +157,19 @@ class ClLike(Likelihood):
         """
         import sacc
 
-        def get_suffix_for_tr(tr):
-            q = tr.quantity
-            if (q == 'galaxy_density') or (q == 'cmb_convergence'):
-                return '0'
-            elif q == 'galaxy_shear':
-                return 'e'
-            else:
-                raise ValueError(f'dtype not found for quantity {q}')
+        def get_cl_type(tr1, tr2):
+            cltyp = 'cl_'
+            for tr in [tr1, tr2]:
+                q = tr.quantity
+                if (q == 'galaxy_density') or (q == 'cmb_convergence'):
+                    cltyp += '0'
+                elif q == 'galaxy_shear':
+                    cltyp += 'e'
+                else:
+                    raise ValueError(f'dtype not found for quantity {q}')
+            if cltyp == 'cl_e0':  # sacc doesn't like this one
+                cltyp = 'cl_0e'
+            return cltyp
 
         def get_lmax_from_kmax(cosmo, kmax, zmid):
             chi = ccl.comoving_radial_distance(cosmo, 1./(1+zmid))
@@ -201,9 +226,8 @@ class ClLike(Likelihood):
             lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
                            self.defaults[tn2].get('lmax', 1E30)])
             # Get the suffix for both tracers
-            cl_name1 = get_suffix_for_tr(s.tracers[tn1])
-            cl_name2 = get_suffix_for_tr(s.tracers[tn2])
-            ind = s.indices('cl_%s%s' % (cl_name1, cl_name2), (tn1, tn2),
+            cltyp = get_cl_type(s.tracers[tn1], s.tracers[tn2])
+            ind = s.indices(cltyp, (tn1, tn2),
                             ell__gt=lmin, ell__lt=lmax)
             indices += list(ind)
         s.keep_indices(np.array(indices))
@@ -216,15 +240,16 @@ class ClLike(Likelihood):
         id_sofar = 0
         self.tracer_qs = {}
         self.l_min_sample = 1E30
-        self.l_max_sample = -1E30
+        self.l_max_sample = self.defaults.get('lmax_sample', -1E30)
+        self.sample_type = self.defaults.get('sample_type', 'convolve')
+        self.sample_cen = self.sample_type in ['center', 'best']
+        self.sample_bpw = self.sample_type == 'convolve'
+        lmax_sample_set = self.l_max_sample > 0
         for cl in self.twopoints:
             # Get the suffix for both tracers
             tn1, tn2 = cl['bins']
-            cl_name1 = get_suffix_for_tr(s.tracers[tn1])
-            cl_name2 = get_suffix_for_tr(s.tracers[tn2])
-            l, c_ell, cov, ind = s.get_ell_cl('cl_%s%s' % (cl_name1, cl_name2),
-                                              tn1,
-                                              tn2,
+            cltyp = get_cl_type(s.tracers[tn1], s.tracers[tn2])
+            l, c_ell, cov, ind = s.get_ell_cl(cltyp, tn1, tn2,
                                               return_cov=True,
                                               return_ind=True)
             if c_ell.size > 0:
@@ -236,8 +261,15 @@ class ClLike(Likelihood):
             bpw = s.get_bandpower_windows(ind)
             if np.amin(bpw.values) < self.l_min_sample:
                 self.l_min_sample = np.amin(bpw.values)
-            if np.amax(bpw.values) > self.l_max_sample:
-                self.l_max_sample = np.amax(bpw.values)
+            if lmax_sample_set:
+                good = bpw.values <= self.l_max_sample
+                l_bpw = bpw.values[good]
+                w_bpw = bpw.weight[good].T
+            else:
+                if np.amax(bpw.values) > self.l_max_sample:
+                    self.l_max_sample = np.amax(bpw.values)
+                l_bpw = bpw.values
+                w_bpw = bpw.weight.T
 
             self.cl_meta.append({'bin_1': tn1,
                                  'bin_2': tn2,
@@ -247,8 +279,8 @@ class ClLike(Likelihood):
                                  'inds': (id_sofar +
                                           np.arange(c_ell.size,
                                                     dtype=int)),
-                                 'l_bpw': bpw.values,
-                                 'w_bpw': bpw.weight.T})
+                                 'l_bpw': l_bpw,
+                                 'w_bpw': w_bpw})
             indices += list(ind)
             id_sofar += c_ell.size
         indices = np.array(indices)
@@ -282,8 +314,8 @@ class ClLike(Likelihood):
     def _eval_interp_cl(self, cl_in, l_bpw, w_bpw):
         """ Interpolates C_ell, evaluates it at bandpower window
         ell values and convolves with window."""
-        f = interp1d(self.l_sample, cl_in)
-        cl_unbinned = f(l_bpw)
+        f = interp1d(np.log(1E-3+self.l_sample), cl_in)
+        cl_unbinned = f(np.log(1E-3+l_bpw))
         cl_binned = np.dot(w_bpw, cl_unbinned)
         return cl_binned
 
@@ -561,11 +593,6 @@ class ClLike(Likelihood):
             raise LoggedError(self.log,
                               "Unknown bias model %s" % self.bias_model)
 
-    def _get_pixel_window(self, clm):
-        pix1 = self.pixwin[clm['bin_1']]
-        pix2 = self.pixwin[clm['bin_2']]
-        return pix1*pix2
-
     def _get_cl_all(self, cosmo, pk, **pars):
         """ Compute all C_ells."""
         # Gather all tracers
@@ -576,19 +603,27 @@ class ClLike(Likelihood):
         clfs = []
         for clm in self.cl_meta:
             pkxy = self._get_pkxy(cosmo, clm, pk, trs, **pars)
+            if self.sample_cen:
+                ls = clm['l_eff']
+            elif self.sample_bpw:
+                ls = self.l_sample
             cl = ccl.angular_cl(cosmo,
                                 trs[clm['bin_1']]['ccl_tracer'],
                                 trs[clm['bin_2']]['ccl_tracer'],
-                                self.l_sample, p_of_k_a=pkxy)
+                                ls, p_of_k_a=pkxy)
             # Pixel window function
-            cl *= self._get_pixel_window(clm)
-            clfs.append(cl)
+            cl *= clm['pixbeam']
+            cls.append(cl)
 
-        # Done in two loops to take advantage of ccl paralelization
-        for clm, cl in zip(self.cl_meta, clfs):
-            clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
-            cls.append(clb)
-        return cls
+        # Bandpower window convolution
+        if self.sample_cen:
+            clbs = cls
+        elif self.sample_bpw:
+            clbs = []
+            for clm, cl in zip(self.cl_meta, cls):
+                clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
+                clbs.append(clb)
+        return clbs
 
     def _apply_shape_systematics(self, cls, **pars):
         if self.shape_model == 'ShapeMultiplicative':
@@ -624,6 +659,55 @@ class ClLike(Likelihood):
         self._apply_shape_systematics(cls, **pars)
         return cls
 
+    def get_best_ells(self, cosmo, **pars):
+        nsides = {b['name']: b.get('nside', None)
+                  for b in self.bins}
+        pkd = self._get_pk_data(cosmo)
+        trs = self._get_tracers(cosmo, **pars)
+
+        # Compute all C_ells
+        cls = []
+        for clm in self.cl_meta:
+            pkxy = self._get_pkxy(cosmo, clm, pkd, trs, **pars)
+            ls = self.l_sample
+            cl = ccl.angular_cl(cosmo,
+                                trs[clm['bin_1']]['ccl_tracer'],
+                                trs[clm['bin_2']]['ccl_tracer'],
+                                ls, p_of_k_a=pkxy)
+            # Pixel window function
+            beam = np.ones(ls.size)
+            for n in [clm['bin_1'], clm['bin_2']]:
+                if nsides[n]:
+                    beam *= beam_hpix(ls, nsides[n])
+            cl *= beam
+            f = interp1d(np.log(1E-3+self.l_sample), cl)
+            cls.append(f(np.log(1E-3+clm['l_bpw'])))
+
+        # Bandpower window convolution
+        clbs = []
+        for clm, cl in zip(self.cl_meta, cls):
+            clb = np.dot(clm['w_bpw'], cl)
+            clbs.append(clb)
+
+        # Find best ells and replace 'l_eff'
+        for clm, cl, clb in zip(self.cl_meta, cls, clbs):
+            lbfs = []
+            for i, ll in enumerate(clm['l_eff']):
+                l0 = ll*0.5
+                l1 = ll*1.5
+                ids = (clm['l_bpw'] >= l0) & (clm['l_bpw'] <= l1)
+                ibf = np.argmin(np.fabs(clb[i]-cl[ids]))
+                lbf = clm['l_bpw'][ids][ibf]
+                lbfs.append(lbf)
+            lbfs = np.array(lbfs)
+            if np.any(np.fabs(lbfs/clm['l_eff']-1) > 0.2):
+                print(clm['bin_1'], clm['bin_1'])
+                print(lbfs)
+                print(clm['l_eff'])
+                raise ValueError("There might be something wrong with "
+                                 "the effective ell assignment.")
+            clm['l_eff'] = lbfs
+
     def get_sacc_file(self, **pars):
         import sacc
 
@@ -648,8 +732,11 @@ class ClLike(Likelihood):
         for clm, cl in zip(self.cl_meta, cls):
             p1 = 'e' if self.tracer_qs[clm['bin_1']] == 'galaxy_shear' else '0'
             p2 = 'e' if self.tracer_qs[clm['bin_2']] == 'galaxy_shear' else '0'
+            cltyp = f'cl_{p1}{p2}'
+            if cltyp == 'cl_e0':
+                cltyp = 'cl_0e'
             bpw = sacc.BandpowerWindow(clm['l_bpw'], clm['w_bpw'].T)
-            s.add_ell_cl(f'cl_{p1}{p2}', clm['bin_1'], clm['bin_2'],
+            s.add_ell_cl(cltyp, clm['bin_1'], clm['bin_2'],
                          clm['l_eff'], cl, window=bpw)
 
         s.add_covariance(self.cov)
