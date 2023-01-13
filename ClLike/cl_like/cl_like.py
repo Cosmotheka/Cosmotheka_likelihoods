@@ -2,13 +2,28 @@ import numpy as np
 from scipy.interpolate import interp1d
 import pyccl as ccl
 import pyccl.nl_pt as pt
-from .hm_extra import HalomodCorrection
 from .pixwin import beam_hpix
-from .lpt import LPTCalculator, get_lpt_pk2d
-from .ept import EPTCalculator, get_ept_pk2d
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 from scipy.optimize import minimize
+
+# Try to import LPT and EPT. If it fails due to some missing library. Raise an
+# error when checking the bias_model requested
+try:
+    from .lpt import LPTCalculator, get_lpt_pk2d
+    HAVE_LPT = True
+    LPT_exception = None
+except ImportError as e:
+    LPT_exception = e
+    HAVE_LPT = False
+
+try:
+    from .ept import EPTCalculator, get_ept_pk2d
+    HAVE_EPT = True
+    EPT_exception = None
+except ImportError as e:
+    EPT_exception = e
+    HAVE_EPT = False
 
 
 class ClLike(Likelihood):
@@ -82,6 +97,52 @@ class ClLike(Likelihood):
                 if nsides[n]:
                     beam *= beam_hpix(ls, nsides[n])
             clm['pixbeam'] = beam
+
+        # Commented out since it does not fit well in the new structure. Let it
+        # for the future.
+        #
+        # Initialize parameterless Halo model stuff
+        # if self.bias_model == 'HaloModel':
+        #     # Mass definition
+        #     if self.mass_def_str == 'fof':
+        #         self.massdef = ccl.halos.MassDef('fof', 'critical')
+        #     else:
+        #         rt = self.mass_def_str[-1]
+        #         if rt == 'c':
+        #             rhotyp = 'critical'
+        #         elif rt == 'm':
+        #             rhotyp = 'matter'
+        #         else:
+        #             raise ValueError(f"Unknown density type {rt}")
+        #         if self.mass_def_str[:-1] == 'Vir':
+        #             Delta = 'vir'
+        #         else:
+        #             Delta = float(self.mass_def_str[:-1])
+        #         self.massdef = ccl.halos.MassDef(Delta, rhotyp)
+        #     # Mass function
+        #     self.mfc = ccl.halos.mass_function_from_name(self.mf_name)
+        #     # Halo bias
+        #     self.hbc = ccl.halos.halo_bias_from_name(self.hb_name)
+        #     # Concentration
+        #     cmc = ccl.halos.concentration_from_name(self.cm_name)
+        #     self.cm = cmc(mdef=self.massdef)
+        #     # Default profiles for different quantities
+        #     self.profs = {'galaxy_density': None,
+        #                   'galaxy_shear': ccl.halos.HaloProfileNFW(self.cm),
+        #                   'cmb_convergence': ccl.halos.HaloProfileNFW(self.cm),
+        #                   'cmb_tSZ': ccl.halos.HaloProfilePressureGNFW()}
+        #     # Profile 2-point function for HOD
+        #     self.p2pt_HOD = ccl.halos.Profile2ptHOD()
+        #     # Halo model correction for the transition regime
+        #     if self.HM_correction == 'halofit':
+        #         from .hm_extra import HalomodCorrection
+        #         self.hmcorr = HalomodCorrection()
+        #     else:
+        #         self.hmcorr = None
+        if self.bias_model == 'LagrangianPT' and not HAVE_LPT:
+            raise LPT_exception
+        elif self.bias_model == 'EulerianPT' and not HAVE_EPT:
+            raise EPT_exception
 
     def _read_data(self):
         """
@@ -266,7 +327,7 @@ class ClLike(Likelihood):
                         ind_bias += 1
                     self.bin_properties[b['name']]['bias_ind'] = [ind_IA]
                 self.bin_properties[b['name']]['eps'] = True
-       
+
     def _get_ell_sampling(self, nl_per_decade=30):
         # Selects ell sampling.
         # Ell max/min are set by the bandpower window ells.
@@ -294,7 +355,7 @@ class ClLike(Likelihood):
         cl_unbinned = f(np.log(1E-3+l_bpw))
         cl_binned = np.dot(w_bpw, cl_unbinned)
         return cl_binned
-                
+
     def _get_tracers(self, cosmo):
         """ Obtains CCL tracers (and perturbation theory tracers,
         and halo profiles where needed) for all used tracers given the
@@ -387,7 +448,7 @@ class ClLike(Likelihood):
             pkd['pk_k2d2'] = pkd['pk_d2k2']
             pkd['pk_k2s2'] = pkd['pk_s2k2']
             pkd['pk_k2k2'] = None
-        return pkd            
+        return pkd
 
     def _get_cl_data(self, cosmo):
         """ Compute all C_ells."""
@@ -488,7 +549,7 @@ class ClLike(Likelihood):
             for clm, cl00 in zip(self.cl_meta, cls_00):
                 if (cl00 is not None):
                     clb00 = self._eval_interp_cl(cl00, clm['l_bpw'], clm['w_bpw'])
-                else: 
+                else:
                     clb00 = None
                 clbs_00.append(clb00)
             for clm, cl01, cl10 in zip(self.cl_meta, cls_01, cls_10):
@@ -499,7 +560,7 @@ class ClLike(Likelihood):
                         clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
                         clb01.append(clb)
                     clb01 = np.array(clb01)
-                else: 
+                else:
                     clb01 = None
                 clbs_01.append(clb01)
                 # 10: biased x unbiased
@@ -512,7 +573,7 @@ class ClLike(Likelihood):
                             clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
                             clb10.append(clb)
                         clb10 = np.array(clb10)
-                    else: 
+                    else:
                         clb10 = None
                     clbs_10.append(clb10)
                 # 11: biased x biased
@@ -527,11 +588,11 @@ class ClLike(Likelihood):
                                 else:
                                     cl = cl11[i1,i2,:]
                                     clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
-                                    clb11[i1,i2,:] = clb 
-                    else: 
+                                    clb11[i1,i2,:] = clb
+                    else:
                         clb11 = None
                     clbs_11.append(clb11)
-                
+
         return {'cl00': clbs_00, 'cl01': clbs_01, 'cl10': clbs_10, 'cl11': clbs_11}
 
     def _model(self, cld, bias_vec):
@@ -556,7 +617,7 @@ class ClLike(Likelihood):
             if (b1 is not None) and (b2 is not None):
                 cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) * ((nbias2), (nbias1,nbias2,nell))
             cls[inds] = cl_this
-            
+
         return cls
 
     def _model_deriv(self, cld, bias_vec):
@@ -754,7 +815,7 @@ class ClLikeFastBias(ClLike):
                      hess=lambda b: self.hessian_chi2(b, cld))
         H = self.hessian_chi2(p.x, cld,
                               include_DF=self.bias_fisher_deriv2)
-                              
+
         return p.fun, 0.5*H, p
 
     def get_can_provide_params(self):
