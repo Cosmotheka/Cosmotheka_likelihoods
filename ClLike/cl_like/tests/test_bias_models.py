@@ -2,10 +2,19 @@ import cl_like as cll
 import numpy as np
 from cobaya.model import get_model
 import pytest
+import os
+import shutil
+import sacc
 
 
-@pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT'])
-def test_dum(bias):
+# Cleaning the tmp dir before running and after running the tests
+@pytest.fixture(autouse=True)
+def run_clean_tmp():
+    if os.path.isdir("dum"):
+        shutil.rmtree("dum")
+
+
+def get_info(bias, A_sE9=True):
     data = "cl_like/tests/data/gc_kp_sh_linear.fits.gz"
     info = {"params": {"A_sE9": 2.23,
                        "Omega_c": 0.25,
@@ -16,7 +25,8 @@ def test_dum(bias):
                        "cll_gc1_b1": 1.0,
                        "cll_gc1_b1p": 0.0,
                        "cll_gc1_b2": 0.0,
-                       "cll_gc1_bs": 0.0},
+                       "cll_gc1_bs": 0.0,
+                       "sigma8": None},
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
                                "matter_pk": "halofit",
@@ -41,7 +51,31 @@ def test_dum(bias):
             "output": "dum",
             "debug": False}
 
+    if not A_sE9:
+        info["params"]["sigma8"] = 0.8098
+        del info["params"]["A_sE9"]
+
+    return info
+
+
+@pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT'])
+def test_dum(bias):
+    info = get_info(bias)
+
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
     assert np.fabs(loglikes[0]) < 2E-3
+
+
+# TODO: Move this test to another file or rename this one
+def test_sigma8():
+    info = get_info(bias="Linear", A_sE9=False)
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    assert np.fabs(loglikes[0]) < 2E-3
+
+    del info["params"]["sigma8"]
+    with pytest.raises(ValueError):
+        model = get_model(info)
