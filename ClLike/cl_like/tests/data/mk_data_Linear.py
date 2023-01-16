@@ -37,8 +37,9 @@ for i in range(nbpw):
 
 
 def interp_bin(cl):
-    clf = interp1d(ls, cl)
-    return np.dot(bpws, clf(l_all))
+    # Interpolating in log space as in the code
+    clf = interp1d(np.log(ls), cl)
+    return np.dot(bpws, clf(np.log(l_all)))
 
 
 def get_pairs():

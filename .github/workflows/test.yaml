@@ -1,0 +1,63 @@
+name: Tests
+on:
+   push:
+     branches: [ master ]
+   pull_request:
+     branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: cancel previous runs
+        uses: styfle/cancel-workflow-action@0.6.0
+        with:
+          access_token: ${{ github.token }}
+
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      # TODO: Fix cache
+      # Commented out because cache makes the actions to fail
+      # 
+      # - name: Cache pip
+      #   uses: actions/cache@v2
+      #   with:
+      #     # Based on: https://medium.com/ai2-blog/python-caching-in-github-actions-e9452698e98d
+      #     # We need to cache everything as we are compiling some
+      #     # packages and their python wrapper look for the source
+      #     # files.
+      #     path: ${{ env.pythonLocation }}
+      #     key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-pip-
+      #       ${{ runner.os }}-
+
+      - name: Install dependencies	
+        run: |
+          # Install non-python CCL dependencies
+          sudo -H apt-get install cmake
+          # Update pip 
+          pip install -U pip
+          # Install wheel to avoid recompiling packages already
+          # in the cache.
+          pip install -U wheel
+          # Installing numpy first to avoid CCL error
+          pip install numpy
+          # Install the likelihood
+          pip install -e ClLike
+          # For coeralls
+          pip install -U pytest-cov coveralls
+
+      - name: Test
+        run: |
+          python3 -m pytest -vv ./ClLike/cl_like/tests --cov=tjpcov
+
+      - name: coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run:
+          coveralls --service=github
