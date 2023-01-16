@@ -36,6 +36,7 @@ in CCL, so this is far from general.
 """
 import numpy as np
 import pyccl as ccl
+import numpy as np
 from cobaya.theory import Theory
 
 
@@ -49,19 +50,25 @@ class CCL(Theory):
     transfer_function: str = 'boltzmann_camb'
     matter_pk: str = 'halofit'
     baryons_pk: str = 'nobaryons'
-    # Params it can accept
-    params = {'Omega_m': None,
-              'Omega_b': None,
-              'h': None,
-              'n_s': None,
-              'sigma8': None,
-              'm_nu': None}
 
     def initialize(self):
         self._required_results = {}
 
+    def initialize_with_params(self):
+        if ('A_sE9' not in self.input_params) and \
+            ('sigma8' not in self.input_params):
+            raise ValueError("One of A_sE9 or sigma8 must be set")
+
     def get_requirements(self):
-        return {}
+        # Specify A_sE9 and sigma8 in get_can_support_params to allow both
+        # inputs.
+        params = {'Omega_c': None,
+                  'Omega_b': None,
+                  'h': None,
+                  'n_s': None,
+                  'm_nu': None}
+
+        return params
 
     def must_provide(self, **requirements):
         # requirements is dictionary of things requested by likelihoods
@@ -80,30 +87,49 @@ class CCL(Theory):
 
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
-        return ['S8']
+        return ['S8', 'sigma8', "Omega_m"]
 
     def get_can_support_params(self):
         # return any nuisance parameters that CCL can support
-        return []
+        return ["sigma8", "A_sE9"]
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
         Ob = self.provider.get_param('Omega_b')
-        Om = self.provider.get_param('Omega_m')
-        cosmo = ccl.Cosmology(Omega_c=Om-Ob,
-                              Omega_b=Ob,
-                              h=self.provider.get_param('h'),
-                              n_s=self.provider.get_param('n_s'),
-                              sigma8=self.provider.get_param('sigma8'),
+        Oc = self.provider.get_param('Omega_c')
+        Om = Ob + Oc
+
+        params = {'Omega_c': Oc,
+                  'Omega_b': Ob,
+                  'h': self.provider.get_param('h'),
+                  'n_s': self.provider.get_param('n_s'),
+                  'm_nu': self.provider.get_param('m_nu')}
+
+        if 'A_sE9' in self.input_params:
+            params.update({'A_s': self.provider.get_param('A_sE9')*1E-9})
+        else:
+            params.update({'sigma8': self.provider.get_param('sigma8')})
+
+        cosmo = ccl.Cosmology(**params,
                               T_CMB=2.7255,
-                              m_nu=self.provider.get_param('m_nu'),
                               transfer_function=self.transfer_function,
                               matter_power_spectrum=self.matter_pk,
                               baryons_power_spectrum=self.baryons_pk)
 
         state['CCL'] = {'cosmo': cosmo}
-        # Compute S8
-        state['derived'] = {'S8': cosmo['sigma8']*np.sqrt(Om/0.3)}
+
+        # Compute derived parameters
+        # (we should actually only do this if required -- TODO)
+        # Compute sigma8 if it is not an input parameter
+        if 'A_sE9' in self.input_params:
+            sigma8 = ccl.sigma8(cosmo)
+            state['derived'] = {'sigma8': sigma8}
+        else:
+            sigma8 = cosmo['sigma8']
+
+        state['derived'].update({'S8': sigma8*np.sqrt(Om/0.3),
+                                 'Omega_m': Om})
+
         for req_res, method in self._required_results.items():
             state['CCL'][req_res] = method(cosmo)
 
