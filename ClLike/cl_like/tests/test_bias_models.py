@@ -1,4 +1,5 @@
 import cl_like as cll
+from cl_like.limber import Limber
 import numpy as np
 from cobaya.model import get_model
 import pytest
@@ -30,7 +31,8 @@ def get_info(bias, A_sE9=True):
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
                                "matter_pk": "halofit",
-                               "baryons_pk": "nobaryons"}},
+                               "baryons_pk": "nobaryons"},
+                       "limber": {"external": Limber}},
             "likelihood": {"ClLike": {"external": cll.ClLike,
                                       "input_file": data,
                                       "bins": [{"name": "gc1"},

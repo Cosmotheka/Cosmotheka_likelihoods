@@ -53,6 +53,7 @@ class CCL(Theory):
 
     def initialize(self):
         self._required_results = {}
+        self.pk_options = None
 
     def initialize_with_params(self):
         if ('A_sE9' not in self.input_params) and \
@@ -83,6 +84,7 @@ class CCL(Theory):
         if 'methods' in options:
             self._required_results.update(options['methods'])
 
+        self.pk_options = options.get("pk_options")
         return {}
 
     def get_can_provide_params(self):
@@ -142,3 +144,12 @@ class CCL(Theory):
         :return: dict of results
         """
         return self._current_state['CCL']
+
+    def get_cosmo(self):
+        "Get the current CCL Cosmology object"
+        return self._current_state['CCL']["cosmo"]
+
+    def get_pk_data(self):
+        "Get the current pk_data dictionary"
+        return self._current_state['CCL']["pk_data"]
+
