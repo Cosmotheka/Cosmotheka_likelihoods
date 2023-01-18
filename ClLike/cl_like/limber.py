@@ -24,6 +24,8 @@ class Limber(Theory):
         self.sample_bpw = None
         self.pk_options = None
         self.provider = None
+        self.nz_model = None
+        self.input_params_prefix = None
 
     def initialize_with_provider(self, provider):
         self.provider = provider
@@ -45,12 +47,15 @@ class Limber(Theory):
         self.sample_cen = options.get("sample_cen")
         self.sample_bpw = options.get("sample_bpw")
         pk_options = options.get("pk_options")
+        self.nz_model = options.get("nz_model")
+        self.input_params_prefix = options.get("input_params_prefix")
 
         return {"CCL": {"pk_options": pk_options} }
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
-        state["Limber"] = {"cl_data": self._get_cl_data(cosmo)}
+        state["Limber"] = {"cl_data": self._get_cl_data(cosmo,
+                                                        **params_values_dict)}
 
     def get_Limber(self):
         """Get dictionary of Limber computed quantities.
@@ -70,7 +75,7 @@ class Limber(Theory):
         cl_binned = np.dot(w_bpw, cl_unbinned)
         return cl_binned
 
-    def _get_tracers(self, cosmo):
+    def _get_tracers(self, cosmo, **pars):
         """ Obtains CCL tracers (and perturbation theory tracers,
         and halo profiles where needed) for all used tracers given the
         current parameters."""
@@ -78,15 +83,14 @@ class Limber(Theory):
         trs1 = {}
         trs1_dnames = {}
         for name, q in self.tracer_qs.items():
-            if q in ["galaxy_density", "galaxy_shear"]:
-                z = self.bin_properties[name]['z_fid']
-                nz = self.bin_properties[name]['nz_fid']
+            if q == 'galaxy_density':
+                dndz = self._get_nz(cosmo, name, **pars)
+                z = dndz[0]
                 oz = np.ones_like(z)
 
-            if q == 'galaxy_density':
                 t0 = None
-                tr = ccl.NumberCountsTracer(cosmo, dndz=(z, nz),
-                                            bias=(z, oz), has_rsd=False)
+                tr = ccl.NumberCountsTracer(cosmo, dndz=dndz, bias=(z, oz),
+                                            has_rsd=False)
                 t1 = [tr]
                 t1n = ['d1']
                 if self.is_PT_bias:
@@ -94,11 +98,12 @@ class Limber(Theory):
                         t1.append(tr)
                         t1n.append(dn)
             elif q == 'galaxy_shear':
-                t0 = ccl.WeakLensingTracer(cosmo, dndz=(z, nz))
+                dndz = self._get_nz(cosmo, name, **pars)
+                t0 = ccl.WeakLensingTracer(cosmo, dndz=dndz)
                 if self.ia_model == 'IANone':
                     t1 = None
                 else:
-                    t1 = [ccl.WeakLensingTracer(cosmo, dndz=(z, nz),
+                    t1 = [ccl.WeakLensingTracer(cosmo, dndz=dndz,
                                                 has_shear=False, ia_bias=None)]
                     t1n = ['m']
             elif q == 'cmb_convergence':
@@ -112,13 +117,13 @@ class Limber(Theory):
             trs1_dnames[name] = t1n
         return trs0, trs1, trs1_dnames
 
-    def _get_cl_data(self, cosmo):
+    def _get_cl_data(self, cosmo, **pars):
         """ Compute all C_ells."""
         # Get P(k)s
         pkd = self.provider.get_CCL()["pk_data"]
 
         # Gather all tracers
-        trs0, trs1, dnames = self._get_tracers(cosmo)
+        trs0, trs1, dnames = self._get_tracers(cosmo, **pars)
 
         # Correlate all needed pairs of tracers
         cls_00 = []
@@ -255,3 +260,37 @@ class Limber(Theory):
                     clbs_11.append(clb11)
 
         return {'cl00': clbs_00, 'cl01': clbs_01, 'cl10': clbs_10, 'cl11': clbs_11}
+
+    def _get_nz(self, cosmo, name, **pars):
+        """ Get redshift distribution for a given tracer.
+        Applies shift and width nuisance parameters if needed.
+        """
+        z = self.bin_properties[name]['z_fid']
+        nz = interp1d(z, self.bin_properties[name]['nz_fid'], kind='cubic',
+                      bounds_error=False, fill_value=(0, 'extrapolate'))
+        zm = self.bin_properties[name]['zmean_fid']
+        dz = 0.
+        wz = 1.
+        jacob = 1
+        if (self.nz_model == 'NzShift') or (self.nz_model == 'NzShiftWidth'):
+            dz = pars.get(self.input_params_prefix + '_' + name + '_dz', 0.)
+        if (self.nz_model == 'NzShiftWidth') or (self.nz_model == 'NzWidth'):
+            wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
+            jacob = wz
+        # NzShiftParam parametrized as z_true - z_false = f(z_true)
+        # These were used in 2210.13434
+        if self.nz_model == 'NzShiftParamLinear':
+            A = pars.get(self.input_params_prefix + '_A_Nz', 0)
+            B = pars.get(self.input_params_prefix + '_B_Nz', 0)
+            dz = A + B * z
+            jacob = (1 - B)
+        elif self.nz_model == 'NzShiftParamLinearPerSurvey':
+            survey = name.split('__')[0]
+            A = pars.get(self.input_params_prefix + '_' + survey + '_A_Nz', 0)
+            B = pars.get(self.input_params_prefix + '_' + survey + '_B_Nz', 0)
+            dz = A + B * z
+            jacob = (1 - B)
+        z_out = (z - dz - zm) * wz + zm
+        # dn/dzt = dzf/dzt|_zt * dn/dzf|_zt
+        nz_out = jacob * nz(z_out)
+        return (z, nz_out)

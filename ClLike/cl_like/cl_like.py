@@ -430,7 +430,9 @@ class ClLike(Likelihood):
                            "ia_model": self.ia_model,
                            "sample_cen": self.sample_cen,
                            "sample_bpw": self.sample_bpw,
-                           "pk_options": pk_options
+                           "pk_options": pk_options,
+                           "nz_model": self.nz_model,
+                           "input_params_prefix": self.input_params_prefix
                            }
                 }
 
