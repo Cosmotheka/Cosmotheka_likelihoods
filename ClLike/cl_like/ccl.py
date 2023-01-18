@@ -118,7 +118,8 @@ class CCL(Theory):
                               matter_power_spectrum=self.matter_pk,
                               baryons_power_spectrum=self.baryons_pk)
 
-        state['CCL'] = {'cosmo': cosmo}
+        state['CCL'] = {'cosmo': cosmo,
+                        "pk_data": self._get_pk_data(cosmo)}
 
         # Compute derived parameters
         # (we should actually only do this if required -- TODO)
@@ -153,3 +154,65 @@ class CCL(Theory):
         "Get the current pk_data dictionary"
         return self._current_state['CCL']["pk_data"]
 
+    def _get_pk_data(self, cosmo):
+        # TODO: I don't like it reading the pk_options dictionary. I think it'd
+        # be better if one could pass the options as argument. Kept like this
+        # for now because it's less work
+        bias_model = self.pk_options["bias_model"]
+        is_PT_bias = self.pk_options["is_PT_bias"]
+
+        cosmo.compute_nonlin_power()
+        pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        if bias_model == 'Linear':
+            pkd = {}
+            pkd['pk_mm'] = pkmm
+            pkd['pk_md1'] = pkmm
+            pkd['pk_d1m'] = pkmm
+            pkd['pk_d1d1'] = pkmm
+        elif is_PT_bias:
+            k_SN_suppress = self.pk_options["k_SN_suppress "]
+            if k_SN_suppress > 0:
+                k_filter = k_SN_suppress
+            else:
+                k_filter = None
+            if bias_model == 'EulerianPT':
+                from .ept import EPTCalculator
+                EPTkwargs = self.pk_options["EPTkwargs"]
+                ptc = EPTCalculator(with_NC=True, with_IA=False,
+                                    log10k_min=EPTkwargs["l10k_min_pks"],
+                                    log10k_max=EPTkwargs["l10k_max_pks"],
+                                    nk_per_decade=EPTkwargs["nk_per_dex_pks"],
+                                    a_arr=EPTkwargs["a_s_pks"],
+                                    k_filter=k_filter)
+            else:
+                raise NotImplementedError("Not yet: " + bias_model)
+            pk_lin_z0 = ccl.linear_matter_power(cosmo, ptc.ks, 1.)
+            Dz = ccl.growth_factor(cosmo, ptc.a_s)
+            ptc.update_pk(pk_lin_z0, Dz)
+            pkd = {}
+            pkd['pk_mm'] = pkmm
+            pkd['pk_md1'] = pkmm
+            pkd['pk_md2'] = ptc.get_pk('d1d2')
+            pkd['pk_ms2'] = ptc.get_pk('d1s2')
+            pkd['pk_mk2'] = ptc.get_pk('d1k2', pgrad=pkmm, cosmo=cosmo)
+            pkd['pk_d1m'] = pkd['pk_md1']
+            pkd['pk_d1d1'] = pkmm
+            pkd['pk_d1d2'] = pkd['pk_md2']
+            pkd['pk_d1s2'] = pkd['pk_ms2']
+            pkd['pk_d1k2'] = pkd['pk_mk2']
+            pkd['pk_d2m'] = pkd['pk_md2']
+            pkd['pk_d2d1'] = pkd['pk_d1d2']
+            pkd['pk_d2d2'] = ptc.get_pk('d2d2')
+            pkd['pk_d2s2'] = ptc.get_pk('d2s2')
+            pkd['pk_d2k2'] = None
+            pkd['pk_s2m'] = pkd['pk_ms2']
+            pkd['pk_s2d1'] = pkd['pk_d1s2']
+            pkd['pk_s2d2'] = pkd['pk_d2s2']
+            pkd['pk_s2s2'] = ptc.get_pk('s2s2')
+            pkd['pk_s2k2'] = None
+            pkd['pk_k2m'] = pkd['pk_mk2']
+            pkd['pk_k2d1'] = pkd['pk_d1k2']
+            pkd['pk_k2d2'] = pkd['pk_d2k2']
+            pkd['pk_k2s2'] = pkd['pk_s2k2']
+            pkd['pk_k2k2'] = None
+        return pkd
