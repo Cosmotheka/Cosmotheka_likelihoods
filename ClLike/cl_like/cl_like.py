@@ -25,10 +25,6 @@ class ClLike(Likelihood):
     jeffrey_bias: bool = False
     # b(z) model name
     bias_model: str = "BzNone"
-    # IA model name. Currently all of these are
-    # just flags, but we could turn them into
-    # homogeneous systematic classes.
-    ia_model: str = "IANone"
 
     def initialize(self):
         # Bias model
@@ -38,7 +34,9 @@ class ClLike(Likelihood):
 
     def initialize_with_provider(self, provider):
         self.provider = provider
-        # self.ia_model = self.provider.get_ia_model()
+        # Additional information specific for this likelihood
+        ia_model = self.provider.get_ia_model()
+        self._get_bin_info_extra(self.sacc_file, ia_model)
         # self.is_PT_bias = self.provider.get_is_PT_bias()
 
     def _read_data(self):
@@ -70,7 +68,7 @@ class ClLike(Likelihood):
             lmax = np.max([10., kmax * chi - 0.5])
             return lmax
 
-        s = sacc.Sacc.load_fits(self.input_file)
+        self.sacc_file = s = sacc.Sacc.load_fits(self.input_file)
 
         # 1. Iterate through tracers and collect properties
         self.bin_properties = {}
@@ -112,7 +110,7 @@ class ClLike(Likelihood):
                     self.defaults[b['name']]['lmax'] = self.defaults['lmax']
 
         # Additional information specific for this likelihood
-        self._get_bin_info_extra(s)
+        # self._get_bin_info_extra(s)
 
         # 2. Iterate through two-point functions and apply scale cuts
         indices = []
@@ -176,7 +174,7 @@ class ClLike(Likelihood):
         self.inv_cov = np.linalg.inv(self.cov)
         self.ndata = len(self.data_vec)
 
-    def _get_bin_info_extra(self, s):
+    def _get_bin_info_extra(self, s, ia_model):
         # Extract additional per-sample information from the sacc
         # file needed for this likelihood.
         ind_bias = 0
@@ -205,7 +203,7 @@ class ClLike(Likelihood):
                 # No magnification bias yet
                 self.bin_properties[b['name']]['eps'] = False
             elif t.quantity == 'galaxy_shear':
-                if self.ia_model != 'IANone':
+                if ia_model != 'IANone':
                     if ind_IA is None:
                         ind_IA = ind_bias
                         self.bias_names.append(self.input_params_prefix + '_A_IA')
@@ -284,8 +282,8 @@ class ClLike(Likelihood):
                            "bin_properties": self.bin_properties,
                            "input_params_prefix": self.input_params_prefix,
                            "bias_model": self.bias_model,
-                           "ia_model": self.ia_model
-                           }
+                           },
+                "ia_model": None
                 }
 
     def _get_chi2(self, **pars):
