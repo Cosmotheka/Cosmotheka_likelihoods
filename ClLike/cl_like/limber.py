@@ -68,9 +68,6 @@ class Limber(Theory):
         """
         return self._current_state['Limber']
 
-    def get_ia_model(self):
-        return self.ia_model
-
     def _eval_interp_cl(self, cl_in, l_bpw, w_bpw):
         """ Interpolates C_ell, evaluates it at bandpower window
         ell values and convolves with window."""

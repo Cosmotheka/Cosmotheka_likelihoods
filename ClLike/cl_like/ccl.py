@@ -142,7 +142,3 @@ class CCL(Theory):
         :return: dict of results
         """
         return self._current_state['CCL']
-
-    def get_cosmo(self):
-        "Get the current CCL Cosmology object"
-        return self._current_state['CCL']["cosmo"]
