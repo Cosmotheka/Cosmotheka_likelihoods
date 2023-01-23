@@ -20,6 +20,9 @@ class Limber(Theory):
     # homogeneous systematic classes.
     # ia_model: str = "IANone"
 
+    # Sample type
+    sample_type: str = "convolve"
+
     def initialize(self):
         self.cl_meta = None
         self.l_sample = None
@@ -27,14 +30,16 @@ class Limber(Theory):
         self.bin_properties = None
         self.is_PT_bias = None
         self.ia_model = None
-        self.sample_cen = None
-        self.sample_bpw = None
         self.provider = None
         self.input_params_prefix = None
 
+        self.sample_cen = self.sample_type in ['center', 'best']
+        self.sample_bpw = self.sample_type == 'convolve'
+
     def initialize_with_provider(self, provider):
         self.provider = provider
-        self._init_pixbeam()
+        self.l_sample = self._get_ell_sampling()
+        self._add_pixbeam_to_cl_meta()
         # self.is_PT_bias = self.provider.get_is_PT_bias()
 
     def get_requirements(self):
@@ -46,11 +51,8 @@ class Limber(Theory):
 
         options = requirements.get('Limber') or {}
         self.cl_meta = options.get("cl_meta")
-        self.l_sample = options.get("l_sample")
         self.tracer_qs = options.get("tracer_qs")
         self.bin_properties = options.get("bin_properties")
-        self.sample_cen = options.get("sample_cen")
-        self.sample_bpw = options.get("sample_bpw")
         self.input_params_prefix = options.get("input_params_prefix")
         self.ia_model = options.get("ia_model")
         bias_model = options["bias_model"]
@@ -300,7 +302,7 @@ class Limber(Theory):
         nz_out = jacob * nz(z_out)
         return (z, nz_out)
 
-    def _init_pixbeam(self):
+    def _add_pixbeam_to_cl_meta(self):
         # Pixel window function product for each power spectrum
         for clm in self.cl_meta:
             if self.sample_cen:
@@ -312,3 +314,36 @@ class Limber(Theory):
                 if nside is not None:
                     beam *= beam_hpix(ls, nside)
             clm['pixbeam'] = beam
+
+    def _get_ell_sampling(self, nl_per_decade=30):
+        # Selects ell sampling.
+        # Ell max/min are set by the bandpower window ells.
+        # It currently uses simple log-spacing.
+        # nl_per_decade is currently fixed at 30
+
+        l_min_sample = []
+        l_max_sample = []
+        for clm in self.cl_meta:
+            l_bpw = clm['l_bpw']
+            l_min_sample.append(l_bpw.min())
+            l_max_sample.append(l_bpw.max())
+
+        l_min_sample = np.min(l_min_sample)
+        l_max_sample = np.max(l_max_sample)
+
+        if l_min_sample == 0:
+            l_min_sample_here = 2
+        else:
+            l_min_sample_here = l_min_sample
+        nl_sample = int(np.log10(l_max_sample / l_min_sample_here) *
+                        nl_per_decade)
+        l_sample = np.unique(np.geomspace(l_min_sample_here,
+                                          l_max_sample+1,
+                                          nl_sample).astype(int)).astype(float)
+
+        if l_min_sample == 0:
+            l_sample = np.concatenate((np.array([0.]), l_sample))
+        else:
+            l_sample = l_sample
+
+        return l_sample

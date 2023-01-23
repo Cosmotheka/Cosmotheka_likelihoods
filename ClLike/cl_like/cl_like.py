@@ -35,8 +35,6 @@ class ClLike(Likelihood):
         self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT']
         # Read SACC file
         self._read_data()
-        # Ell sampling for interpolation
-        self._get_ell_sampling()
 
     def initialize_with_provider(self, provider):
         self.provider = provider
@@ -138,12 +136,6 @@ class ClLike(Likelihood):
         self.cl_meta = []
         id_sofar = 0
         self.tracer_qs = {}
-        self.l_min_sample = 1E30
-        self.l_max_sample = self.defaults.get('lmax_sample', -1E30)
-        self.sample_type = self.defaults.get('sample_type', 'convolve')
-        self.sample_cen = self.sample_type in ['center', 'best']
-        self.sample_bpw = self.sample_type == 'convolve'
-        lmax_sample_set = self.l_max_sample > 0
         nsides = {b['name']: b.get('nside', None) for b in self.bins}
         for cl in self.twopoints:
             # Get the suffix for both tracers
@@ -159,17 +151,8 @@ class ClLike(Likelihood):
                     self.tracer_qs[tn2] = s.tracers[tn2].quantity
 
             bpw = s.get_bandpower_windows(ind)
-            if np.amin(bpw.values) < self.l_min_sample:
-                self.l_min_sample = np.amin(bpw.values)
-            if lmax_sample_set:
-                good = bpw.values <= self.l_max_sample
-                l_bpw = bpw.values[good]
-                w_bpw = bpw.weight[good].T
-            else:
-                if np.amax(bpw.values) > self.l_max_sample:
-                    self.l_max_sample = np.amax(bpw.values)
-                l_bpw = bpw.values
-                w_bpw = bpw.weight.T
+            l_bpw = bpw.values
+            w_bpw = bpw.weight.T
 
             self.cl_meta.append({'bin_1': tn1,
                                  'bin_2': tn2,
@@ -234,26 +217,6 @@ class ClLike(Likelihood):
                 # work
                 self.bin_properties[b['name']]['eps'] = True
 
-    def _get_ell_sampling(self, nl_per_decade=30):
-        # Selects ell sampling.
-        # Ell max/min are set by the bandpower window ells.
-        # It currently uses simple log-spacing.
-        # nl_per_decade is currently fixed at 30
-        if self.l_min_sample == 0:
-            l_min_sample_here = 2
-        else:
-            l_min_sample_here = self.l_min_sample
-        nl_sample = int(np.log10(self.l_max_sample / l_min_sample_here) *
-                        nl_per_decade)
-        l_sample = np.unique(np.geomspace(l_min_sample_here,
-                                          self.l_max_sample+1,
-                                          nl_sample).astype(int)).astype(float)
-
-        if self.l_min_sample == 0:
-            self.l_sample = np.concatenate((np.array([0.]), l_sample))
-        else:
-            self.l_sample = l_sample
-
     def _model(self, cld, bias_vec):
         cls = np.zeros(self.ndata)
         for icl, clm in enumerate(self.cl_meta):
@@ -317,11 +280,8 @@ class ClLike(Likelihood):
 
     def get_requirements(self):
         return {"Limber": {"cl_meta": self.cl_meta,
-                           "l_sample": self.l_sample,
                            "tracer_qs": self.tracer_qs,
                            "bin_properties": self.bin_properties,
-                           "sample_cen": self.sample_cen,
-                           "sample_bpw": self.sample_bpw,
                            "input_params_prefix": self.input_params_prefix,
                            "bias_model": self.bias_model,
                            "ia_model": self.ia_model
