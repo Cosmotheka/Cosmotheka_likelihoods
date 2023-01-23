@@ -86,3 +86,15 @@ def test_sigma8():
     del info["params"]["sigma8"]
     with pytest.raises(ValueError):
         model = get_model(info)
+
+
+def test_timing():
+    info = get_info(bias="Linear", A_sE9=False)
+    info["timing"] = True
+    model = get_model(info)
+    model.measure_and_set_speeds(10)
+    model.dump_timing()
+    time = np.sum([c.timer.get_time_avg() for c in model.components])
+    # Before restructuring, the average evaluation time was ~0.54s in my laptop
+    # After the restructuration, it went to 0.56s.
+    assert time < 0.6
