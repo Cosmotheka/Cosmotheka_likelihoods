@@ -5,6 +5,7 @@ galaxy bias parameters).
 """
 from cobaya.theory import Theory
 from scipy.interpolate import interp1d
+from .pixwin import beam_hpix
 import pyccl as ccl
 import numpy as np
 
@@ -33,6 +34,7 @@ class Limber(Theory):
 
     def initialize_with_provider(self, provider):
         self.provider = provider
+        self._init_pixbeam()
         # self.is_PT_bias = self.provider.get_is_PT_bias()
 
     def get_requirements(self):
@@ -297,3 +299,16 @@ class Limber(Theory):
         # dn/dzt = dzf/dzt|_zt * dn/dzf|_zt
         nz_out = jacob * nz(z_out)
         return (z, nz_out)
+
+    def _init_pixbeam(self):
+        # Pixel window function product for each power spectrum
+        for clm in self.cl_meta:
+            if self.sample_cen:
+                ls = clm['l_eff']
+            elif self.sample_bpw:
+                ls = self.l_sample
+            beam = np.ones(ls.size)
+            for nside in [clm['nside_1'], clm['nside_2']]:
+                if nside is not None:
+                    beam *= beam_hpix(ls, nside)
+            clm['pixbeam'] = beam

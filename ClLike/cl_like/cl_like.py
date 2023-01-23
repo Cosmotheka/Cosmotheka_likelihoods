@@ -1,7 +1,6 @@
 import numpy as np
 import pyccl as ccl
 import pyccl.nl_pt as pt
-from .pixwin import beam_hpix
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 from scipy.optimize import minimize
@@ -38,29 +37,11 @@ class ClLike(Likelihood):
         self._read_data()
         # Ell sampling for interpolation
         self._get_ell_sampling()
-        # Other global parameters
-        self._init_globals()
 
     def initialize_with_provider(self, provider):
         self.provider = provider
         # self.ia_model = self.provider.get_ia_model()
         # self.is_PT_bias = self.provider.get_is_PT_bias()
-
-    def _init_globals(self):
-
-        # Pixel window function product for each power spectrum
-        nsides = {b['name']: b.get('nside', None)
-                  for b in self.bins}
-        for clm in self.cl_meta:
-            if self.sample_cen:
-                ls = clm['l_eff']
-            elif self.sample_bpw:
-                ls = self.l_sample
-            beam = np.ones(ls.size)
-            for n in [clm['bin_1'], clm['bin_2']]:
-                if nsides[n]:
-                    beam *= beam_hpix(ls, nsides[n])
-            clm['pixbeam'] = beam
 
     def _read_data(self):
         """
@@ -163,6 +144,7 @@ class ClLike(Likelihood):
         self.sample_cen = self.sample_type in ['center', 'best']
         self.sample_bpw = self.sample_type == 'convolve'
         lmax_sample_set = self.l_max_sample > 0
+        nsides = {b['name']: b.get('nside', None) for b in self.bins}
         for cl in self.twopoints:
             # Get the suffix for both tracers
             tn1, tn2 = cl['bins']
@@ -198,7 +180,9 @@ class ClLike(Likelihood):
                                           np.arange(c_ell.size,
                                                     dtype=int)),
                                  'l_bpw': l_bpw,
-                                 'w_bpw': w_bpw})
+                                 'w_bpw': w_bpw,
+                                 'nside_1': nsides[tn1],
+                                 'nside_2': nsides[tn2]})
             indices += list(ind)
             id_sofar += c_ell.size
         indices = np.array(indices)
