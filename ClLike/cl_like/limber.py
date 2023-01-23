@@ -12,6 +12,12 @@ import numpy as np
 class Limber(Theory):
     """ Computes the angular power spectra
     """
+    # N(z) model name
+    nz_model: str = "NzNone"
+    # IA model name. Currently all of these are
+    # just flags, but we could turn them into
+    # homogeneous systematic classes.
+    ia_model: str = "IANone"
 
     def initialize(self):
         self.cl_meta = None
@@ -19,16 +25,14 @@ class Limber(Theory):
         self.tracer_qs = None
         self.bin_properties = None
         self.is_PT_bias = None
-        self.ia_model = None
         self.sample_cen = None
         self.sample_bpw = None
-        self.pk_options = None
         self.provider = None
-        self.nz_model = None
         self.input_params_prefix = None
 
     def initialize_with_provider(self, provider):
         self.provider = provider
+        # self.is_PT_bias = self.provider.get_is_PT_bias()
 
     def get_requirements(self):
         return {}
@@ -42,15 +46,12 @@ class Limber(Theory):
         self.l_sample = options.get("l_sample")
         self.tracer_qs = options.get("tracer_qs")
         self.bin_properties = options.get("bin_properties")
-        self.is_PT_bias = options.get("is_PT_bias")
-        self.ia_model = options.get("ia_model")
         self.sample_cen = options.get("sample_cen")
         self.sample_bpw = options.get("sample_bpw")
-        pk_options = options.get("pk_options")
-        self.nz_model = options.get("nz_model")
         self.input_params_prefix = options.get("input_params_prefix")
+        bias_model = options["bias_model"]
 
-        return {"CCL": {"pk_options": pk_options} }
+        return {"CCL": None, "Pk": {"bias_model": bias_model}}
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
@@ -66,6 +67,9 @@ class Limber(Theory):
         :return: dict of results
         """
         return self._current_state['Limber']
+
+    def get_ia_model(self):
+        return self.ia_model
 
     def _eval_interp_cl(self, cl_in, l_bpw, w_bpw):
         """ Interpolates C_ell, evaluates it at bandpower window
@@ -120,7 +124,7 @@ class Limber(Theory):
     def _get_cl_data(self, cosmo, **pars):
         """ Compute all C_ells."""
         # Get P(k)s
-        pkd = self.provider.get_CCL()["pk_data"]
+        pkd = self.provider.get_Pk()["pk_data"]
 
         # Gather all tracers
         trs0, trs1, dnames = self._get_tracers(cosmo, **pars)

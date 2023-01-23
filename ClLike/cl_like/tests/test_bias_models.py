@@ -1,5 +1,6 @@
 import cl_like as cll
 from cl_like.limber import Limber
+from cl_like.power_spectrum import Pk
 import numpy as np
 from cobaya.model import get_model
 import pytest
@@ -32,7 +33,9 @@ def get_info(bias, A_sE9=True):
                                "transfer_function": "boltzmann_camb",
                                "matter_pk": "halofit",
                                "baryons_pk": "nobaryons"},
-                       "limber": {"external": Limber}},
+                       "limber": {"external": Limber},
+                       "Pk": {"external": Pk}
+                       },
             "likelihood": {"ClLike": {"external": cll.ClLike,
                                       "input_file": data,
                                       "bins": [{"name": "gc1"},
@@ -49,7 +52,9 @@ def get_info(bias, A_sE9=True):
                                                    "lmax": 2000,
                                                    "gc1": {"lmin": 20}},
                                       "input_params_prefix": "cll",
-                                      "bias_model": bias}},
+                                      "bias_model": bias
+                                      }
+                           },
             "output": "dum",
             "debug": False}
 

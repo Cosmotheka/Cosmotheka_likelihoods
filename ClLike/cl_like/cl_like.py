@@ -6,24 +6,6 @@ from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 from scipy.optimize import minimize
 
-# Try to import LPT and EPT. If it fails due to some missing library. Raise an
-# error when checking the bias_model requested
-try:
-    from .lpt import LPTCalculator, get_lpt_pk2d
-    HAVE_LPT = True
-    LPT_exception = None
-except ImportError as e:
-    LPT_exception = e
-    HAVE_LPT = False
-
-try:
-    from .ept import EPTCalculator, get_ept_pk2d
-    HAVE_EPT = True
-    EPT_exception = None
-except ImportError as e:
-    EPT_exception = e
-    HAVE_EPT = False
-
 
 class ClLike(Likelihood):
     # TODO: Might many of these make more sense in the Theory classes?
@@ -32,26 +14,6 @@ class ClLike(Likelihood):
     input_params_prefix: str = ""
     # Input sacc file
     input_file: str = ""
-    # IA model name. Currently all of these are
-    # just flags, but we could turn them into
-    # homogeneous systematic classes.
-    ia_model: str = "IANone"
-    # N(z) model name
-    nz_model: str = "NzNone"
-    # b(z) model name
-    bias_model: str = "BzNone"
-    # zmax for 3D power spectra
-    zmax_pks: float = 4.
-    # #z for 3D power spectra
-    nz_pks: int = 30
-    # #k for 3D power spectra
-    nk_per_dex_pks: int = 25
-    # min k 3D power spectra
-    l10k_min_pks: float = -4.0
-    # max k 3D power spectra
-    l10k_max_pks: float = 2.0
-    # k shot noise suppression scale
-    k_SN_suppress: float = 0.01
     # Angular resolution
     nside: int = -1
     # List of bin names
@@ -62,6 +24,12 @@ class ClLike(Likelihood):
     twopoints: list = []
     # Jeffreys prior for bias params?
     jeffrey_bias: bool = False
+    # b(z) model name
+    bias_model: str = "BzNone"
+    # IA model name. Currently all of these are
+    # just flags, but we could turn them into
+    # homogeneous systematic classes.
+    ia_model: str = "IANone"
 
     def initialize(self):
         # Bias model
@@ -73,16 +41,17 @@ class ClLike(Likelihood):
         # Other global parameters
         self._init_globals()
 
+    def initialize_with_provider(self, provider):
+        self.provider = provider
+        # self.ia_model = self.provider.get_ia_model()
+        # self.is_PT_bias = self.provider.get_is_PT_bias()
+
     def _init_globals(self):
         # We will need this to map parameters into tracers
         self.qabbr = {'galaxy_density': 'g',
                       'galaxy_shear': 'm',
                       'cmb_convergence': 'm'}
 
-        # Pk sampling
-        self.a_s_pks = 1./(1+np.linspace(0., self.zmax_pks, self.nz_pks)[::-1])
-        self.nk_pks = int((self.l10k_max_pks - self.l10k_min_pks) *
-                          self.nk_per_dex_pks)
 
         # Pixel window function product for each power spectrum
         nsides = {b['name']: b.get('nside', None)
@@ -97,52 +66,6 @@ class ClLike(Likelihood):
                 if nsides[n]:
                     beam *= beam_hpix(ls, nsides[n])
             clm['pixbeam'] = beam
-
-        # Commented out since it does not fit well in the new structure. Let it
-        # for the future.
-        #
-        # Initialize parameterless Halo model stuff
-        # if self.bias_model == 'HaloModel':
-        #     # Mass definition
-        #     if self.mass_def_str == 'fof':
-        #         self.massdef = ccl.halos.MassDef('fof', 'critical')
-        #     else:
-        #         rt = self.mass_def_str[-1]
-        #         if rt == 'c':
-        #             rhotyp = 'critical'
-        #         elif rt == 'm':
-        #             rhotyp = 'matter'
-        #         else:
-        #             raise ValueError(f"Unknown density type {rt}")
-        #         if self.mass_def_str[:-1] == 'Vir':
-        #             Delta = 'vir'
-        #         else:
-        #             Delta = float(self.mass_def_str[:-1])
-        #         self.massdef = ccl.halos.MassDef(Delta, rhotyp)
-        #     # Mass function
-        #     self.mfc = ccl.halos.mass_function_from_name(self.mf_name)
-        #     # Halo bias
-        #     self.hbc = ccl.halos.halo_bias_from_name(self.hb_name)
-        #     # Concentration
-        #     cmc = ccl.halos.concentration_from_name(self.cm_name)
-        #     self.cm = cmc(mdef=self.massdef)
-        #     # Default profiles for different quantities
-        #     self.profs = {'galaxy_density': None,
-        #                   'galaxy_shear': ccl.halos.HaloProfileNFW(self.cm),
-        #                   'cmb_convergence': ccl.halos.HaloProfileNFW(self.cm),
-        #                   'cmb_tSZ': ccl.halos.HaloProfilePressureGNFW()}
-        #     # Profile 2-point function for HOD
-        #     self.p2pt_HOD = ccl.halos.Profile2ptHOD()
-        #     # Halo model correction for the transition regime
-        #     if self.HM_correction == 'halofit':
-        #         from .hm_extra import HalomodCorrection
-        #         self.hmcorr = HalomodCorrection()
-        #     else:
-        #         self.hmcorr = None
-        if self.bias_model == 'LagrangianPT' and not HAVE_LPT:
-            raise LPT_exception
-        elif self.bias_model == 'EulerianPT' and not HAVE_EPT:
-            raise EPT_exception
 
     def _read_data(self):
         """
@@ -414,25 +337,14 @@ class ClLike(Likelihood):
         return -np.log(np.linalg.det(F))
 
     def get_requirements(self):
-        pk_options = {"bias_model": self.bias_model,
-                      "is_PT_bias": self.is_PT_bias,
-                      "k_SN_suppress": self.k_SN_suppress,
-                      "EPTkwargs": {"l10k_min_pks": self.l10k_min_pks,
-                                    "l10k_max_pks": self.l10k_max_pks,
-                                    "nk_per_dex_pks": self.nk_per_dex_pks,
-                                    "a_s_pks": self.a_s_pks}
-                      }
         return {"Limber": {"cl_meta": self.cl_meta,
                            "l_sample": self.l_sample,
                            "tracer_qs": self.tracer_qs,
                            "bin_properties": self.bin_properties,
-                           "is_PT_bias": self.is_PT_bias,
-                           "ia_model": self.ia_model,
                            "sample_cen": self.sample_cen,
                            "sample_bpw": self.sample_bpw,
-                           "pk_options": pk_options,
-                           "nz_model": self.nz_model,
-                           "input_params_prefix": self.input_params_prefix
+                           "input_params_prefix": self.input_params_prefix,
+                           "bias_model": self.bias_model
                            }
                 }
 
