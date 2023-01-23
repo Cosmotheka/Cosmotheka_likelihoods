@@ -47,11 +47,6 @@ class ClLike(Likelihood):
         # self.is_PT_bias = self.provider.get_is_PT_bias()
 
     def _init_globals(self):
-        # We will need this to map parameters into tracers
-        self.qabbr = {'galaxy_density': 'g',
-                      'galaxy_shear': 'm',
-                      'cmb_convergence': 'm'}
-
 
         # Pixel window function product for each power spectrum
         nsides = {b['name']: b.get('nside', None)
