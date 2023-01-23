@@ -17,7 +17,7 @@ class Limber(Theory):
     # IA model name. Currently all of these are
     # just flags, but we could turn them into
     # homogeneous systematic classes.
-    ia_model: str = "IANone"
+    # ia_model: str = "IANone"
 
     def initialize(self):
         self.cl_meta = None
@@ -25,6 +25,7 @@ class Limber(Theory):
         self.tracer_qs = None
         self.bin_properties = None
         self.is_PT_bias = None
+        self.ia_model = None
         self.sample_cen = None
         self.sample_bpw = None
         self.provider = None
@@ -49,6 +50,7 @@ class Limber(Theory):
         self.sample_cen = options.get("sample_cen")
         self.sample_bpw = options.get("sample_bpw")
         self.input_params_prefix = options.get("input_params_prefix")
+        self.ia_model = options.get("ia_model")
         bias_model = options["bias_model"]
 
         return {"CCL": None, "Pk": {"bias_model": bias_model}}
