@@ -23,12 +23,8 @@ class ClLike(Likelihood):
     twopoints: list = []
     # Jeffreys prior for bias params?
     jeffrey_bias: bool = False
-    # b(z) model name
-    bias_model: str = "BzNone"
 
     def initialize(self):
-        # Bias model
-        self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT']
         # Read SACC file
         self._read_data()
 
@@ -36,8 +32,8 @@ class ClLike(Likelihood):
         self.provider = provider
         # Additional information specific for this likelihood
         ia_model = self.provider.get_ia_model()
-        self._get_bin_info_extra(self.sacc_file, ia_model)
-        # self.is_PT_bias = self.provider.get_is_PT_bias()
+        is_PT_bias = self.provider.get_is_PT_bias()
+        self._get_bin_info_extra(self.sacc_file, ia_model, is_PT_bias)
 
     def _read_data(self):
         """
@@ -174,7 +170,7 @@ class ClLike(Likelihood):
         self.inv_cov = np.linalg.inv(self.cov)
         self.ndata = len(self.data_vec)
 
-    def _get_bin_info_extra(self, s, ia_model):
+    def _get_bin_info_extra(self, s, ia_model, is_PT_bias):
         # Extract additional per-sample information from the sacc
         # file needed for this likelihood.
         ind_bias = 0
@@ -193,7 +189,7 @@ class ClLike(Likelihood):
                                        '_'+b['name']+'_b1')
                 ind_bias += 1
                 # Higher-order biases
-                if self.is_PT_bias:
+                if is_PT_bias:
                     for bn in ['b2', 'bs', 'bk2']:
                         self.bias_names.append(self.input_params_prefix +
                                                '_'+b['name']+'_'+bn)
@@ -281,9 +277,9 @@ class ClLike(Likelihood):
                            "tracer_qs": self.tracer_qs,
                            "bin_properties": self.bin_properties,
                            "input_params_prefix": self.input_params_prefix,
-                           "bias_model": self.bias_model,
                            },
-                "ia_model": None
+                "ia_model": None,
+                "is_PT_bias": None
                 }
 
     def _get_chi2(self, **pars):

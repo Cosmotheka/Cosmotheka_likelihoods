@@ -27,8 +27,8 @@ except ImportError as e:
 
 class Pk(Theory):
     """Computes the power spectrum"""
-    # # b(z) model name
-    # bias_model: str = "BzNone"
+    # b(z) model name
+    bias_model: str = "BzNone"
     # k shot noise suppression scale
     k_SN_suppress: float = 0.01
     # min k 3D power spectra
@@ -43,8 +43,6 @@ class Pk(Theory):
     nk_per_dex_pks: int = 25
 
     def initialize(self):
-        self.bias_model = None
-
         # Bias model
         self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT']
         # Pk sampling
@@ -97,8 +95,6 @@ class Pk(Theory):
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
             return {}
-        options = requirements.get('Pk')
-        self.bias_model = options["bias_model"]
 
         return {"CCL": None}
 
@@ -164,3 +160,9 @@ class Pk(Theory):
             pkd['pk_k2s2'] = pkd['pk_s2k2']
             pkd['pk_k2k2'] = None
         return pkd
+
+    def get_can_provide(self):
+        return ["is_PT_bias"]
+
+    def get_is_PT_bias(self):
+        return self.is_PT_bias

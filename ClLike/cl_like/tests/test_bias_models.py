@@ -34,7 +34,8 @@ def get_info(bias, A_sE9=True):
                                "matter_pk": "halofit",
                                "baryons_pk": "nobaryons"},
                        "limber": {"external": Limber},
-                       "Pk": {"external": Pk}
+                       "Pk": {"external": Pk,
+                              "bias_model": bias}
                        },
             "likelihood": {"ClLike": {"external": cll.ClLike,
                                       "input_file": data,
@@ -52,7 +53,6 @@ def get_info(bias, A_sE9=True):
                                                    "lmax": 2000,
                                                    "gc1": {"lmin": 20}},
                                       "input_params_prefix": "cll",
-                                      "bias_model": bias
                                       }
                            },
             "output": "dum",

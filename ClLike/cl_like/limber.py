@@ -53,9 +53,8 @@ class Limber(Theory):
         self.tracer_qs = options.get("tracer_qs")
         self.bin_properties = options.get("bin_properties")
         self.input_params_prefix = options.get("input_params_prefix")
-        bias_model = options["bias_model"]
 
-        return {"CCL": None, "Pk": {"bias_model": bias_model}}
+        return {"CCL": None, "Pk": None}
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
