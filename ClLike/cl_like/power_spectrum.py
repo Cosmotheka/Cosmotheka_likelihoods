@@ -109,13 +109,6 @@ class Pk(Theory):
     def get_Pk(self):
         return self._current_state['Pk']
 
-    def get_pk_data(self):
-        "Get the current pk_data dictionary"
-        return self._current_state['Pk']["pk_data"]
-
-    def get_is_PT_bias(self):
-        return self.is_PT_bias
-
     def _get_pk_data(self, cosmo):
         cosmo.compute_nonlin_power()
         pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
