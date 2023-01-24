@@ -30,6 +30,7 @@ def get_info(bias, A_sE9=True):
                        "cll_gc1_bs": 0.0,
                        "limber_gc1_dz": -0.1,
                        "limber_sh1_dz": -0.2,
+                       "cll_sh1_m": 0.3,
                        "sigma8": None},
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",

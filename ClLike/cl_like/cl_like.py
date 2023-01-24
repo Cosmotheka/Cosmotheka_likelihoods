@@ -215,7 +215,7 @@ class ClLike(Likelihood):
                 # work
                 self.bin_properties[b['name']]['eps'] = True
 
-    def _model(self, cld, bias_vec):
+    def _model(self, cld, bias_vec, **pars):
         cls = np.zeros(self.ndata)
         for icl, clm in enumerate(self.cl_meta):
             cl_this = np.zeros_like(clm['l_eff'])
@@ -236,6 +236,13 @@ class ClLike(Likelihood):
                 cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
             if (b1 is not None) and (b2 is not None):
                 cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) * ((nbias2), (nbias1,nbias2,nell))
+
+            # Add multiplicative bias
+            for name in [n1, n2]:
+                if self.tracer_qs[name] == "galaxy_shear":
+                    bn = '_'.join([self.input_params_prefix, name, 'm'])
+                    print(name, bn, pars.get(bn))
+                    cl_this *= (1 + pars.get(bn, 0))
             cls[inds] = cl_this
 
         return cls
@@ -294,7 +301,7 @@ class ClLike(Likelihood):
         bias = np.array([pars[k] for k in self.bias_names])
 
         # Theory model
-        t = self._model(cld, bias)
+        t = self._model(cld, bias, **pars)
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata)
 

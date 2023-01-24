@@ -17,7 +17,7 @@ bz = np.ones(zs.size)
 # Nuisance parameters
 dz_gc = 0.1
 dz_sh = 0.2
-m_sh = 0.
+m_sh = 0.3
 
 # CCL tracers
 t_gc = ccl.NumberCountsTracer(cosmo, False, dndz=(zs, nz(zs + dz_gc)),
@@ -66,9 +66,9 @@ sls = np.zeros([n_tracers, n_tracers, nbpw])
 for i1, i2, ix, _ in get_pairs():
     cl = interp_bin(ccl.angular_cl(cosmo, tracers[i1],
                                    tracers[i2], ls))
-    if i1 == 1:
+    if i1 == 2:
         cl *= (1+m_sh)
-    if i2 == 1:
+    if i2 == 2:
         cl *= (1+m_sh)
     sls[i1, i2, :] = cl
 nls = np.zeros([n_tracers, n_tracers, nbpw])
