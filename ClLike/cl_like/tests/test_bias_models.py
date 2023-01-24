@@ -1,6 +1,7 @@
 import cl_like as cll
 from cl_like.limber import Limber
 from cl_like.power_spectrum import Pk
+from cl_like.cl_final import ClFinal
 import numpy as np
 from cobaya.model import get_model
 import pytest
@@ -24,13 +25,13 @@ def get_info(bias, A_sE9=True):
                        "h": 0.67,
                        "n_s": 0.96,
                        "m_nu": 0.0,
-                       "cll_gc1_b1": 1.0,
-                       "cll_gc1_b1p": 0.0,
-                       "cll_gc1_b2": 0.0,
-                       "cll_gc1_bs": 0.0,
+                       "bias_gc1_b1": 1.0,
+                       "bias_gc1_b1p": 0.0,
+                       "bias_gc1_b2": 0.0,
+                       "bias_gc1_bs": 0.0,
+                       "bias_sh1_m": 0.3,
                        "limber_gc1_dz": -0.1,
                        "limber_sh1_dz": -0.2,
-                       "cll_sh1_m": 0.3,
                        "sigma8": None},
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
@@ -40,7 +41,9 @@ def get_info(bias, A_sE9=True):
                                   "nz_model": "NzShift",
                                   "input_params_prefix": "limber"},
                        "Pk": {"external": Pk,
-                              "bias_model": bias}
+                             "bias_model": bias},
+                       "clfinal": {"external": ClFinal,
+                                   "input_params_prefix": "bias"}
                        },
             "likelihood": {"ClLike": {"external": cll.ClLike,
                                       "input_file": data,

@@ -7,7 +7,6 @@ from scipy.optimize import minimize
 
 
 class ClLike(Likelihood):
-    # TODO: Might many of these make more sense in the Theory classes?
     # All parameters starting with this will be
     # identified as belonging to this stage.
     input_params_prefix: str = ""
@@ -27,17 +26,6 @@ class ClLike(Likelihood):
     def initialize(self):
         # Read SACC file
         self._read_data()
-
-    def initialize_with_provider(self, provider):
-        self.provider = provider
-        # Additional information specific for this likelihood
-        ia_model = self.provider.get_ia_model()
-        is_PT_bias = self.provider.get_is_PT_bias()
-
-        # TODO: This is modifying the cl_meta dictionary after passing it to
-        # the Theory classes. Not sure if this could cause problems in the
-        # future.
-        self._get_bin_info_extra(self.sacc_file, ia_model, is_PT_bias)
 
     def _read_data(self):
         """
@@ -174,141 +162,28 @@ class ClLike(Likelihood):
         self.inv_cov = np.linalg.inv(self.cov)
         self.ndata = len(self.data_vec)
 
-    def _get_bin_info_extra(self, s, ia_model, is_PT_bias):
-        # Extract additional per-sample information from the sacc
-        # file needed for this likelihood.
-        ind_bias = 0
-        ind_IA = None
-        self.bias_names = []
-        for b in self.bins:
-            if b['name'] not in s.tracers:
-                raise LoggedError(self.log, "Unknown tracer %s" % b['name'])
-            t = s.tracers[b['name']]
-
-            self.bin_properties[b['name']]['bias_ind'] = None # No biases by default
-            if t.quantity == 'galaxy_density':
-                # Linear bias
-                inds = [ind_bias]
-                self.bias_names.append(self.input_params_prefix +
-                                       '_'+b['name']+'_b1')
-                ind_bias += 1
-                # Higher-order biases
-                if is_PT_bias:
-                    for bn in ['b2', 'bs', 'bk2']:
-                        self.bias_names.append(self.input_params_prefix +
-                                               '_'+b['name']+'_'+bn)
-                        inds.append(ind_bias)
-                        ind_bias += 1
-                self.bin_properties[b['name']]['bias_ind'] = inds
-                # No magnification bias yet
-                self.bin_properties[b['name']]['eps'] = False
-            elif t.quantity == 'galaxy_shear':
-                if ia_model != 'IANone':
-                    if ind_IA is None:
-                        ind_IA = ind_bias
-                        self.bias_names.append(self.input_params_prefix + '_A_IA')
-                        ind_bias += 1
-                    self.bin_properties[b['name']]['bias_ind'] = [ind_IA]
-                self.bin_properties[b['name']]['eps'] = True
-            elif t.quantity == 'cmb_convergence':
-                # TODO: No idea what eps is so setting to True to make the test
-                # work
-                self.bin_properties[b['name']]['eps'] = True
-
-    def _model(self, cld, bias_vec, **pars):
-        cls = np.zeros(self.ndata)
-        for icl, clm in enumerate(self.cl_meta):
-            cl_this = np.zeros_like(clm['l_eff'])
-            n1 = clm['bin_1']
-            n2 = clm['bin_2']
-            e1 = self.bin_properties[n1]['eps']
-            e2 = self.bin_properties[n2]['eps']
-            ind1 = self.bin_properties[n1]['bias_ind']
-            ind2 = self.bin_properties[n2]['bias_ind']
-            b1 = bias_vec[ind1] if ind1 is not None else None
-            b2 = bias_vec[ind2] if ind2 is not None else None
-            inds = clm['inds']
-            if e1 and e2:
-                cl_this += cld['cl00'][icl]
-            if e1 and (b2 is not None):
-                cl_this += np.dot(b2, cld['cl01'][icl]) # (nbias) , (nbias, nell)
-            if e2 and (b1 is not None):
-                cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
-            if (b1 is not None) and (b2 is not None):
-                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) * ((nbias2), (nbias1,nbias2,nell))
-
-            # Add multiplicative bias
-            for name in [n1, n2]:
-                if self.tracer_qs[name] == "galaxy_shear":
-                    bn = '_'.join([self.input_params_prefix, name, 'm'])
-                    print(name, bn, pars.get(bn))
-                    cl_this *= (1 + pars.get(bn, 0))
-            cls[inds] = cl_this
-
-        return cls
-
-    def _model_deriv(self, cld, bias_vec):
-        nbias = len(bias_vec)
-        cls_deriv = np.zeros((self.ndata, nbias))
-
-        for icl, clm in enumerate(self.cl_meta):
-            cls_grad = np.zeros([nbias, len(clm['l_eff'])])
-            n1 = clm['bin_1']
-            n2 = clm['bin_2']
-            e1 = self.bin_properties[n1]['eps']
-            e2 = self.bin_properties[n2]['eps']
-            ind1 = self.bin_properties[n1]['bias_ind']
-            ind2 = self.bin_properties[n2]['bias_ind']
-            b1 = bias_vec[ind1] if ind1 is not None else None
-            b2 = bias_vec[ind2] if ind2 is not None else None
-            inds = clm['inds']
-
-            if e1 and (b2 is not None):
-                cls_grad[ind2] += cld['cl01'][icl] # (nbias2, ndata) , (nbias2, ndata)
-            if e2 and (b1 is not None):
-                cls_grad[ind1] += cld['cl10'][icl] # (nbias1, ndata) , (nbias1, ndat)
-
-            if (b1 is not None) and (b2 is not None):
-                cl_b2 = np.dot(b2, cld['cl11'][icl]) # (nbias2) , (nbias1, nbias2, ndata) -> (nbias1, ndata)
-                cl_b1 = np.sum(b1[:, None, None] * cld['cl11'][icl], axis=0) # (nbias1) , (nbias1, nbias2, ndata) -> (nbias2, ndata)
-                cls_grad[ind1] += cl_b2
-                cls_grad[ind2] += cl_b1
-
-            cls_deriv[inds] = cls_grad.T
-        return cls_deriv # (ndata, nbias)
-
-    def _get_jeffrey_bias_dchi2(self, bias, cld):
-        g = self._model_deriv(cld, bias)
+    def _get_jeffrey_bias_dchi2(self):
+        g = self.provider.get_cl_theory_deriv()
         ic_g = np.dot(self.inv_cov, g) # (ndata, ndata) , (ndata, nbias)
         F = np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
         return -np.log(np.linalg.det(F))
 
     def get_requirements(self):
-        return {"Limber": {"cl_meta": self.cl_meta,
-                           "tracer_qs": self.tracer_qs,
-                           "bin_properties": self.bin_properties,
-                           },
-                "ia_model": None,
-                "is_PT_bias": None
+        return {"cl_theory": {"cl_meta": self.cl_meta,
+                              "tracer_qs": self.tracer_qs,
+                              "bin_properties": self.bin_properties,
+                             },
                 }
 
     def _get_chi2(self, **pars):
-        # First, gather all the necessary ingredients for the Cls without bias parameters
-        res = self.provider.get_Limber()
-        cld = res['cl_data']
-
-        # Construct bias vector
-        bias = np.array([pars[k] for k in self.bias_names])
-
-        # Theory model
-        t = self._model(cld, bias, **pars)
+        t = self.provider.get_cl_theory()
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata)
 
         # Jeffreys prior for bias?
         dchi2_jeffrey = 0
         if self.jeffrey_bias:
-            dchi2_jeffrey = self._get_jeffrey_bias_dchi2(bias, cld)
+            dchi2_jeffrey = self._get_jeffrey_bias_dchi2()
         return chi2, dchi2_jeffrey
 
     def get_can_provide_params(self):
