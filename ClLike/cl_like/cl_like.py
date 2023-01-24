@@ -33,6 +33,10 @@ class ClLike(Likelihood):
         # Additional information specific for this likelihood
         ia_model = self.provider.get_ia_model()
         is_PT_bias = self.provider.get_is_PT_bias()
+
+        # TODO: This is modifying the cl_meta dictionary after passing it to
+        # the Theory classes. Not sure if this could cause problems in the
+        # future.
         self._get_bin_info_extra(self.sacc_file, ia_model, is_PT_bias)
 
     def _read_data(self):
@@ -276,7 +280,6 @@ class ClLike(Likelihood):
         return {"Limber": {"cl_meta": self.cl_meta,
                            "tracer_qs": self.tracer_qs,
                            "bin_properties": self.bin_properties,
-                           "input_params_prefix": self.input_params_prefix,
                            },
                 "ia_model": None,
                 "is_PT_bias": None

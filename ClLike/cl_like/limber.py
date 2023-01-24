@@ -13,6 +13,7 @@ import numpy as np
 class Limber(Theory):
     """ Computes the angular power spectra
     """
+    input_params_prefix: str = ""
     # N(z) model name
     nz_model: str = "NzNone"
     # IA model name. Currently all of these are
@@ -30,7 +31,6 @@ class Limber(Theory):
         self.bin_properties = None
         self.is_PT_bias = None
         self.provider = None
-        self.input_params_prefix = None
 
         self.sample_cen = self.sample_type in ['center', 'best']
         self.sample_bpw = self.sample_type == 'convolve'
@@ -52,7 +52,6 @@ class Limber(Theory):
         self.cl_meta = options.get("cl_meta")
         self.tracer_qs = options.get("tracer_qs")
         self.bin_properties = options.get("bin_properties")
-        self.input_params_prefix = options.get("input_params_prefix")
 
         return {"CCL": None, "Pk": None}
 
@@ -271,13 +270,14 @@ class Limber(Theory):
         """
         z = self.bin_properties[name]['z_fid']
         nz = interp1d(z, self.bin_properties[name]['nz_fid'], kind='cubic',
-                      bounds_error=False, fill_value=(0, 'extrapolate'))
+                      bounds_error=False, fill_value=0)
         zm = self.bin_properties[name]['zmean_fid']
         dz = 0.
         wz = 1.
         jacob = 1
         if (self.nz_model == 'NzShift') or (self.nz_model == 'NzShiftWidth'):
             dz = pars.get(self.input_params_prefix + '_' + name + '_dz', 0.)
+            print(dz)
         if (self.nz_model == 'NzShiftWidth') or (self.nz_model == 'NzWidth'):
             wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
             jacob = wz

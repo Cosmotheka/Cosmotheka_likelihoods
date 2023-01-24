@@ -17,7 +17,7 @@ def run_clean_tmp():
 
 
 def get_info(bias, A_sE9=True):
-    data = "cl_like/tests/data/gc_kp_sh_linear.fits.gz"
+    data = "cl_like/tests/data/gc_kp_sh_linear_nuisances.fits.gz"
     info = {"params": {"A_sE9": 2.23,
                        "Omega_c": 0.25,
                        "Omega_b": 0.05,
@@ -28,12 +28,16 @@ def get_info(bias, A_sE9=True):
                        "cll_gc1_b1p": 0.0,
                        "cll_gc1_b2": 0.0,
                        "cll_gc1_bs": 0.0,
+                       "limber_gc1_dz": -0.1,
+                       "limber_sh1_dz": -0.2,
                        "sigma8": None},
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
                                "matter_pk": "halofit",
                                "baryons_pk": "nobaryons"},
-                       "limber": {"external": Limber},
+                       "limber": {"external": Limber,
+                                  "nz_model": "NzShift",
+                                  "input_params_prefix": "limber"},
                        "Pk": {"external": Pk,
                               "bias_model": bias}
                        },
