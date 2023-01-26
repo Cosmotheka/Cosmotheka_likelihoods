@@ -2,6 +2,7 @@
 Theory class that computes the full angular power spectrum
 """
 from cobaya.theory import Theory
+from cobaya.log import LoggedError
 import numpy as np
 
 
@@ -161,6 +162,7 @@ class ClFinal(Theory):
                 # No magnification bias yet
                 bd['eps'] = False
             elif quantity == 'galaxy_shear':
+                bd['eps'] = True
                 if ia_model == 'IAPerBin':
                     pn = '_'.join([self.input_params_prefix, name, 'A_IA'])
                 elif ia_model == 'IADESY1':
@@ -176,7 +178,6 @@ class ClFinal(Theory):
                 bias_names.append(pn)
                 bd['bias_ind'] = [ind_bias]
                 ind_bias += 1
-                bd['eps'] = True
             elif quantity == 'cmb_convergence':
                 bd['eps'] = True
 

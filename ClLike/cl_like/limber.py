@@ -281,7 +281,6 @@ class Limber(Theory):
         jacob = 1
         if (self.nz_model == 'NzShift') or (self.nz_model == 'NzShiftWidth'):
             dz = pars.get(self.input_params_prefix + '_' + name + '_dz', 0.)
-            print(dz)
         if (self.nz_model == 'NzShiftWidth') or (self.nz_model == 'NzWidth'):
             wz = pars.get(self.input_params_prefix + '_' + name + '_wz', 1.)
             jacob = wz
