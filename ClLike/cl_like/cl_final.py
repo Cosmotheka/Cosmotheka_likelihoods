@@ -9,6 +9,7 @@ class ClFinal(Theory):
     # All parameters starting with this will be
     # identified as belonging to this stage.
     input_params_prefix: str = ""
+    shape_model: str = "ShapeNone"
 
     def initialize_with_provider(self, provider):
         self.provider = provider
@@ -59,18 +60,14 @@ class ClFinal(Theory):
 
     def _get_global_bias(self, **pars):
         global_bias = {}
-        for icl, clm in enumerate(self.cl_meta):
-            n1 = clm['bin_1']
-            n2 = clm['bin_2']
+        for name in self.bin_properties.keys():
+            global_bias[name] = 1
+
             # Add multiplicative bias
-            for name in [n1, n2]:
-                if name in global_bias:
-                    continue
-                if self.tracer_qs[name] == "galaxy_shear":
+            if self.tracer_qs[name] == "galaxy_shear":
+                if self.shape_model == 'ShapeMultiplicative':
                     bn = '_'.join([self.input_params_prefix, name, 'm'])
                     global_bias[name] = (1 + pars.get(bn, 0))
-                else:
-                    global_bias[name] = 1
 
         return global_bias
 

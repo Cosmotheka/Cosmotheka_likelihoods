@@ -46,7 +46,8 @@ def get_info(bias, A_sE9=True):
                        "Pk": {"external": Pk,
                              "bias_model": bias},
                        "clfinal": {"external": ClFinal,
-                                   "input_params_prefix": "bias"}
+                                   "input_params_prefix": "bias",
+                                   "shape_model": "ShapeMultiplicative"}
                        },
             "likelihood": {"ClLike": {"external": cll.ClLike,
                                       "input_file": data,
@@ -117,6 +118,18 @@ def test_ia_models(case):
     else:
         assert cond
 
+def test_shape_model():
+    info = get_info(bias="Linear", A_sE9=False)
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    assert np.fabs(loglikes[0]) < 2E-3
+
+    info["theory"]["clfinal"]["shape_model"] = "ShapeNone"
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    assert np.fabs(loglikes[0]) > 2E-3
 
 
 def test_timing():
