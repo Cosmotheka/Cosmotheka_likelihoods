@@ -44,10 +44,11 @@ class ClFinal(Theory):
 
         # Construct bias vector
         bias = np.array([pars[k] for k in self.bias_names])
+        # Construct global bias vector
+        global_bias = self._get_global_bias(**pars)
 
         # Theory model
-        t = self._model(cld, bias, **pars)
-        state["cl_theory"] = self._model(cld, bias, **pars)
+        state["cl_theory"] = self._model(cld, bias, global_bias)
         # state["cl_theory_deriv"] = self._model_deriv(cld, bias, **pars)
 
     def get_cl_theory(self):
@@ -56,7 +57,24 @@ class ClFinal(Theory):
     def get_cl_theory_deriv(self):
         return self._current_state["cl_theory_deriv"]
 
-    def _model(self, cld, bias_vec, **pars):
+    def _get_global_bias(self, **pars):
+        global_bias = {}
+        for icl, clm in enumerate(self.cl_meta):
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            # Add multiplicative bias
+            for name in [n1, n2]:
+                if name in global_bias:
+                    continue
+                if self.tracer_qs[name] == "galaxy_shear":
+                    bn = '_'.join([self.input_params_prefix, name, 'm'])
+                    global_bias[name] = (1 + pars.get(bn, 0))
+                else:
+                    global_bias[name] = 1
+
+        return global_bias
+
+    def _model(self, cld, bias_vec, global_bias):
         cls = np.zeros(self.ndata)
         for icl, clm in enumerate(self.cl_meta):
             cl_this = np.zeros_like(clm['l_eff'])
@@ -78,18 +96,15 @@ class ClFinal(Theory):
             if (b1 is not None) and (b2 is not None):
                 cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) * ((nbias2), (nbias1,nbias2,nell))
 
-            # Add multiplicative bias
-            for name in [n1, n2]:
-                if self.tracer_qs[name] == "galaxy_shear":
-                    bn = '_'.join([self.input_params_prefix, name, 'm'])
-                    print(name, bn, pars.get(bn))
-                    cl_this *= (1 + pars.get(bn, 0))
+            # Multiply global biases (e.g. multiplicative bias)
+            cl_this *= global_bias[n1]
+            cl_this *= global_bias[n2]
+
             cls[inds] = cl_this
 
         return cls
 
-    def _model_deriv(self, cld, bias_vec):
-        # TODO: Fix this
+    def _model_deriv(self, cld, bias_vec, global_bias):
         nbias = len(bias_vec)
         cls_deriv = np.zeros((self.ndata, nbias))
 
@@ -97,10 +112,10 @@ class ClFinal(Theory):
             cls_grad = np.zeros([nbias, len(clm['l_eff'])])
             n1 = clm['bin_1']
             n2 = clm['bin_2']
-            e1 = self.bin_properties[n1]['eps']
-            e2 = self.bin_properties[n2]['eps']
-            ind1 = self.bin_properties[n1]['bias_ind']
-            ind2 = self.bin_properties[n2]['bias_ind']
+            e1 = self.bias_info[n1]['eps']
+            e2 = self.bias_info[n2]['eps']
+            ind1 = self.bias_info[n1]['bias_ind']
+            ind2 = self.bias_info[n2]['bias_ind']
             b1 = bias_vec[ind1] if ind1 is not None else None
             b2 = bias_vec[ind2] if ind2 is not None else None
             inds = clm['inds']
@@ -115,6 +130,10 @@ class ClFinal(Theory):
                 cl_b1 = np.sum(b1[:, None, None] * cld['cl11'][icl], axis=0) # (nbias1) , (nbias1, nbias2, ndata) -> (nbias2, ndata)
                 cls_grad[ind1] += cl_b2
                 cls_grad[ind2] += cl_b1
+
+            # Multiply global biases (e.g. multiplicative bias)
+            cls_grad[ind1] *= global_bias[n1]
+            cls_grad[ind2] *= global_bias[n2]
 
             cls_deriv[inds] = cls_grad.T
         return cls_deriv # (ndata, nbias)
