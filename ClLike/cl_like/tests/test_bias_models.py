@@ -98,6 +98,26 @@ def test_sigma8():
     with pytest.raises(ValueError):
         model = get_model(info)
 
+@pytest.mark.parametrize('case', ['IAPerBin', 'IADESY1', 'IADESY1_PerSurvey'])
+def test_ia_models(case):
+    info = get_info(bias="Linear")
+    if case not in ['IAPerBin', 'IADESY1_PerSurvey']:
+        # In this case, the params are already as they have to
+        info["params"]["bias_A_IA"] = info["params"].pop("bias_sh1_A_IA")
+        info["params"]["limber_eta_IA"] = info["params"].pop("limber_sh1_eta_IA")
+    info["theory"]["limber"]["ia_model"] = case
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    cond = np.fabs(loglikes[0]) < 2E-3
+    if case == 'IAPerBin':
+        # IAPerBin has a constant ia_bias, which does not fit the generated
+        # data.
+        assert not cond
+    else:
+        assert cond
+
+
 
 def test_timing():
     info = get_info(bias="Linear", A_sE9=False)

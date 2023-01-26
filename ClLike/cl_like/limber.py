@@ -308,11 +308,13 @@ class Limber(Theory):
         """
         # The amplitudes are multiplied in cl_like/cl_final.py with the galaxy
         # bias parameters.
-        if self.ia_model in ['IANone', 'IAPerBin']:
+        if self.ia_model == 'IANone':
             return None
 
         z = self.bin_properties[name]['z_fid']
-        if self.ia_model == 'IADESY1':
+        if self.ia_model == 'IAPerBin':
+            A_IA = np.ones_like(z)
+        elif self.ia_model == 'IADESY1':
             A0 = 1
             eta = pars[self.input_params_prefix + '_eta_IA']
             A_IA = A0 * ((1+z)/1.62)**eta
