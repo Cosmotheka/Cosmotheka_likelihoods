@@ -18,11 +18,16 @@ bz = np.ones(zs.size)
 dz_gc = 0.1
 dz_sh = 0.2
 m_sh = 0.3
+# Intinsic Alingments
+A0 = 0.1
+eta = 1
+A_IA = A0 * ((1+zs)/1.62)**eta
+ia_bias = (zs, A_IA)
 
 # CCL tracers
 t_gc = ccl.NumberCountsTracer(cosmo, False, dndz=(zs, nz(zs + dz_gc)),
                               bias=(zs, bz))
-t_sh = ccl.WeakLensingTracer(cosmo, dndz=(zs, nz(zs + dz_sh)))
+t_sh = ccl.WeakLensingTracer(cosmo, dndz=(zs, nz(zs + dz_sh)), ia_bias=ia_bias)
 t_kp = ccl.CMBLensingTracer(cosmo, z_source=1100.)
 n_tracers = 3
 nx = (n_tracers * (n_tracers + 1)) // 2

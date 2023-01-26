@@ -142,7 +142,6 @@ class ClFinal(Theory):
         # Extract additional per-sample information from the sacc
         # file needed for this likelihood.
         ind_bias = 0
-        ind_IA = None
         bias_names = []
         bias_info = {}
         for name in self.bin_properties.keys():
@@ -165,16 +164,23 @@ class ClFinal(Theory):
                 # No magnification bias yet
                 bd['eps'] = False
             elif quantity == 'galaxy_shear':
-                if ia_model != 'IANone':
-                    if ind_IA is None:
-                        ind_IA = ind_bias
-                        bias_names.append(self.input_params_prefix + '_A_IA')
-                        ind_bias += 1
-                    bd['bias_ind'] = [ind_IA]
+                if ia_model == 'IAPerBin':
+                    pn = '_'.join([self.input_params_prefix, name, 'A_IA'])
+                elif ia_model == 'IADESY1':
+                    pn = '_'.join([self.input_params_prefix, 'A_IA'])
+                    if pn in bias_names:
+                        continue
+                elif ia_model == 'IADESY1_PerSurvey':
+                    # This assumes that name = survey__zbin
+                    survey = name.split('__')[0]
+                    pn = '_'.join([self.input_params_prefix, survey, 'A_IA'])
+                    if pn in bias_names:
+                        continue
+                bias_names.append(pn)
+                bd['bias_ind'] = [ind_bias]
+                ind_bias += 1
                 bd['eps'] = True
             elif quantity == 'cmb_convergence':
-                # TODO: No idea what eps is so setting to True to make the test
-                # work
                 bd['eps'] = True
 
         return bias_names, bias_info

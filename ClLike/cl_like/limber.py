@@ -4,6 +4,7 @@ class and the nuisance parameters that cannot be factored out (such as the
 galaxy bias parameters).
 """
 from cobaya.theory import Theory
+from cobaya.log import LoggedError
 from scipy.interpolate import interp1d
 from .pixwin import beam_hpix
 import pyccl as ccl
@@ -105,9 +106,12 @@ class Limber(Theory):
                 t0 = ccl.WeakLensingTracer(cosmo, dndz=dndz)
                 if self.ia_model == 'IANone':
                     t1 = None
+                    t1n = None
                 else:
+                    ia_bias = self._get_ia_bias(cosmo, name, **pars)
                     t1 = [ccl.WeakLensingTracer(cosmo, dndz=dndz,
-                                                has_shear=False, ia_bias=None)]
+                                                has_shear=False,
+                                                ia_bias=ia_bias)]
                     t1n = ['m']
             elif q == 'cmb_convergence':
                 # B.H. TODO: pass z_source as parameter to the YAML file
@@ -298,6 +302,29 @@ class Limber(Theory):
         # dn/dzt = dzf/dzt|_zt * dn/dzf|_zt
         nz_out = jacob * nz(z_out)
         return (z, nz_out)
+
+    def _get_ia_bias(self, cosmo, name, **pars):
+        """ Intrinsic alignment.
+        """
+        # The amplitudes are multiplied in cl_like/cl_final.py with the galaxy
+        # bias parameters.
+        if self.ia_model in ['IANone', 'IAPerBin']:
+            return None
+
+        z = self.bin_properties[name]['z_fid']
+        if self.ia_model == 'IADESY1':
+            A0 = 1
+            eta = pars[self.input_params_prefix + '_eta_IA']
+            A_IA = A0 * ((1+z)/1.62)**eta
+        elif self.ia_model == 'IADESY1_PerSurvey':
+            # This assumes that name = survey__zbin
+            survey = name.split('__')[0]
+            A0 = 1
+            eta = pars[self.input_params_prefix + '_' + survey + '_eta_IA']
+            A_IA = A0 * ((1+z)/1.62)**eta
+        else:
+            raise LoggedError(self.log, f"Unknown IA model {self.ia_model}")
+        return (z, A_IA)
 
     def _add_pixbeam_to_cl_meta(self):
         # Pixel window function product for each power spectrum
