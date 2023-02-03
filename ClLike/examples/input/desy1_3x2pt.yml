@@ -1,0 +1,363 @@
+sampler:
+  mcmc:
+    burn_in: 1000
+    max_tries: 1000
+
+params:
+  # List all the likelihood parameters here.
+  # You need to include `prior`, `ref` and
+  # `proposal` for all parameters you want
+  # to vary.
+  A_sE9:
+    prior:
+      min: 0.5
+      max: 5.
+    ref:
+      dist: norm
+      loc: 2.02
+      scale: 0.01
+    latex: A_s
+    proposal: 0.001
+
+  Omega_c:
+    prior: 
+      min: 0.07
+      max: 0.83
+    ref:
+      dist: norm
+      loc: 0.2
+      scale: 0.01
+    latex: \Omega_c
+    proposal: 0.01
+
+  Omega_b:
+    prior: 
+      min: 0.03
+      max: 0.07
+    ref:
+      dist: norm
+      loc: 0.04
+      scale: 0.001
+    latex: \Omega_b
+    proposal: 0.001
+
+  h: 
+    prior: 
+      min: 0.55
+      max: 0.91
+    ref:
+      dist: norm
+      loc: 0.7
+      scale: 0.02
+    latex: h
+    proposal: 0.02
+
+  n_s:
+    prior: 
+      min: 0.87
+      max: 1.07
+    ref:
+      dist: norm
+      loc: 0.96
+      scale: 0.02
+    latex: n_s
+    proposal: 0.02
+
+  m_nu: 0.
+
+  sigma8:
+    latex: \sigma_8
+
+  # Bias parameters. Note that you can declare
+  # all nuisance parameters as
+  # `<prefix>_param_name` where `<prefix>` is
+  # whatever you've chosen as `input_params_prefix`
+  # further down. All such parameters will
+  # automatically be understood by cobaya and
+  # assigned to your likelihood.
+  # First-order bias
+  bias_DESgc__0_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.421521
+      scale: 0.1
+    latex: b^{DESgc}_0
+    proposal: 0.1
+
+  bias_DESgc__1_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.730038
+      scale: 0.1
+    latex: b^{DESgc}_1
+    proposal: 0.1
+
+  bias_DESgc__2_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.699162
+      scale: 0.1
+    latex: b^{DESgc}_2
+    proposal: 0.1
+
+  bias_DESgc__3_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 2.064552
+      scale: 0.1
+    latex: b^{DESgc}_3
+    proposal: 0.1
+
+  bias_DESgc__4_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 2.129857
+      scale: 0.1
+    latex: b^{DESgc}_4
+    proposal: 0.1
+
+  limber_DESgc__0_dz:
+    prior: 
+      dist: norm
+      loc: 0.
+      scale: 0.007
+    latex: \Delta z^{DESgc}_0
+    proposal: 0.005
+
+  limber_DESgc__1_dz:
+    prior: 
+      dist: norm
+      loc: 0.
+      scale: 0.007
+    latex: \Delta z^{DESgc}_1
+    proposal: 0.005
+    
+  limber_DESgc__2_dz:
+    prior: 
+      dist: norm
+      loc: 0.
+      scale: 0.006
+    latex: \Delta z^{DESgc}_2
+    proposal: 0.005
+
+  limber_DESgc__3_dz:
+    prior: 
+      dist: norm
+      loc: 0.
+      scale: 0.01
+    latex: \Delta z^{DESgc}_3
+    proposal: 0.005
+
+  limber_DESgc__4_dz:
+    prior: 
+      dist: norm
+      loc: 0.
+      scale: 0.01
+    latex: \Delta z^{DESgc}_4
+    proposal: 0.005
+
+  bias_DESwl__0_m:
+    prior: 
+      dist: norm
+      loc: 0.012
+      scale: 0.023
+    latex: m^{DESwl}_0
+    proposal: 0.005
+
+  bias_DESwl__1_m: 
+    prior: 
+      dist: norm
+      loc: 0.012
+      scale: 0.023
+    latex: m^{DESwl}_1
+    proposal: 0.005
+
+  bias_DESwl__2_m: 
+    prior: 
+      dist: norm
+      loc: 0.012
+      scale: 0.023
+    latex: m^{DESwl}_2
+    proposal: 0.005
+
+  bias_DESwl__3_m:
+    prior: 
+      dist: norm
+      loc: 0.012
+      scale: 0.023
+    latex: m^{DESwl}_3
+    proposal: 0.005
+
+  limber_DESwl__0_dz:
+    prior: 
+      dist: norm
+      loc: -0.001
+      scale: 0.016
+    latex: \Delta z^{DESwl}_0
+    proposal: 0.005
+
+  limber_DESwl__1_dz:
+    prior: 
+      dist: norm
+      loc: -0.019
+      scale: 0.013
+    latex: \Delta z^{DESwl}_1
+    proposal: 0.005
+    
+  limber_DESwl__2_dz:
+    prior: 
+      dist: norm
+      loc: 0.009
+      scale: 0.011
+    latex: \Delta z^{DESwl}_2
+    proposal: 0.005
+
+  limber_DESwl__3_dz:
+    prior: 
+      dist: norm
+      loc: -0.018
+      scale: 0.022
+    latex: \Delta z^{DESwl}_3
+    proposal: 0.005
+
+  bias_A_IA:
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.
+      scale: 0.1
+    latex: A_{IA}^{DESwl}
+    proposal: 0.1
+
+  limber_eta_IA: 
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.
+      scale: 0.1
+    latex: \eta_{IA}^{DESwl}
+    proposal: 0.1
+
+# CCL settings
+theory:
+  cl_like.CCL:
+    transfer_function: boltzmann_camb
+    matter_pk: halofit
+    baryons_pk: nobaryons
+  cl_like.Pk:
+    # Linear, EulerianPT, LagrangianPT
+    bias_model: "Linear"
+  cl_like.Limber:
+    nz_model: "NzShift"
+    ia_model: "IADESY1"
+    input_params_prefix: "limber"
+  cl_like.ClFinal:
+    input_params_prefix: "bias"
+    shape_model: ShapeMultiplicative
+
+# Likelihood settings
+likelihood:
+  cl_like.ClLike:
+    # Input sacc file
+    input_file: /mnt/extraspace/gravityls_3/S8z/Cls_new_pipeline/4096_DES_eBOSS_CMB/cls_covG_new.fits
+    # List all relevant bins. The clustering
+    # bins are clX, the shear bins are shX.
+    bins:
+      - name: DESgc__0
+      - name: DESgc__1
+      - name: DESgc__2
+      - name: DESgc__3
+      - name: DESgc__4
+      - name: DESwl__0
+      - name: DESwl__1
+      - name: DESwl__2
+      - name: DESwl__3
+    # List all 2-points that should go into the
+    # data vector. For now we only include
+    # galaxy-galaxy auto-correlations, but all
+    # galaxy-shear and shear-shear correlations.
+    twopoints:
+      - bins: [DESgc__0, DESgc__0]
+      - bins: [DESgc__1, DESgc__1]
+      - bins: [DESgc__2, DESgc__2]
+      - bins: [DESgc__3, DESgc__3]
+      - bins: [DESgc__4, DESgc__4]
+
+      - bins: [DESgc__0, DESwl__0]
+      - bins: [DESgc__0, DESwl__1]
+      - bins: [DESgc__0, DESwl__2]
+      - bins: [DESgc__0, DESwl__3]
+        
+      - bins: [DESgc__1, DESwl__0]
+      - bins: [DESgc__1, DESwl__1]
+      - bins: [DESgc__1, DESwl__2]
+      - bins: [DESgc__1, DESwl__3]
+
+      - bins: [DESgc__2, DESwl__0]
+      - bins: [DESgc__2, DESwl__1]
+      - bins: [DESgc__2, DESwl__2]
+      - bins: [DESgc__2, DESwl__3]
+
+      - bins: [DESgc__3, DESwl__0]
+      - bins: [DESgc__3, DESwl__1]
+      - bins: [DESgc__3, DESwl__2]
+      - bins: [DESgc__3, DESwl__3]
+
+      - bins: [DESgc__4, DESwl__0]
+      - bins: [DESgc__4, DESwl__1]
+      - bins: [DESgc__4, DESwl__2]
+      - bins: [DESgc__4, DESwl__3]
+
+      - bins: [DESwl__0, DESwl__0]
+      - bins: [DESwl__0, DESwl__1]
+      - bins: [DESwl__0, DESwl__2]
+      - bins: [DESwl__0, DESwl__3]
+      - bins: [DESwl__1, DESwl__1]
+      - bins: [DESwl__1, DESwl__2]
+      - bins: [DESwl__1, DESwl__3]
+      - bins: [DESwl__2, DESwl__2]
+      - bins: [DESwl__2, DESwl__3]
+      - bins: [DESwl__3, DESwl__3]
+
+    defaults:
+      # Scale cut for galaxy clustering
+      # (ignored for shear-shear)
+      kmax: 0.15
+      # These one will apply to all power
+      # spectra (unless the lmax corresponding
+      # to the chosen kmax is smaller).
+      lmin: 0
+      lmax: 2000
+      DESwl__0:
+        lmin: 30
+      DESwl__1:
+        lmin: 30
+      DESwl__2:
+        lmin: 30
+      DESwl__3:
+        lmin: 30
+
+    # Prefix associated to all nuisance params
+    input_params_prefix: clk
+
+debug: False
+output: 'chains/desy1_3x2pt_nodebug/desy1_3x2pt_nodebug'
