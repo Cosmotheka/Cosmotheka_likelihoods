@@ -175,9 +175,10 @@ class ClFinal(Theory):
                     pn = '_'.join([self.input_params_prefix, survey, 'A_IA'])
                     if pn in bias_names:
                         continue
-                bias_names.append(pn)
-                bd['bias_ind'] = [ind_bias]
-                ind_bias += 1
+                if ia_model != 'IANone':
+                    bias_names.append(pn)
+                    bd['bias_ind'] = [ind_bias]
+                    ind_bias += 1
             elif quantity == 'cmb_convergence':
                 bd['eps'] = True
 
