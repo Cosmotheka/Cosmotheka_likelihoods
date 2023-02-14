@@ -167,17 +167,19 @@ class ClFinal(Theory):
                     pn = '_'.join([self.input_params_prefix, name, 'A_IA'])
                 elif ia_model == 'IADESY1':
                     pn = '_'.join([self.input_params_prefix, 'A_IA'])
-                    if pn in bias_names:
-                        continue
                 elif ia_model == 'IADESY1_PerSurvey':
                     # This assumes that name = survey__zbin
                     survey = name.split('__')[0]
                     pn = '_'.join([self.input_params_prefix, survey, 'A_IA'])
-                    if pn in bias_names:
-                        continue
-                bias_names.append(pn)
-                bd['bias_ind'] = [ind_bias]
-                ind_bias += 1
+                else:
+                    continue
+
+                if pn in bias_names:
+                    bd['bias_ind'] = [bias_names.index(pn)]
+                else:
+                    bias_names.append(pn)
+                    bd['bias_ind'] = [ind_bias]
+                    ind_bias += 1
             elif quantity == 'cmb_convergence':
                 bd['eps'] = True
 
