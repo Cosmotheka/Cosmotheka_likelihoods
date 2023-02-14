@@ -10,11 +10,24 @@ cosmo = ccl.Cosmology(Omega_c=0.25, Omega_b=0.05, h=0.67,
                       n_s=0.96, A_s=2.23E-9, T_CMB=2.7255)
 
 zs = np.linspace(0., 1., 1024)
-nz = np.exp(-0.5*((zs-0.5)/0.05)**2)
+nz = interp1d(zs, np.exp(-0.5*((zs-0.5)/0.05)**2), bounds_error=False,
+              fill_value=0)
 bz = np.ones(zs.size)
 
-t_gc = ccl.NumberCountsTracer(cosmo, False, dndz=(zs, nz), bias=(zs, bz))
-t_sh = ccl.WeakLensingTracer(cosmo, dndz=(zs, nz))
+# Nuisance parameters
+dz_gc = 0.1
+dz_sh = 0.2
+m_sh = 0.3
+# Intinsic Alingments
+A0 = 0.1
+eta = 1
+A_IA = A0 * ((1+zs)/1.62)**eta
+ia_bias = (zs, A_IA)
+
+# CCL tracers
+t_gc = ccl.NumberCountsTracer(cosmo, False, dndz=(zs, nz(zs + dz_gc)),
+                              bias=(zs, bz))
+t_sh = ccl.WeakLensingTracer(cosmo, dndz=(zs, nz(zs + dz_sh)), ia_bias=ia_bias)
 t_kp = ccl.CMBLensingTracer(cosmo, z_source=1100.)
 n_tracers = 3
 nx = (n_tracers * (n_tracers + 1)) // 2
@@ -22,6 +35,7 @@ tracers = [t_gc, t_kp, t_sh]
 pols = ['0', '0', 'e']
 tracer_names = ['gc1', 'kp', 'sh1']
 
+# Scale sampling
 ls = np.unique(np.geomspace(2, 2002, 90).astype(int)).astype(float)
 ls = np.concatenate((np.array([0.]), ls))
 
@@ -57,6 +71,10 @@ sls = np.zeros([n_tracers, n_tracers, nbpw])
 for i1, i2, ix, _ in get_pairs():
     cl = interp_bin(ccl.angular_cl(cosmo, tracers[i1],
                                    tracers[i2], ls))
+    if i1 == 2:
+        cl *= (1+m_sh)
+    if i2 == 2:
+        cl *= (1+m_sh)
     sls[i1, i2, :] = cl
 nls = np.zeros([n_tracers, n_tracers, nbpw])
 # 4 gal per arcmin^2
@@ -76,10 +94,10 @@ cov = cov.reshape([nx*nbpw, nx*nbpw])
 s = sacc.Sacc()
 s.add_tracer('NZ', 'gc1',
              quantity='galaxy_density',
-             spin=0, z=zs, nz=nz)
+             spin=0, z=zs, nz=nz(zs))
 s.add_tracer('NZ', 'sh1',
              quantity='galaxy_shear',
-             spin=2, z=zs, nz=nz)
+             spin=2, z=zs, nz=nz(zs))
 s.add_tracer('Map', 'kp',
              quantity='cmb_convergence',
              spin=0, ell=l_all,
@@ -99,5 +117,5 @@ for i1, i2, ix, typ in get_pairs():
     plt.plot(l, nls[i1, i2], 'k--')
     plt.loglog()
 plt.show()
-s.save_fits("gc_kp_sh_linear.fits", overwrite=True)
-os.system('gzip gc_kp_sh_linear.fits')
+s.save_fits("gc_kp_sh_linear_nuisances.fits", overwrite=True)
+os.system('gzip gc_kp_sh_linear_nuisances.fits')

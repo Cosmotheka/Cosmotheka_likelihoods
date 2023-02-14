@@ -1,4 +1,7 @@
 import cl_like as cll
+from cl_like.limber import Limber
+from cl_like.power_spectrum import Pk
+from cl_like.cl_final import ClFinal
 import numpy as np
 from cobaya.model import get_model
 import pytest
@@ -15,22 +18,37 @@ def run_clean_tmp():
 
 
 def get_info(bias, A_sE9=True):
-    data = "cl_like/tests/data/gc_kp_sh_linear.fits.gz"
+    data = "cl_like/tests/data/gc_kp_sh_linear_nuisances.fits.gz"
     info = {"params": {"A_sE9": 2.23,
                        "Omega_c": 0.25,
                        "Omega_b": 0.05,
                        "h": 0.67,
                        "n_s": 0.96,
                        "m_nu": 0.0,
-                       "cll_gc1_b1": 1.0,
-                       "cll_gc1_b1p": 0.0,
-                       "cll_gc1_b2": 0.0,
-                       "cll_gc1_bs": 0.0,
+                       "bias_gc1_b1": 1.0,
+                       "bias_gc1_b1p": 0.0,
+                       "bias_gc1_b2": 0.0,
+                       "bias_gc1_bs": 0.0,
+                       "bias_sh1_m": 0.3,
+                       "limber_gc1_dz": -0.1,
+                       "limber_sh1_dz": -0.2,
+                       "limber_sh1_eta_IA": 1,
+                       "bias_sh1_A_IA": 0.1,
                        "sigma8": None},
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
                                "matter_pk": "halofit",
-                               "baryons_pk": "nobaryons"}},
+                               "baryons_pk": "nobaryons"},
+                       "limber": {"external": Limber,
+                                  "nz_model": "NzShift",
+                                  "input_params_prefix": "limber",
+                                  "ia_model": "IADESY1_PerSurvey"},
+                       "Pk": {"external": Pk,
+                             "bias_model": bias},
+                       "clfinal": {"external": ClFinal,
+                                   "input_params_prefix": "bias",
+                                   "shape_model": "ShapeMultiplicative"}
+                       },
             "likelihood": {"ClLike": {"external": cll.ClLike,
                                       "input_file": data,
                                       "bins": [{"name": "gc1"},
@@ -47,7 +65,8 @@ def get_info(bias, A_sE9=True):
                                                    "lmax": 2000,
                                                    "gc1": {"lmin": 20}},
                                       "input_params_prefix": "cll",
-                                      "bias_model": bias}},
+                                      }
+                           },
             "output": "dum",
             "debug": False}
 
@@ -79,3 +98,47 @@ def test_sigma8():
     del info["params"]["sigma8"]
     with pytest.raises(ValueError):
         model = get_model(info)
+
+@pytest.mark.parametrize('case', ['IAPerBin', 'IADESY1', 'IADESY1_PerSurvey'])
+def test_ia_models(case):
+    info = get_info(bias="Linear")
+    if case not in ['IAPerBin', 'IADESY1_PerSurvey']:
+        # In this case, the params are already as they have to
+        info["params"]["bias_A_IA"] = info["params"].pop("bias_sh1_A_IA")
+        info["params"]["limber_eta_IA"] = info["params"].pop("limber_sh1_eta_IA")
+    info["theory"]["limber"]["ia_model"] = case
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    cond = np.fabs(loglikes[0]) < 2E-3
+    if case == 'IAPerBin':
+        # IAPerBin has a constant ia_bias, which does not fit the generated
+        # data.
+        assert not cond
+    else:
+        assert cond
+
+def test_shape_model():
+    info = get_info(bias="Linear", A_sE9=False)
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    assert np.fabs(loglikes[0]) < 2E-3
+
+    info["theory"]["clfinal"]["shape_model"] = "ShapeNone"
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    assert np.fabs(loglikes[0]) > 2E-3
+
+
+def test_timing():
+    info = get_info(bias="Linear", A_sE9=False)
+    info["timing"] = True
+    model = get_model(info)
+    model.measure_and_set_speeds(10)
+    model.dump_timing()
+    time = np.sum([c.timer.get_time_avg() for c in model.components])
+    # Before restructuring, the average evaluation time was ~0.54s in my laptop
+    # After the restructuration, it went to 0.56s.
+    assert time < 0.6

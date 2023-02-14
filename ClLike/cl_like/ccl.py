@@ -34,7 +34,7 @@ the cosmo object itself between different likelihoods.
 Also note lots of things still cannot be done consistently
 in CCL, so this is far from general.
 """
-
+import numpy as np
 import pyccl as ccl
 import numpy as np
 from cobaya.theory import Theory
@@ -95,7 +95,6 @@ class CCL(Theory):
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
-
         Ob = self.provider.get_param('Omega_b')
         Oc = self.provider.get_param('Omega_c')
         Om = Ob + Oc

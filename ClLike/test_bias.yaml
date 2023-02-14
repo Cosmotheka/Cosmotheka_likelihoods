@@ -1,0 +1,67 @@
+theory:
+  cl_like.CCL:
+    transfer_function: eisenstein_hu
+    matter_pk: halofit
+    baryons_pk: nobaryons
+likelihood:
+  cl_like.ClLikeFastBias:
+    input_file: ../../cls_test.fits
+    bins:
+    - name: gc
+    - name: sh
+    twopoints:
+    - bins:
+      - gc
+      - gc
+    - bins:
+      - gc
+      - sh
+    defaults:
+      kmax: 0.3
+      lmin: 0
+      lmax: 2000
+      sh:
+        lmin: 0
+      sample_type: 'center'
+    input_params_prefix: clk
+    ia_model: IADESY1
+    nz_model: NzNone
+    bias_model: Linear
+    bias_fisher: True
+    bias_params:
+      gc_b1:
+        value: 1.1
+        prior:
+          mean: 1.1
+          sigma: 100.0
+      A_IA:
+        value: 0.0
+params:
+  sigma8:
+    prior:
+      min: 0.5
+      max: 1.1
+    ref:
+      dist: norm
+      loc: 0.8
+      scale: 0.01
+    latex: \sigma_8
+    proposal: 0.001
+  Omega_m: 0.3
+  Omega_b: 0.05
+  h: 0.7
+  n_s: 0.96
+  m_nu: 0.0
+  S8:
+    latex: S_8
+  nfev:
+  dchi2_marg:
+  gc_b1:
+  A_IA:
+sampler:
+  evaluate:
+#  mcmc:
+#    burn_in: 0
+#    max_tries: 1000
+output: ../../fastbias/cls_test
+debug: False
