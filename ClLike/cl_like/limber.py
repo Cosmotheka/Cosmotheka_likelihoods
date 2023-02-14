@@ -40,7 +40,7 @@ class Limber(Theory):
         self.provider = provider
         self.l_sample = self._get_ell_sampling()
         self._add_pixbeam_to_cl_meta()
-        # self.is_PT_bias = self.provider.get_is_PT_bias()
+        self.is_PT_bias = self.provider.get_is_PT_bias()
 
     def get_requirements(self):
         return {}
