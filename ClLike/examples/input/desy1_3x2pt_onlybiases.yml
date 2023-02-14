@@ -131,45 +131,15 @@ params:
     latex: b^{DESgc}_4
     proposal: 0.1
 
-  limber_DESgc__0_dz:
-    prior: 
-      dist: norm
-      loc: 0.
-      scale: 0.007
-    latex: \Delta z^{DESgc}_0
-    proposal: 0.005
+  limber_DESgc__0_dz: 0
 
-  limber_DESgc__1_dz:
-    prior: 
-      dist: norm
-      loc: 0.
-      scale: 0.007
-    latex: \Delta z^{DESgc}_1
-    proposal: 0.005
+  limber_DESgc__1_dz: 0
     
-  limber_DESgc__2_dz:
-    prior: 
-      dist: norm
-      loc: 0.
-      scale: 0.006
-    latex: \Delta z^{DESgc}_2
-    proposal: 0.005
+  limber_DESgc__2_dz: 0
 
-  limber_DESgc__3_dz:
-    prior: 
-      dist: norm
-      loc: 0.
-      scale: 0.01
-    latex: \Delta z^{DESgc}_3
-    proposal: 0.005
+  limber_DESgc__3_dz: 0
 
-  limber_DESgc__4_dz:
-    prior: 
-      dist: norm
-      loc: 0.
-      scale: 0.01
-    latex: \Delta z^{DESgc}_4
-    proposal: 0.005
+  limber_DESgc__4_dz: 0
 
   bias_DESwl__0_m:
     prior: 
@@ -203,37 +173,13 @@ params:
     latex: m^{DESwl}_3
     proposal: 0.005
 
-  limber_DESwl__0_dz:
-    prior: 
-      dist: norm
-      loc: -0.001
-      scale: 0.016
-    latex: \Delta z^{DESwl}_0
-    proposal: 0.005
+  limber_DESwl__0_dz: -0.001
 
-  limber_DESwl__1_dz:
-    prior: 
-      dist: norm
-      loc: -0.019
-      scale: 0.013
-    latex: \Delta z^{DESwl}_1
-    proposal: 0.005
+  limber_DESwl__1_dz: -0.019
     
-  limber_DESwl__2_dz:
-    prior: 
-      dist: norm
-      loc: 0.009
-      scale: 0.011
-    latex: \Delta z^{DESwl}_2
-    proposal: 0.005
+  limber_DESwl__2_dz: 0.009
 
-  limber_DESwl__3_dz:
-    prior: 
-      dist: norm
-      loc: -0.018
-      scale: 0.022
-    latex: \Delta z^{DESwl}_3
-    proposal: 0.005
+  limber_DESwl__3_dz: -0.018
 
   bias_A_IA:
     prior: 
@@ -246,16 +192,7 @@ params:
     latex: A_{IA}^{DESwl}
     proposal: 0.1
 
-  limber_eta_IA: 
-    prior: 
-      min: -5
-      max: 5
-    ref:
-      dist: norm
-      loc: 0.
-      scale: 0.1
-    latex: \eta_{IA}^{DESwl}
-    proposal: 0.1
+  limber_eta_IA: 0
 
 # CCL settings
 theory:
@@ -360,4 +297,4 @@ likelihood:
     input_params_prefix: clk
 
 debug: False
-output: 'chains/desy1_3x2pt_nodebug/desy1_3x2pt_nodebug'
+output: 'chains/desy1_3x2pt_onlybiases/desy1_3x2pt_onlybiases'
