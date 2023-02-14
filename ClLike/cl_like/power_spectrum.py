@@ -121,12 +121,11 @@ class Pk(Theory):
                 k_filter = None
             if self.bias_model == 'EulerianPT':
                 from .ept import EPTCalculator
-                EPTkwargs = self.pk_options["EPTkwargs"]
                 ptc = EPTCalculator(with_NC=True, with_IA=False,
                                     log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
-                                    nk_per_decade=EPTkwargs["nk_per_dex_pks"],
-                                    a_arr=EPTkwargs["a_s_pks"],
+                                    nk_per_decade=self.nk_per_dex_pks,
+                                    a_arr=self.a_s_pks,
                                     k_filter=k_filter)
             else:
                 raise NotImplementedError("Not yet: " + self.bias_model)
