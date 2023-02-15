@@ -132,7 +132,7 @@ class Pk(Theory):
                 ptc = LPTCalculator(log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
                                     nk_per_decade=self.nk_per_dex_pks,
-                                    a_arr=self.a_s_pks,
+                                    a_arr=self.a_s_pks, h=cosmo['h'],
                                     k_filter=k_filter)
             else:
                 raise NotImplementedError("Not yet: " + self.bias_model)
