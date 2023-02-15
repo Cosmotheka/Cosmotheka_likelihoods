@@ -53,6 +53,114 @@ class LPTCalculator(object):
             self.lpt_table.append(cleft.pktable)
         self.lpt_table = np.array(self.lpt_table)
         self.lpt_table /= self.h**3
+        self.pk2d_computed = {}
+
+    def get_pk(self, kind, pnl=None, cosmo=None, alt=None):
+        if self.lpt_table is None:
+            raise ValueError("Please initialise CLEFT calculator")
+        # Clarification:
+        # CLEFT uses the followint expansion for the galaxy overdensity:
+        #   d_g = b1 d + b2 d2^2/2 + bs s^2
+        # (see Eq. 4.4 of https://arxiv.org/pdf/2005.00523.pdf).
+        # But we want to use
+        #   d_g = b1 d + b2 d2^2/2 + bs s^2/2 + bk k^2 d
+        # So, to add to the confusion, this is different from the prescription
+        # used by EPT (and which we want to use), where s^2 is divided by 2 :-|
+        #
+        # The LPT table below contains the following power spectra
+        # in order:
+        #  <1,1>
+        #  2*<1,d>
+        #  <d,d>
+        #  2*<1,d^2/2>
+        #  2*<d,d^2/2>
+        #  <d^2/2,d^2/2> (!)
+        #  2*<1,s^2>
+        #  2*<d,s^2>
+        #  2*<d^2/2,s^2> (!)
+        #  <s^2,s^2> (!)
+        #
+        # So:
+        #   a) The cross-correlations need to be divided by 2.
+        #   b) The spectra involving b2 are for d^2/2, NOT d^2!!
+        #   c) The spectra invoving bs are for s^2, NOT s^2/2!!
+        # Also, the spectra marked with (!) tend to a constant
+        # as k-> 0, which we can suppress with a low-pass filter.
+        #
+        # Importantly, we have corrected the spectra involving s2 to
+        # make the definition of bs equivalent in the EPT and LPT
+        # expansions.
+        # The power spectra provided below are:
+        # mm   -> <1*1> (returns pnl)
+        # md1  -> <1*d> (returns pnl)
+        # md2  -> <1*d^2/2>
+        # ms2  -> <1*s^2/2>
+        # mk2  -> k^2 <1*1> (with <1*1> as pnl)
+        # d1d1 -> <d*d> (returns pnl)
+        # d1d2 -> <d*d^2/2>
+        # d1s2 -> <d*s^2/2>
+        # d1k2 -> k^2 <1*d> (with <1*d> as pnl)
+        # d2d2 -> <d^2/2*d^2/2>
+        # d2s2 -> <d^2/2*s^2/2>
+        # d2k2 -> k^2 <1*d^2/2>, not provided
+        # s2s2 -> <s^2/2*s^2/2>
+        # s2k2 -> k^2 <1*s^2/2>, not provided
+        # k2k2 -> k^4 <1*1>, not provided
+
+        if kind in self.pk2d_computed:
+            return self.pk2d_computed[kind]
+
+        if kind in ['mm', 'md1', 'd1d1']:
+            return pnl
+
+        if kind in ['mk2', 'd1k2']:
+            pk = np.array([pnl.eval(self.ks, a, cosmo)*self.ks**2
+                           for a in self.a_s])
+            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
+                            pk_arr=pk, is_logp=False)
+            self.pk2d_computed['mk2'] = pk2d
+            self.pk2d_computed['d1k2'] = pk2d
+            return pk2d
+
+        inds = {'mm': 1,
+                'md1': 2,
+                'md2': 4,
+                'ms2': 7,
+                'd1d1': 3,
+                'd1d2': 5,
+                'd1s2': 8,
+                'd2d2': 6,
+                'd2s2': 9,
+                's2s2': 10}
+        filt = {'mm': 1.,
+                'md1': 1.,
+                'md2': 1.,
+                'ms2': 1.,
+                'd1d1': 1.,
+                'd1d2': 1.,
+                'd1s2': 1.,
+                'd2d2': self.wk_low[None, :],
+                'd2s2': self.wk_low[None, :],
+                's2s2': self.wk_low[None, :]}
+        pfac = {'mm': 1.0,
+                'md1': 0.5, # x-corr
+                'md2': 0.5, # x-corr
+                'ms2': 0.25, # x-corr, s^2
+                'd1d1': 1.0,
+                'd1d2': 0.5, # x-corr
+                'd1s2': 0.25, # x-corr, s^2
+                'd2d2': 1.0,
+                'd2s2': 0.25, # x-corr, s^2
+                's2s2': 0.25} # s^2, s^2
+
+        if kind not in inds:
+            return alt
+
+        pk = pfac[kind]*self.lpt_table[:, :, inds[kind]]*filt[kind]
+        pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
+                        pk_arr=pk, is_logp=False)
+        self.pk2d_computed[kind] = pk2d
+        return pk2d
 
     def get_pgg(self, Pnl, b11, b21, bs1, b12, b22, bs2):
         if self.lpt_table is None:
@@ -83,10 +191,6 @@ class LPTCalculator(object):
         #   c) The spectra invoving bs are for s^2, NOT s^2/2!!
         # Also, the spectra marked with (!) tend to a constant
         # as k-> 0, which we can suppress with a low-pass filter.
-        #
-        # Importantly, we have corrected the spectra involving s2 to
-        # make the definition of bs equivalent in the EPT and LPT
-        # expansions.
         bL11 = b11-1
         bL12 = b12-1
         if Pnl is None:

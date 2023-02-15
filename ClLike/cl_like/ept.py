@@ -102,6 +102,7 @@ class EPTCalculator(object):
         if self.with_IA:
             self._get_ia_bias(pk)
         self.g4 = Dz**4
+        self.pk2d_computed = {}
 
     def _get_one_loop_dd(self, pk):
         # Precompute quantities needed for one-loop dd
@@ -131,12 +132,55 @@ class EPTCalculator(object):
                                      P_window=self.P_window,
                                      C_window=self.C_window)
 
-    def get_pk(self, kind, pgrad=None, cosmo=None, sub_lowk=False, alt=None):
+    def get_pk(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
+        # Clarification:
+        # We are expanding the galaxy overdensity as:
+        #   d_g = b1 d + b2 d2^2/2 + bs s^2/2 + bk k^2 d
+        # (see cell 10 in
+        # https://github.com/JoeMcEwen/FAST-PT/blob/master/examples/fastpt_examples.ipynb). # noqa
+        # The `dd_bias` array below contains the following power
+        # spectra in order:
+        #  <d,d^2>
+        #  <d^2,d^2> (!)
+        #  <d,s^2>
+        #  <d^2,s^2> (!)
+        #  <s^2,s^2> (!)
+        # So: the d^2 and s^2 are not divided by 2
+        # Also, the spectra marked with (!) tend to a constant
+        # as k-> 0, which we can suppress with a low-pass filter.
+        # The power spectra provided below are:
+        # mm -> <d*d> (returns pnl)
+        # md1 -> <d*d> (returns pnl)
+        # md2 -> <d*d^2/2>
+        # ms2 -> <d*s^2/2>
+        # mk2 -> k^2 <d*d> (with <d*d> as pnl)
+        # d1d1 -> <d*d> (returns pnl)
+        # d1d2 -> <d*d^2/2>
+        # d1s2 -> <d*s^2/2>
+        # d1k2 -> k^2 <d*d> (with <d*d> as pnl)
+        # d2d2 -> <d^2/2*d^2/2>
+        # d2s2 -> <d^2/2*s^2/2>
+        # d2k2 -> k^2 <d*d^2/2>, not provided
+        # s2s2 -> <s^2/2*s^2/2>
+        # s2k2 -> k^2 <d*s^2/2>, not provided
+        # k2k2 -> k^4 <d*d>, not provided
+        # When not provided, this function just returns `alt`
+
+        kind = kind.replace('m', 'd1')
+
+        if kind in self.pk2d_computed:
+            return self.pk2d_computed[kind]
+
+        if kind == 'd1d1':
+            return pnl
+
         if kind == 'd1k2':
-            pk = np.array([pgrad.eval(self.ks, a, cosmo)*self.ks**2*0.5
+            pk = np.array([pnl.eval(self.ks, a, cosmo)*self.ks**2
                            for a in self.a_s])
-            return ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
+            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
                             pk_arr=pk, is_logp=False)
+            self.pk2d_computed[kind] = pk2d
+            return pk2d
 
         inds = {'d1d2': 2,
                 'd1s2': 4,
@@ -153,21 +197,26 @@ class EPTCalculator(object):
                 'd2d2': 2.,
                 'd2s2': 4./3.,
                 's2s2': 8./9.}
-        pfac = {'d1d2': 0.5,
-                'd1s2': 0.5,
-                'd2d2': 0.25,
-                'd2s2': 0.25,
-                's2s2': 0.25}
+        pfac = {'d1d2': 0.5, # d^2
+                'd1s2': 0.5, # s^2
+                'd2d2': 0.25, # d^2, d^2
+                'd2s2': 0.25, # d^2, s^2
+                's2s2': 0.25} # s^2, s^2
+
         if kind not in inds:
             return alt
+
         s4 = 0.
         if sub_lowk:
             s4 = self.g4*self.dd_bias[7]
             s4 = s4[:, None]
+
         pk = pfac[kind]*self.g4[:, None]*((filt[kind]*self.dd_bias[inds[kind]])[None, :] -
                                           sfac[kind]*s4)
-        return ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
+        pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
                         pk_arr=pk, is_logp=False)
+        self.pk2d_computed[kind] = pk2d
+        return pk2d
 
     def get_pgg(self, Pnl,
                 b11, b21, bs1, b12, b22, bs2,
