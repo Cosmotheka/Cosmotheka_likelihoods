@@ -9,7 +9,7 @@ import numpy as np
 # Try to import LPT and EPT. If it fails due to some missing library. Raise an
 # error when checking the bias_model requested
 try:
-    from .lpt import LPTCalculator, get_lpt_pk2d
+    from .lpt import LPTCalculator
     HAVE_LPT = True
     LPT_exception = None
 except ImportError as e:
@@ -17,7 +17,7 @@ except ImportError as e:
     HAVE_LPT = False
 
 try:
-    from .ept import EPTCalculator, get_ept_pk2d
+    from .ept import EPTCalculator
     HAVE_EPT = True
     EPT_exception = None
 except ImportError as e:
