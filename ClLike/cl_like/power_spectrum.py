@@ -133,13 +133,13 @@ class Pk(Theory):
             Dz = ccl.growth_factor(cosmo, ptc.a_s)
             ptc.update_pk(pk_lin_z0, Dz)
             pkd = {}
-            pkd['pk_mm'] = pkmm
-            pkd['pk_md1'] = pkmm
+            pkd['pk_mm'] = ptc.get_pk('mm', alt=pkmm)
+            pkd['pk_md1'] = ptc.get_pk('md1', alt=pkmm)
             pkd['pk_md2'] = ptc.get_pk('d1d2')
             pkd['pk_ms2'] = ptc.get_pk('d1s2')
             pkd['pk_mk2'] = ptc.get_pk('d1k2', pgrad=pkmm, cosmo=cosmo)
             pkd['pk_d1m'] = pkd['pk_md1']
-            pkd['pk_d1d1'] = pkmm
+            pkd['pk_d1d1'] = ptc.get_pk('d1d1', alt=pkmm)
             pkd['pk_d1d2'] = pkd['pk_md2']
             pkd['pk_d1s2'] = pkd['pk_ms2']
             pkd['pk_d1k2'] = pkd['pk_mk2']
@@ -147,17 +147,17 @@ class Pk(Theory):
             pkd['pk_d2d1'] = pkd['pk_d1d2']
             pkd['pk_d2d2'] = ptc.get_pk('d2d2')
             pkd['pk_d2s2'] = ptc.get_pk('d2s2')
-            pkd['pk_d2k2'] = None
+            pkd['pk_d2k2'] = ptc.get_pk('d2k2')
             pkd['pk_s2m'] = pkd['pk_ms2']
             pkd['pk_s2d1'] = pkd['pk_d1s2']
             pkd['pk_s2d2'] = pkd['pk_d2s2']
             pkd['pk_s2s2'] = ptc.get_pk('s2s2')
-            pkd['pk_s2k2'] = None
+            pkd['pk_s2k2'] = ptc.get_pk('s2k2')
             pkd['pk_k2m'] = pkd['pk_mk2']
             pkd['pk_k2d1'] = pkd['pk_d1k2']
             pkd['pk_k2d2'] = pkd['pk_d2k2']
             pkd['pk_k2s2'] = pkd['pk_s2k2']
-            pkd['pk_k2k2'] = None
+            pkd['pk_k2k2'] = ptc.get_pk('k2k2')
         return pkd
 
     def get_can_provide(self):

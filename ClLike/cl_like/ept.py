@@ -131,7 +131,7 @@ class EPTCalculator(object):
                                      P_window=self.P_window,
                                      C_window=self.C_window)
 
-    def get_pk(self, kind, pgrad=None, cosmo=None, sub_lowk=False):
+    def get_pk(self, kind, pgrad=None, cosmo=None, sub_lowk=False, alt=None):
         if kind == 'd1k2':
             pk = np.array([pgrad.eval(self.ks, a, cosmo)*self.ks**2*0.5
                            for a in self.a_s])
@@ -158,6 +158,8 @@ class EPTCalculator(object):
                 'd2d2': 0.25,
                 'd2s2': 0.25,
                 's2s2': 0.25}
+        if kind not in inds:
+            return alt
         s4 = 0.
         if sub_lowk:
             s4 = self.g4*self.dd_bias[7]
