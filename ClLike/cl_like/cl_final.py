@@ -16,14 +16,16 @@ class ClFinal(Theory):
         self.provider = provider
         # Additional information specific for this likelihood
         ia_model = self.provider.get_ia_model()
+        bias_model = self.provider.get_bias_model()
         is_PT_bias = self.provider.get_is_PT_bias()
 
         self.bias_names, self.bias_info = self._get_bias_info(ia_model,
+                                                              bias_model,
                                                               is_PT_bias)
         self.ndata = np.sum([clm['l_eff'].size for clm in self.cl_meta])
 
     def get_requirements(self):
-        return {"ia_model": None, "is_PT_bias": None}
+        return {"ia_model": None, "bias_model": None, "is_PT_bias": None}
 
     def must_provide(self, **requirements):
         if "cl_theory" not in requirements:
@@ -136,7 +138,7 @@ class ClFinal(Theory):
             cls_deriv[inds] = cls_grad.T
         return cls_deriv # (ndata, nbias)
 
-    def _get_bias_info(self, ia_model, is_PT_bias):
+    def _get_bias_info(self, ia_model, bias_model, is_PT_bias):
         # Extract additional per-sample information from the sacc
         # file needed for this likelihood.
         ind_bias = 0
@@ -159,8 +161,9 @@ class ClFinal(Theory):
                         inds.append(ind_bias)
                         ind_bias += 1
                 bd['bias_ind'] = inds
+                # In the lagrangian picture there's an unbiased term.
+                bd['eps'] = (bias_model == 'LagrangianPT')
                 # No magnification bias yet
-                bd['eps'] = False
             elif quantity == 'galaxy_shear':
                 bd['eps'] = True
                 if ia_model == 'IAPerBin':
