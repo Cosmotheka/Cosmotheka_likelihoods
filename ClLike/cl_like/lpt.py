@@ -91,7 +91,7 @@ class LPTCalculator(object):
         # Importantly, we have corrected the spectra involving s2 to
         # make the definition of bs equivalent in the EPT and LPT
         # expansions.
-        # The power spectra provided below are:
+        # The power spectra provided below are (kind -> Pk):
         # mm   -> <1*1> (returns pnl)
         # md1  -> <1*d> (returns pnl)
         # md2  -> <1*d^2/2>
