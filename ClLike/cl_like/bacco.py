@@ -14,14 +14,14 @@ class BaccoCalculator(object):
         a_arr (array_like): array of scale factors at which
             growth/bias will be evaluated.
     """
-    def __init__(self, log10k_min=-4, log10k_max=2, nk_per_decade=20,
+    def __init__(self, log10k_min=np.log10(0.008), log10k_max=np.log10(0.5), nk_per_decade=20,
                  a_arr=None):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
         self.ks = np.logspace(log10k_min, log10k_max, nk_total)
         if a_arr is None:
             a_arr = 1./(1+np.linspace(0., 4., 30)[::-1])
         self.a_s = a_arr
-        self.lbias = baccoemu.Lbias_expansion(allow_extrapolation=False)
+        self.lbias = baccoemu.Lbias_expansion(allow_extrapolate=False)
 
     def update_pk(self, cosmo):
         """ Update the internal PT arrays.
@@ -37,12 +37,12 @@ class BaccoCalculator(object):
             'sigma8_cold': cosmo.sigma8(),
             'ns': cosmo['n_s'],
             'hubble': h,
-            'neutrino_mass': cosmo['m_nu'],
+            'neutrino_mass': np.sum(cosmo['m_nu']),
             'w0': cosmo['w0'],
             'wa': cosmo['wa']}
         self.pk_temp = np.array([self.lbias.get_nonlinear_pnn(k=self.ks/h,
                                                               expfactor=a,
-                                                              **cosmo)[1]/h**3
+                                                              **cospar)[1]/h**3
                                  for a in self.a_s])
         self.pk2d_computed = {}
 

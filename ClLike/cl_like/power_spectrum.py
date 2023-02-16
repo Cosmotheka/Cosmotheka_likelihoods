@@ -103,7 +103,7 @@ class Pk(Theory):
             raise BACCO_exception
 
         if self.bias_model == 'BaccoPT':
-            self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pk)
+            self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks)
 
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
