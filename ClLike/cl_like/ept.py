@@ -148,7 +148,7 @@ class EPTCalculator(object):
         # So: the d^2 and s^2 are not divided by 2
         # Also, the spectra marked with (!) tend to a constant
         # as k-> 0, which we can suppress with a low-pass filter.
-        # The power spectra provided below are:
+        # The power spectra provided below are (kind -> Pk):
         # mm -> <d*d> (returns pnl)
         # md1 -> <d*d> (returns pnl)
         # md2 -> <d*d^2/2>
