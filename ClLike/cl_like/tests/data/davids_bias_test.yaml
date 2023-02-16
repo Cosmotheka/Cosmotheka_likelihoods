@@ -1,0 +1,298 @@
+theory:
+  cl_like.CCL:
+    baryons_pk: nobaryons
+    matter_pk: halofit
+    transfer_function: eisenstein_hu
+  cl_like.Pk:
+    bias_model: "BaccoPT"
+  cl_like.Limber:
+    nz_model: "NzShift"
+    ia_model: "IADESY1"
+    input_params_prefix: "limber"
+    sample_type: center
+  cl_like.ClFinal:
+    input_params_prefix: "bias"
+    shape_model: ShapeMultiplicative
+likelihood:
+  cl_like.ClLike:
+    input_file: ../../cls_LSST_linear.fits
+    bins:
+    - name: cl_0
+    - name: cl_1
+    - name: cl_2
+    - name: cl_3
+    - name: cl_4
+    - name: cl_5
+    - name: sh_0
+    - name: sh_1
+    - name: sh_2
+    - name: sh_3
+    - name: sh_4
+    twopoints:
+    - bins:
+      - cl_0
+      - cl_0
+    - bins:
+      - cl_0
+      - cl_1
+    - bins:
+      - cl_0
+      - cl_2
+    - bins:
+      - cl_0
+      - cl_3
+    - bins:
+      - cl_0
+      - cl_4
+    - bins:
+      - cl_0
+      - cl_5
+    - bins:
+      - cl_1
+      - cl_1
+    - bins:
+      - cl_1
+      - cl_2
+    - bins:
+      - cl_1
+      - cl_3
+    - bins:
+      - cl_1
+      - cl_4
+    - bins:
+      - cl_1
+      - cl_5
+    - bins:
+      - cl_2
+      - cl_2
+    - bins:
+      - cl_2
+      - cl_3
+    - bins:
+      - cl_2
+      - cl_4
+    - bins:
+      - cl_2
+      - cl_5
+    - bins:
+      - cl_3
+      - cl_3
+    - bins:
+      - cl_3
+      - cl_4
+    - bins:
+      - cl_3
+      - cl_5
+    - bins:
+      - cl_4
+      - cl_4
+    - bins:
+      - cl_4
+      - cl_5
+    - bins:
+      - cl_5
+      - cl_5
+    - bins:
+      - cl_0
+      - sh_0
+    - bins:
+      - cl_0
+      - sh_1
+    - bins:
+      - cl_0
+      - sh_2
+    - bins:
+      - cl_0
+      - sh_3
+    - bins:
+      - cl_0
+      - sh_4
+    - bins:
+      - cl_1
+      - sh_0
+    - bins:
+      - cl_1
+      - sh_1
+    - bins:
+      - cl_1
+      - sh_2
+    - bins:
+      - cl_1
+      - sh_3
+    - bins:
+      - cl_1
+      - sh_4
+    - bins:
+      - cl_2
+      - sh_0
+    - bins:
+      - cl_2
+      - sh_1
+    - bins:
+      - cl_2
+      - sh_2
+    - bins:
+      - cl_2
+      - sh_3
+    - bins:
+      - cl_2
+      - sh_4
+    - bins:
+      - cl_3
+      - sh_0
+    - bins:
+      - cl_3
+      - sh_1
+    - bins:
+      - cl_3
+      - sh_2
+    - bins:
+      - cl_3
+      - sh_3
+    - bins:
+      - cl_3
+      - sh_4
+    - bins:
+      - cl_4
+      - sh_0
+    - bins:
+      - cl_4
+      - sh_1
+    - bins:
+      - cl_4
+      - sh_2
+    - bins:
+      - cl_4
+      - sh_3
+    - bins:
+      - cl_4
+      - sh_4
+    - bins:
+      - cl_5
+      - sh_0
+    - bins:
+      - cl_5
+      - sh_1
+    - bins:
+      - cl_5
+      - sh_2
+    - bins:
+      - cl_5
+      - sh_3
+    - bins:
+      - cl_5
+      - sh_4
+    - bins:
+      - sh_0
+      - sh_0
+    - bins:
+      - sh_0
+      - sh_1
+    - bins:
+      - sh_0
+      - sh_2
+    - bins:
+      - sh_0
+      - sh_3
+    - bins:
+      - sh_0
+      - sh_4
+    - bins:
+      - sh_1
+      - sh_1
+    - bins:
+      - sh_1
+      - sh_2
+    - bins:
+      - sh_1
+      - sh_3
+    - bins:
+      - sh_1
+      - sh_4
+    - bins:
+      - sh_2
+      - sh_2
+    - bins:
+      - sh_2
+      - sh_3
+    - bins:
+      - sh_2
+      - sh_4
+    - bins:
+      - sh_3
+      - sh_3
+    - bins:
+      - sh_3
+      - sh_4
+    - bins:
+      - sh_4
+      - sh_4
+    defaults:
+      kmax: 0.3
+      lmax: 2000
+      lmin: 0
+    input_params_prefix: clk
+params:
+  sigma8: 0.8
+  Omega_c: 0.25
+  Omega_b: 0.05
+  h: 0.67
+  n_s:
+    prior:
+      min: 0.87
+      max: 1.07
+    ref:
+      dist: norm
+      loc: 0.96
+      scale: 0.01
+    latex: n_s
+    proposal: 0.01
+  m_nu: 0.0
+  bias_A_IA: 1.0
+  bias_cl_0_b1: 0.5
+  bias_cl_1_b1: 0.5
+  bias_cl_2_b1: 0.5
+  bias_cl_3_b1: 0.5
+  bias_cl_4_b1: 0.5
+  bias_cl_5_b1: 0.5
+  bias_cl_0_b2: 0.0
+  bias_cl_1_b2: 0.0
+  bias_cl_2_b2: 0.0
+  bias_cl_3_b2: 0.0
+  bias_cl_4_b2: 0.0
+  bias_cl_5_b2: 0.0
+  bias_cl_0_bs: 0.0
+  bias_cl_1_bs: 0.0
+  bias_cl_2_bs: 0.0
+  bias_cl_3_bs: 0.0
+  bias_cl_4_bs: 0.0
+  bias_cl_5_bs: 0.0
+  bias_cl_0_bk2: 0.0
+  bias_cl_1_bk2: 0.0
+  bias_cl_2_bk2: 0.0
+  bias_cl_3_bk2: 0.0
+  bias_cl_4_bk2: 0.0
+  bias_cl_5_bk2: 0.0
+  limber_eta_IA: 0.0
+  limber_cl_0_dz: 0.0
+  limber_cl_1_dz: 0.0
+  limber_cl_2_dz: 0.0
+  limber_cl_3_dz: 0.0
+  limber_cl_4_dz: 0.0
+  limber_cl_5_dz: 0.0
+  limber_sh_0_dz: 0.0
+  limber_sh_1_dz: 0.0
+  limber_sh_2_dz: 0.0
+  limber_sh_3_dz: 0.0
+  limber_sh_4_dz: 0.0
+sampler:
+  #minimize: 
+  mcmc:
+    burn_in: 10
+    max_tries: 1000
+    learn_proposal: true
+    Rminus1_stop: 0.01
+    measure_speeds: true
+debug: true
+stop_at_error: true
+output: blah
