@@ -31,6 +31,7 @@ class Limber(Theory):
         self.tracer_qs = None
         self.bin_properties = None
         self.is_PT_bias = None
+        self.bias_model = None
         self.provider = None
 
         self.sample_cen = self.sample_type in ['center', 'best']
@@ -41,9 +42,10 @@ class Limber(Theory):
         self.l_sample = self._get_ell_sampling()
         self._add_pixbeam_to_cl_meta()
         self.is_PT_bias = self.provider.get_is_PT_bias()
+        self.bias_model = self.provider.get_bias_model()
 
     def get_requirements(self):
-        return {}
+        return {'bias_model': None, 'is_PT_bias': None}
 
     def must_provide(self, **requirements):
         if "Limber" not in requirements:
@@ -92,9 +94,13 @@ class Limber(Theory):
                 z = dndz[0]
                 oz = np.ones_like(z)
 
-                t0 = None
                 tr = ccl.NumberCountsTracer(cosmo, dndz=dndz, bias=(z, oz),
                                             has_rsd=False)
+                # Tracer for the unbiased component
+                t0 = None
+                if self.bias_model == 'LagrangianPT':
+                    t0 = tr
+                # Tracers for the biased components
                 t1 = [tr]
                 t1n = ['d1']
                 if self.is_PT_bias:

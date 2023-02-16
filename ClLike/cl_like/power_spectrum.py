@@ -9,7 +9,7 @@ import numpy as np
 # Try to import LPT and EPT. If it fails due to some missing library. Raise an
 # error when checking the bias_model requested
 try:
-    from .lpt import LPTCalculator, get_lpt_pk2d
+    from .lpt import LPTCalculator
     HAVE_LPT = True
     LPT_exception = None
 except ImportError as e:
@@ -17,7 +17,7 @@ except ImportError as e:
     HAVE_LPT = False
 
 try:
-    from .ept import EPTCalculator, get_ept_pk2d
+    from .ept import EPTCalculator
     HAVE_EPT = True
     EPT_exception = None
 except ImportError as e:
@@ -127,41 +127,35 @@ class Pk(Theory):
                                     nk_per_decade=self.nk_per_dex_pks,
                                     a_arr=self.a_s_pks,
                                     k_filter=k_filter)
+            elif self.bias_model == 'LagrangianPT':
+                from .lpt import LPTCalculator
+                ptc = LPTCalculator(log10k_min=self.l10k_min_pks,
+                                    log10k_max=self.l10k_max_pks,
+                                    nk_per_decade=self.nk_per_dex_pks,
+                                    a_arr=self.a_s_pks, h=cosmo['h'],
+                                    k_filter=k_filter)
             else:
                 raise NotImplementedError("Not yet: " + self.bias_model)
             pk_lin_z0 = ccl.linear_matter_power(cosmo, ptc.ks, 1.)
             Dz = ccl.growth_factor(cosmo, ptc.a_s)
             ptc.update_pk(pk_lin_z0, Dz)
             pkd = {}
-            pkd['pk_mm'] = pkmm
-            pkd['pk_md1'] = pkmm
-            pkd['pk_md2'] = ptc.get_pk('d1d2')
-            pkd['pk_ms2'] = ptc.get_pk('d1s2')
-            pkd['pk_mk2'] = ptc.get_pk('d1k2', pgrad=pkmm, cosmo=cosmo)
-            pkd['pk_d1m'] = pkd['pk_md1']
-            pkd['pk_d1d1'] = pkmm
-            pkd['pk_d1d2'] = pkd['pk_md2']
-            pkd['pk_d1s2'] = pkd['pk_ms2']
-            pkd['pk_d1k2'] = pkd['pk_mk2']
-            pkd['pk_d2m'] = pkd['pk_md2']
-            pkd['pk_d2d1'] = pkd['pk_d1d2']
-            pkd['pk_d2d2'] = ptc.get_pk('d2d2')
-            pkd['pk_d2s2'] = ptc.get_pk('d2s2')
-            pkd['pk_d2k2'] = None
-            pkd['pk_s2m'] = pkd['pk_ms2']
-            pkd['pk_s2d1'] = pkd['pk_d1s2']
-            pkd['pk_s2d2'] = pkd['pk_d2s2']
-            pkd['pk_s2s2'] = ptc.get_pk('s2s2')
-            pkd['pk_s2k2'] = None
-            pkd['pk_k2m'] = pkd['pk_mk2']
-            pkd['pk_k2d1'] = pkd['pk_d1k2']
-            pkd['pk_k2d2'] = pkd['pk_d2k2']
-            pkd['pk_k2s2'] = pkd['pk_s2k2']
-            pkd['pk_k2k2'] = None
+            operators = ['m', 'd1', 'd2', 's2', 'k2']
+            for i1, op1 in enumerate(operators):
+                for op2 in operators[i1:]:
+                    comb_12 = op1+op2
+                    pkd[f'pk_{comb_12}'] = ptc.get_pk(comb_12, pnl=pkmm, cosmo=cosmo)
+                    # Symmetric terms for convenience
+                    if op1 != op2:
+                        comb_21 = op2+op1
+                        pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
         return pkd
 
     def get_can_provide(self):
-        return ["is_PT_bias"]
+        return ["is_PT_bias", "bias_model"]
+
+    def get_bias_model(self):
+        return self.bias_model
 
     def get_is_PT_bias(self):
         return self.is_PT_bias
