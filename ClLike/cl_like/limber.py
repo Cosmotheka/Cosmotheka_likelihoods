@@ -96,9 +96,11 @@ class Limber(Theory):
 
                 tr = ccl.NumberCountsTracer(cosmo, dndz=dndz, bias=(z, oz),
                                             has_rsd=False)
+                # Tracer for the unbiased component
                 t0 = None
                 if self.bias_model == 'LagrangianPT':
                     t0 = tr
+                # Tracers for the biased components
                 t1 = [tr]
                 t1n = ['d1']
                 if self.is_PT_bias:
