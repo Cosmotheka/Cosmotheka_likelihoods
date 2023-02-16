@@ -1,0 +1,449 @@
+# Configuration file to reproduce the LCDM analysis of Garcia-Garcia et al.
+# 2021 (2105.12108) with the Full Dataset (FD), but with the dz and
+# multiplicative biases marginalized into the covariance.
+
+sampler:
+  mcmc:
+    burn_in: 0
+    max_tries: 1000
+
+params:
+  # Cosmological parameters
+  A_sE9:
+    prior:
+      min: 0.5
+      max: 5.
+    ref:
+      dist: norm
+      loc: 2.02
+      scale: 0.01
+    latex: A_s
+    proposal: 0.001
+
+  Omega_c:
+    prior: 
+      min: 0.07
+      max: 0.83
+    ref:
+      dist: norm
+      loc: 0.2
+      scale: 0.01
+    latex: \Omega_c
+    proposal: 0.01
+
+  Omega_b:
+    prior: 
+      min: 0.03
+      max: 0.07
+    ref:
+      dist: norm
+      loc: 0.04
+      scale: 0.001
+    latex: \Omega_b
+    proposal: 0.001
+
+  h: 
+    prior: 
+      min: 0.55
+      max: 0.91
+    ref:
+      dist: norm
+      loc: 0.7
+      scale: 0.02
+    latex: h
+    proposal: 0.02
+
+  n_s:
+    prior: 
+      min: 0.87
+      max: 1.07
+    ref:
+      dist: norm
+      loc: 0.96
+      scale: 0.02
+    latex: n_s
+    proposal: 0.02
+
+  m_nu: 0.
+
+  sigma8:
+    latex: \sigma_8
+
+  S_8:
+    latex: S_8
+
+  # Nuisance parameters
+  # SD (DESgc + DESwl)
+  bias_DESgc__0_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.421521
+      scale: 0.1
+    latex: b^{DESgc_0}_1
+    proposal: 0.1
+
+  bias_DESgc__1_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.730038
+      scale: 0.1
+    latex: b^{DESgc_1}_1
+    proposal: 0.1
+
+  bias_DESgc__2_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.699162
+      scale: 0.1
+    latex: b^{DESgc_2}_1
+    proposal: 0.1
+
+  bias_DESgc__3_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 2.064552
+      scale: 0.1
+    latex: b^{DESgc_3}_1
+    proposal: 0.1
+
+  bias_DESgc__4_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 2.129857
+      scale: 0.1
+    latex: b^{DESgc_4}_1
+    proposal: 0.1
+
+  # ND (DECALS + KiDS)
+  bias_DECALS__0_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.13
+      scale: 0.1
+    latex: b^{DECALS_0}_1
+    proposal: 0.1
+
+  bias_DECALS__1_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.40
+      scale: 0.1
+    latex: b^{DECALS_1}_1
+    proposal: 0.1
+
+  bias_DECALS__2_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.35
+      scale: 0.1
+    latex: b^{DECALS_2}_1
+    proposal: 0.1
+
+  bias_DECALS__3_b1:
+    prior: 
+        min: 0.8
+        max: 3.0
+    ref:
+      dist: norm
+      loc: 1.77
+      scale: 0.1
+    latex: b^{DECALS_3}_1
+    proposal: 0.1
+
+  # eBOSS-QSOs
+  bias_eBOSS__0_b0:
+    prior: 
+        min: 0.8
+        max: 5.0
+    ref:
+      dist: norm
+      loc: 2.41
+      scale: 0.1
+    latex: b^{eBOSS_0}_1
+    proposal: 0.1
+
+  bias_eBOSS__1_b0:
+    prior: 
+        min: 0.8
+        max: 5.0
+    ref:
+      dist: norm
+      loc: 2.6
+      scale: 0.1
+    latex: b^{eBOSS_1}_1
+    proposal: 0.1
+
+  # Commented out because it is not implemented yet
+  # Magnification biases
+  # bias_eBOSS__0_s: 0.2
+  # bias_eBOSS__1_s: 0.2
+ 
+  # In this paper, the same IA was used for all wl samples
+  bias_A_IA:
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.
+      scale: 0.1
+    latex: A_{IA}
+    proposal: 0.1
+
+  limber_eta_IA: 
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.
+      scale: 0.1
+    latex: \eta_{IA}
+    proposal: 0.1
+
+# CCL settings
+theory:
+  cl_like.CCL:
+    transfer_function: boltzmann_camb
+    matter_pk: halofit
+    baryons_pk: nobaryons
+  cl_like.Pk:
+    # Linear, EulerianPT, LagrangianPT
+    bias_model: "Linear"
+  cl_like.Limber:
+    nz_model: "NzShift"
+    ia_model: "IADESY1"
+    input_params_prefix: "limber"
+  cl_like.ClFinal:
+    input_params_prefix: "bias"
+    shape_model: ShapeMultiplicative
+
+# Likelihood settings
+likelihood:
+  cl_like.ClLike:
+    # Input sacc file
+    input_file: /mnt/extraspace/gravityls_3/sacc_files/cls_FD_covG_dzMarg_mMarg.fits
+    # List all relevant bins. The clustering
+    # bins are clX, the shear bins are shX.
+    bins:
+      - name: DESgc__0
+      - name: DESgc__1
+      - name: DESgc__2
+      - name: DESgc__3
+      - name: DESgc__4
+      - name: DESwl__0
+      - name: DESwl__1
+      - name: DESwl__2
+      - name: DESwl__3
+      - name: DECALS__0
+      - name: DECALS__1
+      - name: DECALS__2
+      - name: DECALS__3
+      - name: KiDS1000__0
+      - name: KiDS1000__1
+      - name: KiDS1000__2
+      - name: KiDS1000__3
+      - name: KiDS1000__4
+      - name: eBOSS__0
+      - name: eBOSS__1
+      - name: PLAcv
+
+    # List all 2-points that should go into the
+    # data vector. For now we only include
+    # galaxy-galaxy auto-correlations, but all
+    # galaxy-shear and shear-shear correlations.
+    twopoints:
+      # SD (DESgc, DESwl, PlAcv)
+      - bins: [DESgc__0, DESgc__0]
+      - bins: [DESgc__1, DESgc__1]
+      - bins: [DESgc__2, DESgc__2]
+      - bins: [DESgc__3, DESgc__3]
+      - bins: [DESgc__4, DESgc__4]
+
+      - bins: [DESgc__0, DESwl__0]
+      - bins: [DESgc__0, DESwl__1]
+      - bins: [DESgc__0, DESwl__2]
+      - bins: [DESgc__0, DESwl__3]
+        
+      - bins: [DESgc__1, DESwl__0]
+      - bins: [DESgc__1, DESwl__1]
+      - bins: [DESgc__1, DESwl__2]
+      - bins: [DESgc__1, DESwl__3]
+
+      - bins: [DESgc__2, DESwl__0]
+      - bins: [DESgc__2, DESwl__1]
+      - bins: [DESgc__2, DESwl__2]
+      - bins: [DESgc__2, DESwl__3]
+
+      - bins: [DESgc__3, DESwl__0]
+      - bins: [DESgc__3, DESwl__1]
+      - bins: [DESgc__3, DESwl__2]
+      - bins: [DESgc__3, DESwl__3]
+
+      - bins: [DESgc__4, DESwl__0]
+      - bins: [DESgc__4, DESwl__1]
+      - bins: [DESgc__4, DESwl__2]
+      - bins: [DESgc__4, DESwl__3]
+
+      - bins: [DESwl__0, DESwl__0]
+      - bins: [DESwl__0, DESwl__1]
+      - bins: [DESwl__0, DESwl__2]
+      - bins: [DESwl__0, DESwl__3]
+      - bins: [DESwl__1, DESwl__1]
+      - bins: [DESwl__1, DESwl__2]
+      - bins: [DESwl__1, DESwl__3]
+      - bins: [DESwl__2, DESwl__2]
+      - bins: [DESwl__2, DESwl__3]
+      - bins: [DESwl__3, DESwl__3]
+
+      - bins: [DESgc__0, PLAcv]
+      - bins: [DESgc__1, PLAcv]
+      - bins: [DESgc__2, PLAcv]
+      - bins: [DESgc__3, PLAcv]
+      - bins: [DESgc__4, PLAcv]
+
+      - bins: [DESwl__0, PLAcv]
+      - bins: [DESwl__1, PLAcv]
+      - bins: [DESwl__2, PLAcv]
+      - bins: [DESwl__3, PLAcv]
+        
+      # ND (DECALS, KiDS1000, PlAcv)
+      - bins: [DECALS__0, DECALS__0]
+      - bins: [DECALS__1, DECALS__1]
+      - bins: [DECALS__2, DECALS__2]
+      - bins: [DECALS__3, DECALS__3]
+
+      - bins: [DECALS__0, KiDS1000__0]
+      - bins: [DECALS__0, KiDS1000__1]
+      - bins: [DECALS__0, KiDS1000__2]
+      - bins: [DECALS__0, KiDS1000__3]
+      - bins: [DECALS__0, KiDS1000__4]
+        
+      - bins: [DECALS__1, KiDS1000__0]
+      - bins: [DECALS__1, KiDS1000__1]
+      - bins: [DECALS__1, KiDS1000__2]
+      - bins: [DECALS__1, KiDS1000__3]
+      - bins: [DECALS__1, KiDS1000__4]
+
+      - bins: [DECALS__2, KiDS1000__0]
+      - bins: [DECALS__2, KiDS1000__1]
+      - bins: [DECALS__2, KiDS1000__2]
+      - bins: [DECALS__2, KiDS1000__3]
+      - bins: [DECALS__2, KiDS1000__4]
+
+      - bins: [DECALS__3, KiDS1000__0]
+      - bins: [DECALS__3, KiDS1000__1]
+      - bins: [DECALS__3, KiDS1000__2]
+      - bins: [DECALS__3, KiDS1000__3]
+      - bins: [DECALS__3, KiDS1000__4]
+
+      - bins: [KiDS1000__0, KiDS1000__0]
+      - bins: [KiDS1000__0, KiDS1000__1]
+      - bins: [KiDS1000__0, KiDS1000__2]
+      - bins: [KiDS1000__0, KiDS1000__3]
+      - bins: [KiDS1000__0, KiDS1000__4]
+      - bins: [KiDS1000__1, KiDS1000__1]
+      - bins: [KiDS1000__1, KiDS1000__2]
+      - bins: [KiDS1000__1, KiDS1000__3]
+      - bins: [KiDS1000__1, KiDS1000__4]
+      - bins: [KiDS1000__2, KiDS1000__2]
+      - bins: [KiDS1000__2, KiDS1000__3]
+      - bins: [KiDS1000__2, KiDS1000__4]
+      - bins: [KiDS1000__3, KiDS1000__3]
+      - bins: [KiDS1000__3, KiDS1000__4]
+      - bins: [KiDS1000__4, KiDS1000__4]
+
+      - bins: [DECALS__0, PLAcv]
+      - bins: [DECALS__1, PLAcv]
+      - bins: [DECALS__2, PLAcv]
+      - bins: [DECALS__3, PLAcv]
+
+      - bins: [KiDS1000__0, PLAcv]
+      - bins: [KiDS1000__1, PLAcv]
+      - bins: [KiDS1000__2, PLAcv]
+      - bins: [KiDS1000__3, PLAcv]
+      - bins: [KiDS1000__4, PLAcv]
+
+      # eBOSS-QSOs
+      - bins: [eBOSS__0, eBOSS__0]
+      - bins: [eBOSS__1, eBOSS__1]
+
+      - bins: [eBOSS__0, PLAcv]
+      - bins: [eBOSS__1, PLAcv]
+
+    defaults:
+      # Scale cut for galaxy clustering
+      # (ignored for shear-shear)
+      kmax: 0.15
+      # These ones will apply to all power
+      # spectra (unless the lmax corresponding
+      # to the chosen kmax is smaller).
+      lmin: 0
+      lmax: 2000
+
+      # Note: as is now, we will be removing the DESgc x DESwl Cell at ell<30.
+      # In the paper, those were kept and only removed for wl x wl wl x PlAcv.
+      DESwl__0:
+        lmin: 30
+      DESwl__1:
+        lmin: 30
+      DESwl__2:
+        lmin: 30
+      DESwl__3:
+        lmin: 30
+
+      DECALS__0:
+        lmin: 30
+      DECALS__1:
+        lmin: 30
+      DECALS__2:
+        lmin: 30
+      DECALS__3:
+        lmin: 30
+      KiDS1000__0:
+        lmin: 100
+      KiDS1000__1:
+        lmin: 100
+      KiDS1000__2:
+        lmin: 100
+      KiDS1000__3:
+        lmin: 100
+      KiDS1000__4:
+        lmin: 100
+
+      # For eBOSS we chose kmin = 0.02Mpc^-1 and estimated the 
+      # lmin ~ chi(z_mean) * kmin, with z_mean = {1.2, 1.8}
+      eBOSS__0:
+        lmin: 79
+      eBOSS__1:
+        lmin: 102
+
+    # Prefix associated to all nuisance params
+    input_params_prefix: clk
+
+debug: False
+output: 'chains/FD_Garcia-Garcia2021_dzMarg_mMarg/FD_Garcia-Garcia2021_dzMarg_mMarg'
