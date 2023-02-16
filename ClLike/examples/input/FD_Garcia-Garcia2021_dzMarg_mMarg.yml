@@ -69,7 +69,7 @@ params:
   sigma8:
     latex: \sigma_8
 
-  S_8:
+  S8:
     latex: S_8
 
   # Nuisance parameters
@@ -175,7 +175,7 @@ params:
     proposal: 0.1
 
   # eBOSS-QSOs
-  bias_eBOSS__0_b0:
+  bias_eBOSS__0_b1:
     prior: 
         min: 0.8
         max: 5.0
@@ -186,7 +186,7 @@ params:
     latex: b^{eBOSS_0}_1
     proposal: 0.1
 
-  bias_eBOSS__1_b0:
+  bias_eBOSS__1_b1:
     prior: 
         min: 0.8
         max: 5.0

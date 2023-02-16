@@ -68,7 +68,7 @@ params:
   sigma8:
     latex: \sigma_8
 
-  S_8:
+  S8:
     latex: S_8
 
   # Nuisance parameters
@@ -361,7 +361,7 @@ params:
     proposal: 0.005
 
   # eBOSS-QSOs
-  bias_eBOSS__0_b0:
+  bias_eBOSS__0_b1:
     prior: 
         min: 0.8
         max: 5.0
@@ -372,7 +372,7 @@ params:
     latex: b^{eBOSS_0}_1
     proposal: 0.1
 
-  bias_eBOSS__1_b0:
+  bias_eBOSS__1_b1:
     prior: 
         min: 0.8
         max: 5.0
@@ -433,7 +433,7 @@ theory:
 likelihood:
   cl_like.ClLike:
     # Input sacc file
-    input_file: /mnt/extraspace/gravityls_3/S8z/Cls_new_pipeline/4096_DES_eBOSS_CMB/cls_covG_new.fits
+    input_file: /mnt/extraspace/gravityls_3/sacc_files/cls_FD_covG.fits
     # List all relevant bins. The clustering
     # bins are clX, the shear bins are shX.
     bins:
