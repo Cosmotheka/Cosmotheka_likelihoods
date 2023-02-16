@@ -97,7 +97,7 @@ class Limber(Theory):
                 tr = ccl.NumberCountsTracer(cosmo, dndz=dndz, bias=(z, oz),
                                             has_rsd=False)
                 t0 = None
-                if self.bias_model == 'LagrangianPT':
+                if self.bias_model in ['LagrangianPT', 'BaccoPT']:
                     t0 = tr
                 t1 = [tr]
                 t1n = ['d1']
