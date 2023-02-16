@@ -278,6 +278,38 @@ params:
     latex: b^{DECALS_3}_1
     proposal: 0.1
 
+  limber_DECALS__0_dz:
+    prior: 
+      dist: norm
+      loc: 0.
+      scale: 0.007
+    latex: \Delta z^{DECALS_0}
+    proposal: 0.005
+
+  limber_DECALS__1_dz:
+    prior: 
+      dist: norm
+      loc: 0.
+      scale: 0.007
+    latex: \Delta z^{DECALS_1}
+    proposal: 0.005
+
+  limber_DECALS__2_dz:
+    prior: 
+      dist: norm
+      loc: 0.
+      scale: 0.006
+    latex: \Delta z^{DECALS_2}
+    proposal: 0.005
+
+  limber_DECALS__3_dz:
+    prior: 
+      dist: norm
+      loc: 0.
+      scale: 0.01
+    latex: \Delta z^{DECALS_3}
+    proposal: 0.005
+
   # Note: dz's in ClLike are defined as in DES (nz_true = nz(z + dz)). So the
   # sign is the opposite for KiDS
   limber_KiDS1000__0_dz:
