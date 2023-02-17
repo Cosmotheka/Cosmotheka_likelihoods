@@ -108,12 +108,18 @@ class Pk(Theory):
     def _get_pk_data(self, cosmo):
         cosmo.compute_nonlin_power()
         pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        # pkmw = cosmo.get_nonlin_power(name='delta_matter:weyl')
+        # pkww = cosmo.get_nonlin_power(name='weyl:weyl')
+        pkww = pkwm = pkmm
         if self.bias_model == 'Linear':
             pkd = {}
             pkd['pk_mm'] = pkmm
             pkd['pk_md1'] = pkmm
             pkd['pk_d1m'] = pkmm
             pkd['pk_d1d1'] = pkmm
+            pkd['pk_d1w'] = pkd['pk_wd1'] = pkwm
+            pkd['pk_mw'] = pkd['pk_wm'] = pkwm
+            pkd['pk_ww'] = pkww
         elif self.is_PT_bias:
             if self.k_SN_suppress > 0:
                 k_filter = self.k_SN_suppress
@@ -140,7 +146,7 @@ class Pk(Theory):
             Dz = ccl.growth_factor(cosmo, ptc.a_s)
             ptc.update_pk(pk_lin_z0, Dz)
             pkd = {}
-            operators = ['m', 'd1', 'd2', 's2', 'k2']
+            operators = ['m', 'w', 'd1', 'd2', 's2', 'k2']
             for i1, op1 in enumerate(operators):
                 for op2 in operators[i1:]:
                     comb_12 = op1+op2

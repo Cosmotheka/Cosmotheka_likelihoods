@@ -107,6 +107,9 @@ class LPTCalculator(object):
         # s2k2 -> k^2 <1*s^2/2>, not provided
         # k2k2 -> k^4 <1*1>, not provided
 
+        # Replace the weyl by matter
+        kind.replace("w", "m")
+
         if kind in self.pk2d_computed:
             return self.pk2d_computed[kind]
 

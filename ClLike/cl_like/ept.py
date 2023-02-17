@@ -167,6 +167,8 @@ class EPTCalculator(object):
         # When not provided, this function just returns `alt`
 
         kind = kind.replace('m', 'd1')
+        # Replace the weyl by matter
+        kind.replace("w", "m")
 
         if kind in self.pk2d_computed:
             return self.pk2d_computed[kind]
