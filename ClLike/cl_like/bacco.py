@@ -73,7 +73,7 @@ class BaccoCalculator(object):
         # When not provided, this function just returns `alt`
 
         if kind in self.pk2d_computed:
-            return pk2d_computed[kind]
+            return self.pk2d_computed[kind]
 
         inds = {'mm': 0,
                 'md1': 1,
@@ -107,7 +107,9 @@ class BaccoCalculator(object):
                 'k2k2': 1.0}
 
         pk = pfac[kind]*self.pk_temp[:, inds[kind], :]
+        if kind in ['mm']:
+            pk = np.log(pk)
         pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
-                        pk_arr=pk, is_logp=False)
+                        pk_arr=pk, is_logp=kind in ['mm'])
         self.pk2d_computed[kind] = pk2d
         return pk2d
