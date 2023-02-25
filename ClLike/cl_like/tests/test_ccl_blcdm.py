@@ -81,7 +81,7 @@ def get_info(non_linear="halofit"):
                                       }
                            },
             "output": "dum",
-            "debug": False}
+            "debug": True}
 
     if non_linear == "hmcode":
         # HMCode will not be able to match the Pk as much as halofit because

@@ -18,37 +18,42 @@ class CCL_BLCDM(Theory):
     parameters directly (i.e. cannot be used downstream from camb/CLASS.
     """
     # CCL options
-    baryons_pk: str = 'nobaryons'
     nonlinear_model: str = 'muSigma'
     classy_arguments: dict = {}
 
     def initialize(self):
         self._required_results = {}
 
-        cosmo = ccl.CosmologyVanillaLCDM(transfer_function="boltzmann_class")
+        # cosmo = ccl.CosmologyVanillaLCDM(transfer_function="boltzmann_class")
         # Copied from ccl/pk2d.py
         # These lines are needed to compute the Pk2D array
-        self.nk = ccl.ccllib.get_pk_spline_nk(cosmo.cosmo)
-        self.na = ccl.ccllib.get_pk_spline_na(cosmo.cosmo)
-        self.a_arr, _ = ccl.ccllib.get_pk_spline_a(cosmo.cosmo, self.na, 0)
-        self.z_arr = 1/self.a_arr - 1
-        lk_arr, _ = ccl.ccllib.get_pk_spline_lk(cosmo.cosmo, self.nk, 0)
-        self.k_arr = np.exp(lk_arr)
-
-        # Reduce the computations needed (in particular, going up to very high
-        # k makes unfeasable to compute the Pk with hi_class
-        self.a_arr = self.a_arr[self.z_arr < 8]
-        self.z_arr = self.z_arr[self.z_arr < 8]
-        self.lk_arr = lk_arr[self.k_arr < 10]
-        self.k_arr = self.k_arr[self.k_arr < 10]
+        # self.nk = ccl.ccllib.get_pk_spline_nk(cosmo.cosmo)
+        # self.na = ccl.ccllib.get_pk_spline_na(cosmo.cosmo)
+        # self.a_arr, _ = ccl.ccllib.get_pk_spline_a(cosmo.cosmo, self.na, 0)
+        # self.z_arr = 1/self.a_arr - 1
+        # self.lk_arr, _ = ccl.ccllib.get_pk_spline_lk(cosmo.cosmo, self.nk, 0)
+        # self.k_arr = np.exp(self.lk_arr)
 
         # Initialize Class
         self.cosmo_class = Class()
-        self.cosmo_class.set({'output': 'mPk,mTk',
-                              'z_max_pk': np.max(self.z_arr),
-                              'P_k_max_1/Mpc': np.max(self.k_arr),
-                              'k_per_decade_for_pk': 200,
-                              'k_per_decade_for_bao': 200})
+        self.cosmo_class.set({'output': 'mPk',
+                              'z_max_pk': 4,
+                              'P_k_max_1/Mpc': 2,
+                              'hmcode_min_k_max': 35,
+                              # 'hmcode_min_k_max' added to avoid this error:
+                              # Fails with
+                              # CosmoSevereError("get_pk_and_k_and_z() is
+                              # trying to return P(k,z) up to
+                              # z_max=5.000000e+00 (to encompass your requested
+                              # maximum value of z); but the input parameters
+                              # sent to CLASS were such that the non-linear
+                              # P(k,z) could only be consistently computed up
+                              # to z=4.710776e+00; increase the input parameter
+                              # 'P_k_max_h/Mpc' or 'P_k_max_1/Mpc', or increase
+                              # the precision parameters 'halofit_min_k_max'
+                              # and/or 'hmcode_min_k_max', or decrease your
+                              # requested z_max")
+                              })
 
         self.cosmo_class.set(self.classy_arguments)
 
@@ -108,58 +113,17 @@ class CCL_BLCDM(Theory):
         bhc = hc.get_background()
         # Background
         H = bhc['H [1/Mpc]']
-        background = {'a': 1 / (bhc['z'] + 1), 'chi': bhc['comov. dist.'],
+        a_bhc = 1 / (bhc['z'] + 1)
+        background = {'a': a_bhc, 'chi': bhc['comov. dist.'],
                       'h_over_h0':  H / H[-1]}
         # Growth
-        D_arr = np.array([hc.scale_independent_growth_factor(z) for z in self.z_arr])
-        f_arr = np.array([hc.scale_independent_growth_factor_f(z) for z in self.z_arr])
-        growth = {'a': self.a_arr, 'growth_factor': D_arr,
-                  'growth_rate': f_arr}
+        growth = {'a': a_bhc, 'growth_factor': bhc['gr.fac. D'],
+                  "growth_rate": bhc['gr.fac. f']}
         # Pk
-        # pkln = np.array([[hc.pk_lin(k, z) for k in self.k_arr] for z in self.z_arr])
-        pkln_mm = np.array([self._get_pklin_pair(('delta_matter', 'delta_matter'),
-                                              z) for z in self.z_arr])
-        pkln_mw = np.array([self._get_pklin_pair(('delta_matter', 'Weyl'), z) for
-                            z in self.z_arr])
-        pkln_ww = np.array([self._get_pklin_pair(('Weyl', 'Weyl'), z) for z in
-                            self.z_arr])
+        pkln_mm, k, z_pk = hc.get_pk_and_k_and_z(nonlinear=False)
+        a_pk = 1 / (1+z_pk)
 
-        pk_linear = {'a': self.a_arr, 'k': self.k_arr,
-                     # 'delta_matter:delta_matter': pkln,
-                     'delta_matter:delta_matter': pkln_mm,
-                     'delta_matter:Weyl': pkln_mw,
-                     'Weyl:Weyl': pkln_ww
-                     }
-
-        if self.nonlinear_model == 'Linear':
-            pk_nonlin = pk_linear
-        elif self.nonlinear_model == 'muSigma':
-            pk_mm = np.array([self._get_pknonlin_pair_muSigma(('delta_matter', 'delta_matter'),
-                                                z) for z in self.z_arr])
-            pk_mw = np.array([self._get_pknonlin_pair_muSigma(('delta_matter', 'Weyl'), z) for
-                              z in self.z_arr])
-            pk_ww = np.array([self._get_pknonlin_pair_muSigma(('Weyl', 'Weyl'), z) for z in
-                                self.z_arr])
-
-            pk_nonlin = {'a': self.a_arr, 'k': self.k_arr,
-                         'delta_matter:delta_matter': pk_mm,
-                         'delta_matter:Weyl': pk_mw,
-                         'Weyl:Weyl': pk_ww}
-
-            # from matplotlib import pyplot as plt
-            # plt.loglog(self.k_arr, pk_ww[-1])
-            # plt.loglog(self.k_arr, pkln_ww[-1])
-            # plt.title(f'z = {self.z_arr[-1]}')
-            # plt.show()
-            # plt.close()
-
-            # plt.semilogx(self.k_arr, pkln_ww[-1] / pk_ww[-1] - 1)
-            # plt.title(f'z = {self.z_arr[-1]}')
-            # plt.show()
-            # plt.close()
-        else:
-            raise NotImplementedError("nonlinear_model = "
-                                      f"{self.nonlinear_model} not Implemented")
+        pk_linear, pk_nonlin = self._get_pks_muSigma(hc, bhc)
 
         sigma8 = hc.sigma8()
         Omega_m = hc.Omega_m()
@@ -191,71 +155,81 @@ class CCL_BLCDM(Theory):
         for req_res, method in self._required_results.items():
             state['CCL'][req_res] = method(cosmo)
 
-    def _get_primordial_pk(self):
-        cosmo = self.cosmo_class
 
-        Pk = cosmo.get_primordial()
-        lpPk = np.log(Pk['P_scalar(k)'])
-        lkPk = np.log(Pk['k [1/Mpc]'])
+    def _get_pks_muSigma(self, hc, bhc):
+        # Passing bhc to avoid overhead
+        pkln_mm, k, z_pk = hc.get_pk_and_k_and_z(nonlinear=False)
+        a_pk = 1 / (1+z_pk)
 
-        pPk = np.exp(interp1d(lkPk, lpPk)(self.lk_arr))
+        mu = interp1d(bhc['z'], bhc['mgclass_dmu'] + 1)(z_pk)
+        Sigma = interp1d(bhc['z'], bhc['mgclass_dSigma'] + 1)(z_pk)
 
-        return (2 * np.pi ** 2) * pPk / self.k_arr ** 3
+        pkln_mw = Sigma * pkln_mm
+        pkln_ww = Sigma**2 * pkln_mm
 
-    def _get_pklin_pair(self, pair, z):
-        cosmo = self.cosmo_class
-        pPk = self._get_primordial_pk()
+        pk_linear = {'a': a_pk, 'k': k,
+                     'delta_matter:delta_matter': pkln_mm.T,
+                     'delta_matter:Weyl': pkln_mw.T,
+                     'Weyl:Weyl': pkln_ww.T
+                     }
 
-        H0 = self.cosmo_class.Hubble(0)
-        Omega_m = self.cosmo_class.Omega_m()
+        if self.nonlinear_model == "Linear":
+            pk_nonlin = pk_linear
+        elif self.nonlinear_model == "muSigma":
+            pk_mm, k, z = hc.get_pk_and_k_and_z(nonlinear=True)
+            pk_mw = Sigma * pk_mm
+            pk_ww = Sigma**2 * pk_mm
 
-        Tks = cosmo.get_transfer(z)
-        kTk = Tks['k (h/Mpc)'] * cosmo.h()
-        lkTk = np.log(kTk)
+            pk_nonlin = {'a': a_pk, 'k': k,
+                         'delta_matter:delta_matter': pk_mm.T,
+                         'delta_matter:Weyl': pk_mw.T,
+                         'Weyl:Weyl': pk_ww.T}
+        else:
+            raise NotImplementedError("nonlinear_model = "
+                                      f"{self.nonlinear_model} not Implemented")
 
-        Tk = []
-        for ti in pair:
-            if (ti == 'delta_matter'):
-                iTk = Tks['d_m']
-            elif (ti.lower() == 'weyl'):
-                iTk = (Tks['phi'] + Tks['psi']) / 2.
-                # Correct by the GR W->d factor. CCL devides by it
-                iTk *= (- kTk**2 * 2 / 3 / (H0)**2 / Omega_m / (1 + z))
-            else:
-                raise ValueError(f'Tracer {ti} not implemented')
+        return pk_linear, pk_nonlin
 
-            Tk.append(interp1d(lkTk, iTk, kind='cubic')(self.lk_arr))
+    # Commented out. Old way but could be useful for models that are not
+    # mu/Sigma
+    #
 
-        return Tk[0] * Tk[1] * pPk
+    # def _get_primordial_pk(self):
+    #     cosmo = self.cosmo_class
 
-    def _get_pknonlin_pair_muSigma(self, pair, z):
-        cosmo = self.cosmo_class
-        mPk = np.array([cosmo.pk(k, z) for k in self.k_arr])
+    #     Pk = cosmo.get_primordial()
+    #     lpPk = np.log(Pk['P_scalar(k)'])
+    #     lkPk = np.log(Pk['k [1/Mpc]'])
 
-        H0 = self.cosmo_class.Hubble(0)
-        Omega_m = self.cosmo_class.Omega_m()
+    #     pPk = np.exp(interp1d(lkPk, lpPk)(self.lk_arr))
 
-        back = cosmo.get_background()
-        mu = interp1d(back['z'], back['mgclass_dmu'] + 1)(z)
-        Sigma = interp1d(back['z'], back['mgclass_dSigma'] + 1)(z)
+    #     return (2 * np.pi ** 2) * pPk / self.k_arr ** 3
 
-        pk = mPk.copy()
-        for ti in pair:
-            if (ti == 'delta_matter'):
-                factor = 1
-            elif (ti.lower() == 'weyl'):
-                # This is the factor that goes in the lensing equations and
-                # relates Weyl and the matter density fluctuation
-                #     factor = 3 * (H0)**2 * Omega_m * (1 + z) * Sigma / (-self.k_arr**2 * 2)
-                #
-                # CCL has the GR factor already in, so the only missing
-                # term is Sigma
-                factor = Sigma
-            else:
-                raise ValueError(f'Tracer {ti} not implemented')
-            pk *= factor
+    # def _get_pklin_pair(self, pair, z):
+    #     cosmo = self.cosmo_class
+    #     pPk = self._get_primordial_pk()
 
-        return pk
+    #     H0 = self.cosmo_class.Hubble(0)
+    #     Omega_m = self.cosmo_class.Omega_m()
+
+    #     Tks = cosmo.get_transfer(z)
+    #     kTk = Tks['k (h/Mpc)'] * cosmo.h()
+    #     lkTk = np.log(kTk)
+
+    #     Tk = []
+    #     for ti in pair:
+    #         if (ti == 'delta_matter'):
+    #             iTk = Tks['d_m']
+    #         elif (ti.lower() == 'weyl'):
+    #             iTk = (Tks['phi'] + Tks['psi']) / 2.
+    #             # Correct by the GR W->d factor. CCL devides by it
+    #             iTk *= (- kTk**2 * 2 / 3 / (H0)**2 / Omega_m / (1 + z))
+    #         else:
+    #             raise ValueError(f'Tracer {ti} not implemented')
+
+    #         Tk.append(interp1d(lkTk, iTk, kind='cubic')(self.lk_arr))
+
+    #     return Tk[0] * Tk[1] * pPk
 
     def get_CCL(self):
         """
