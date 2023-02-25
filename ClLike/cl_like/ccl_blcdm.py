@@ -25,7 +25,7 @@ class CCL_BLCDM(Theory):
     def initialize(self):
         self._required_results = {}
 
-        cosmo = ccl.CosmologyVanillaLCDM()
+        cosmo = ccl.CosmologyVanillaLCDM(transfer_function="boltzmann_class")
         # Copied from ccl/pk2d.py
         # These lines are needed to compute the Pk2D array
         self.nk = ccl.ccllib.get_pk_spline_nk(cosmo.cosmo)
@@ -86,13 +86,9 @@ class CCL_BLCDM(Theory):
 
         return params
 
-
     def calculate(self, state, want_derived=True, **params_values_dict):
         hc = self.cosmo_class
         hc.set(self._get_params_for_classy(params_values_dict))
-        print("#############################")
-        print(hc.pars)
-        print("#############################")
         try:
             hc.compute()
         # Based on the official classy theory class:
@@ -137,7 +133,6 @@ class CCL_BLCDM(Theory):
 
         if self.nonlinear_model == 'Linear':
             pk_nonlin = pk_linear
-            nonlinear_model = None
         elif self.nonlinear_model == 'muSigma':
             pk_mm = np.array([self._get_pknonlin_pair_muSigma(('delta_matter', 'delta_matter'),
                                                 z) for z in self.z_arr])
@@ -162,14 +157,6 @@ class CCL_BLCDM(Theory):
             # plt.title(f'z = {self.z_arr[-1]}')
             # plt.show()
             # plt.close()
-
-            # Set nonlinear_model to None so that CCL does not compute the
-            # nonlinear Pk
-            nonlinear_model = None
-        elif self.nonlinear_model == 'halofit':
-            # CCL will compute the nonlinear Pk
-            pk_nonlin = None
-            nonlinear_model = self.nonlinear_model
         else:
             raise NotImplementedError("nonlinear_model = "
                                       f"{self.nonlinear_model} not Implemented")
@@ -182,8 +169,7 @@ class CCL_BLCDM(Theory):
                                         background=background, growth=growth,
                                         pk_linear=pk_linear,
                                         pk_nonlin=pk_nonlin,
-                                        nonlinear_model=nonlinear_model)
-
+                                        nonlinear_model=None)
 
 
 
@@ -198,7 +184,7 @@ class CCL_BLCDM(Theory):
             params.update({'sigma8': sigma8})
         else:
             params.update({'A_s':
-                           hc.get_current_derived_parameters(['A_s'])[0]})
+                           hc.get_current_derived_parameters(['A_s'])['A_s']})
         params.update({'S8': sigma8*np.sqrt(Omega_m/0.3), 'Omega_m': Omega_m})
 
         state['derived'] = params
