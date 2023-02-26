@@ -20,7 +20,7 @@ def run_clean_tmp():
         shutil.rmtree("dum")
 
 
-def get_info(non_linear="halofit", nonlinear_model="muSigma"):
+def get_info(non_linear="halofit", nonlinear_model="muSigma", pars_smg=(0, 0)):
     # FIXME: kp x kp has been commented out because the scale factor up to
     # which we compute the growth factor and Pks is not too high and fails
     data = "cl_like/tests/data/gc_kp_sh_linear_nuisances.fits.gz"
@@ -29,8 +29,8 @@ def get_info(non_linear="halofit", nonlinear_model="muSigma"):
                        "Omega_b": 0.05,
                        "h": 0.67,
                        "n_s": 0.96,
-                       "parameters_smg__1": 0,  # dmu
-                       "parameters_smg__2": 0,  # dSigma
+                       "parameters_smg__1": pars_smg[0],  # dmu
+                       "parameters_smg__2": pars_smg[1],  # dSigma
                        "expansion_smg": 0.7,    # DE, tuned
                        "bias_gc1_b1": 1.0,
                        "bias_gc1_b1p": 0.0,
@@ -154,9 +154,10 @@ def test_timing(non_linear):
     assert time < 0.6
 
 
-def test_get_pks_muSigma():
+@pytest.mark.parametrize('pars_smg', [(0, 0), (1, 1)])
+def test_get_pks_muSigma(pars_smg):
     # We compare with the Pk obtained through the tranfers functions
-    info = get_info(nonlinear_model="Linear")
+    info = get_info(nonlinear_model="Linear", pars_smg=pars_smg)
     model = get_model(info)
     loglikes, derived = model.loglikes()
     pk_data = model.provider.get_Pk()['pk_data']
