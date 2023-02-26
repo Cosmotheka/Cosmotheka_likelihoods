@@ -108,9 +108,15 @@ class Pk(Theory):
     def _get_pk_data(self, cosmo):
         cosmo.compute_nonlin_power()
         pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-        # pkmw = cosmo.get_nonlin_power(name='delta_matter:weyl')
-        # pkww = cosmo.get_nonlin_power(name='weyl:weyl')
-        pkww = pkwm = pkmm
+        if 'delta_matter:Weyl' in cosmo._pk_nl:
+            pkwm = pkmw = cosmo.get_nonlin_power(name='delta_matter:Weyl')
+        else:
+            pkwm = pkmw = pkmm
+        if 'Weyl:Weyl' in cosmo._pk_nl:
+            pkww = cosmo.get_nonlin_power(name='Weyl:Weyl')
+        else:
+            pkww = pkmm
+
         if self.bias_model == 'Linear':
             pkd = {}
             pkd['pk_mm'] = pkmm

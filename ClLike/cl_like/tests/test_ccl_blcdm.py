@@ -9,6 +9,8 @@ import pytest
 import os
 import shutil
 import sacc
+from classy import Class
+from scipy.interpolate import interp1d
 
 
 # Cleaning the tmp dir before running and after running the tests
@@ -18,7 +20,7 @@ def run_clean_tmp():
         shutil.rmtree("dum")
 
 
-def get_info(non_linear="halofit"):
+def get_info(non_linear="halofit", nonlinear_model="muSigma"):
     # FIXME: kp x kp has been commented out because the scale factor up to
     # which we compute the growth factor and Pks is not too high and fails
     data = "cl_like/tests/data/gc_kp_sh_linear_nuisances.fits.gz"
@@ -41,7 +43,7 @@ def get_info(non_linear="halofit"):
                        "bias_sh1_A_IA": 0.1,
                        "sigma8": None},
             "theory": {"ccl_blcdm": {"external": CCL_BLCDM,
-                                     "nonlinear_model": "muSigma",
+                                     "nonlinear_model": nonlinear_model,
                                      "classy_arguments": {
                                      "Omega_Lambda": 0,
                                      "Omega_fld": 0,
@@ -81,7 +83,7 @@ def get_info(non_linear="halofit"):
                                       }
                            },
             "output": "dum",
-            "debug": True}
+            "debug": False}
 
     if non_linear == "hmcode":
         # HMCode will not be able to match the Pk as much as halofit because
@@ -89,6 +91,38 @@ def get_info(non_linear="halofit"):
         info["likelihood"]["ClLike"]["defaults"]["kmax"] = 0.15
 
     return info
+
+
+def get_pk_lin(cosmo, pair, z):
+    Tks = cosmo.get_transfer(z)
+    kTk = Tks['k (h/Mpc)'] * cosmo.h()
+
+    Pk = cosmo.get_primordial()
+    lpPk = np.log(Pk['P_scalar(k)'])
+    lkPk = np.log(Pk['k [1/Mpc]'])
+
+    kPk = kTk
+    pPk = np.exp(interp1d(lkPk, lpPk, kind="cubic",
+                          fill_value="extrapolate")(np.log(kTk)))
+    pPk = (2 * np.pi ** 2) * pPk / kTk ** 3
+
+    H0 = cosmo.Hubble(0)
+    Omega_m = cosmo.Omega_m()
+
+    Tk = []
+    for ti in pair:
+        if (ti == 'delta_matter'):
+            iTk = Tks['d_m']
+        elif (ti.lower() == 'weyl'):
+            iTk = (Tks['phi'] + Tks['psi']) / 2.
+            # Correct by the GR W->d factor. CCL devides by it
+            iTk *= (- kTk**2 * 2 / 3 / (H0)**2 / Omega_m / (1 + z))
+        else:
+            raise ValueError(f'Tracer {ti} not implemented')
+
+        Tk.append(iTk)
+
+    return kTk, Tk[0] * Tk[1] * pPk
 
 
 @pytest.mark.parametrize('non_linear', ['halofit', 'hmcode'])
@@ -118,3 +152,52 @@ def test_timing(non_linear):
     # Before restructuring, the average evaluation time was ~0.54s in my laptop
     # After the restructuration, it went to 0.56s.
     assert time < 0.6
+
+
+def test_get_pks_muSigma():
+    # We compare with the Pk obtained through the tranfers functions
+    info = get_info(nonlinear_model="Linear")
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    pk_data = model.provider.get_Pk()['pk_data']
+
+    pars = info["params"]
+
+    cosmo = Class()
+    cosmo.set({'output': 'mPk, mTk', 'z_max_pk': 4, 'P_k_max_1/Mpc': 2,
+               'hmcode_min_k_max': 35, 'output_background_smg': 10})
+    cosmo.set(info['theory']['ccl_blcdm']['classy_arguments'])
+    cosmo.set({"A_s": pars["A_s"],
+               "Omega_cdm": pars["Omega_cdm"],
+               "Omega_b": pars["Omega_b"],
+               "h": pars["h"],
+               "n_s": pars["n_s"],
+               "parameters_smg": ",".join([str(pars["parameters_smg__1"]),
+                                           str(pars["parameters_smg__2"])]),
+               "expansion_smg": pars["expansion_smg"]})
+    cosmo.compute()
+
+
+    for z in np.linspace(0, 4, 10):
+        k, pk_mm = get_pk_lin(cosmo, ["delta_matter", "delta_matter"], z)
+        pk_mm2 = pk_data["pk_mm"].eval(k, 1/(1+z))
+
+        # from matplotlib import pyplot as plt
+        # plt.loglog(k, pk_mm)
+        # plt.loglog(k, pk_mm2, ls='--')
+        # plt.title(f"z = {z}")
+        # plt.show()
+        # plt.close()
+        assert pk_mm == pytest.approx(pk_mm2, 1e-4)
+
+        # Not sure why the precission for Pk_mw is only 1%
+        k, pk_mw = get_pk_lin(cosmo, ["delta_matter", "weyl"], z)
+        pk_mw2 = pk_data["pk_mw"].eval(k, 1/(1+z))
+        assert pk_mw == pytest.approx(pk_mw2, 1e-2)
+
+        # Not sure why the precission for Pk_ww is only 1%
+        k, pk_ww = get_pk_lin(cosmo, ["weyl", "weyl"], z)
+        pk_ww2 = pk_data["pk_ww"].eval(k, 1/(1+z))
+        assert pk_ww == pytest.approx(pk_ww2, 1e-2)
+
+    cosmo.struct_cleanup()
