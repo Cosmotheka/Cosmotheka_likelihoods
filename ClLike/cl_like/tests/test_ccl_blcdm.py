@@ -154,10 +154,11 @@ def test_timing(non_linear):
     assert time < 0.6
 
 
+@pytest.mark.parametrize('non_linear', ['Linear', 'muSigma'])
 @pytest.mark.parametrize('pars_smg', [(0, 0), (1, 1)])
-def test_get_pks_muSigma(pars_smg):
+def test_get_pks_muSigma(non_linear, pars_smg):
     # We compare with the Pk obtained through the tranfers functions
-    info = get_info(nonlinear_model="Linear", pars_smg=pars_smg)
+    info = get_info(nonlinear_model=non_linear, pars_smg=pars_smg)
     model = get_model(info)
     loglikes, derived = model.loglikes()
     pk_data = model.provider.get_Pk()['pk_data']
@@ -178,26 +179,40 @@ def test_get_pks_muSigma(pars_smg):
                "expansion_smg": pars["expansion_smg"]})
     cosmo.compute()
 
+    if non_linear == 'muSigma':
+        # In this case we will be comparing a non_linear pk vs a linear pk.
+        # These only match at large scales
+        kmax = 0.01
+        rdev_mm = 1e-2  # Relaxing the condition for matter
+    else:
+        kmax = 2
+        rdev_mm = 1e-4
 
     for z in np.linspace(0, 4, 10):
         k, pk_mm = get_pk_lin(cosmo, ["delta_matter", "delta_matter"], z)
+        pk_mm = pk_mm[k < kmax]
+        k = k[k < kmax]
         pk_mm2 = pk_data["pk_mm"].eval(k, 1/(1+z))
 
         # from matplotlib import pyplot as plt
-        # plt.loglog(k, pk_mm)
+        # plt.loglog(k, pk_mm/pk_mm2)
         # plt.loglog(k, pk_mm2, ls='--')
         # plt.title(f"z = {z}")
         # plt.show()
         # plt.close()
-        assert pk_mm == pytest.approx(pk_mm2, 1e-4)
+        assert pk_mm == pytest.approx(pk_mm2, rdev_mm)
 
         # Not sure why the precission for Pk_mw is only 1%
         k, pk_mw = get_pk_lin(cosmo, ["delta_matter", "weyl"], z)
+        pk_mw = pk_mw[k < kmax]
+        k = k[k < kmax]
         pk_mw2 = pk_data["pk_mw"].eval(k, 1/(1+z))
         assert pk_mw == pytest.approx(pk_mw2, 1e-2)
 
         # Not sure why the precission for Pk_ww is only 1%
         k, pk_ww = get_pk_lin(cosmo, ["weyl", "weyl"], z)
+        pk_ww = pk_ww[k < kmax]
+        k = k[k < kmax]
         pk_ww2 = pk_data["pk_ww"].eval(k, 1/(1+z))
         assert pk_ww == pytest.approx(pk_ww2, 1e-2)
 
