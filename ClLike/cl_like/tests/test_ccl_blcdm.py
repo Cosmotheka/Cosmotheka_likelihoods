@@ -153,6 +153,21 @@ def test_timing(non_linear):
     # After the restructuration, it went to 0.56s.
     assert time < 0.6
 
+@pytest.mark.parametrize('pars_smg', [(0, 1), (1, 0), (1, 1)])
+def test_blcdm_pars(pars_smg):
+    info = get_info(non_linear="hmcode", pars_smg=pars_smg)
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    assert not np.fabs(loglikes[0]) < 3
+
+    if pars_smg == (0, 1):
+        # Remove weak lensing if Sigma != 1
+        info['likelihood']["ClLike"]['bins'] = [{"name": 'gc1'}]
+        info['likelihood']["ClLike"]['twopoints'] = [{"bins": ["gc1", "gc1"]}]
+        model = get_model(info)
+        loglikes, derived = model.loglikes()
+        assert np.fabs(loglikes[0]) < 3
+
 
 @pytest.mark.parametrize('non_linear', ['Linear', 'muSigma'])
 @pytest.mark.parametrize('pars_smg', [(0, 0), (1, 1)])
