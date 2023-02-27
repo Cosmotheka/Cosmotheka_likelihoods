@@ -117,6 +117,7 @@ class CCL_BLCDM(Theory):
         background = {'a': a_bhc, 'chi': bhc['comov. dist.'],
                       'h_over_h0':  H / H[-1]}
         # Growth
+        # FIXME: growth factor f column is only valid for dust-only cosmologies
         growth = {'a': a_bhc, 'growth_factor': bhc['gr.fac. D'],
                   "growth_rate": bhc['gr.fac. f']}
         # Pk

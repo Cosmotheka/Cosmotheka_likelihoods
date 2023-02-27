@@ -153,6 +153,7 @@ def test_timing(non_linear):
     # After the restructuration, it went to 0.56s.
     assert time < 0.6
 
+
 @pytest.mark.parametrize('pars_smg', [(0, 1), (1, 0), (1, 1)])
 def test_blcdm_pars(pars_smg):
     info = get_info(non_linear="hmcode", pars_smg=pars_smg)
