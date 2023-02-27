@@ -1,6 +1,7 @@
 import numpy as np
 import pyccl as ccl
 import pyccl.nl_pt as pt
+import copy
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 from scipy.optimize import minimize
@@ -24,6 +25,8 @@ class ClLike(Likelihood):
     jeffrey_bias: bool = False
 
     def initialize(self):
+        # Deep copy defaults to avoid modifying the input yaml
+        self.defaults = copy.deepcopy(self.defaults)
         # Read SACC file
         self._read_data()
 
