@@ -24,6 +24,8 @@ class Limber(Theory):
 
     # Sample type
     sample_type: str = "convolve"
+    # Magnification bias
+    with_magnification_bias: bool = False
 
     def initialize(self):
         self.cl_meta = None
@@ -107,6 +109,15 @@ class Limber(Theory):
                     for bn, dn in zip(['b2', 'bs', 'bk2'], ['d2', 's2', 'k2']):
                         t1.append(tr)
                         t1n.append(dn)
+                # Magnification
+                if self.with_magnification_bias:
+                    # We use s = 1/5 here so that (2-5s)=1 and we multiply by
+                    # (2-5s) in cl_total
+                    tr = ccl.NumberCountsTracer(cosmo, dndz=dndz,
+                                                bias=(z, z*0), has_rsd=False,
+                                                mag_bias=(z, oz/5.))
+                    t1.append(tr)
+                    t1n.append("m")
             elif q == 'galaxy_shear':
                 dndz = self._get_nz(cosmo, name, **pars)
                 t0 = ccl.WeakLensingTracer(cosmo, dndz=dndz)
@@ -380,7 +391,10 @@ class Limber(Theory):
         return l_sample
 
     def get_can_provide(self):
-        return ["ia_model"]
+        return ["ia_model", "with_magnification_bias"]
 
     def get_ia_model(self):
         return self.ia_model
+
+    def get_with_magnification_bias(self):
+        return self.with_magnification_bias

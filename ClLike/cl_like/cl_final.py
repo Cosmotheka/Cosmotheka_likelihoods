@@ -18,14 +18,17 @@ class ClFinal(Theory):
         ia_model = self.provider.get_ia_model()
         bias_model = self.provider.get_bias_model()
         is_PT_bias = self.provider.get_is_PT_bias()
+        with_mag_bias = self.provider.get_with_magnification_bias()
 
         self.bias_names, self.bias_info = self._get_bias_info(ia_model,
                                                               bias_model,
-                                                              is_PT_bias)
+                                                              is_PT_bias,
+                                                              with_mag_bias)
         self.ndata = np.sum([clm['l_eff'].size for clm in self.cl_meta])
 
     def get_requirements(self):
-        return {"ia_model": None, "bias_model": None, "is_PT_bias": None}
+        return {"with_magnification_bias": None,
+                "ia_model": None, "bias_model": None, "is_PT_bias": None}
 
     def must_provide(self, **requirements):
         if "cl_theory" not in requirements:
@@ -47,7 +50,14 @@ class ClFinal(Theory):
         cld = res['cl_data']
 
         # Construct bias vector
-        bias = np.array([pars[k] for k in self.bias_names])
+        bias = np.zeros(len(self.bias_names))
+        for i, k in enumerate(self.bias_names):
+            if k[-2:] == "_s":
+                # Magnification i.e. (2 - 5s)
+                bias[i] = 2 - 5*pars.get(k, 2/5)
+            else:
+                bias[i] = pars[k]
+
         # Construct global bias vector
         global_bias = self._get_global_bias(**pars)
 
@@ -138,7 +148,8 @@ class ClFinal(Theory):
             cls_deriv[inds] = cls_grad.T
         return cls_deriv # (ndata, nbias)
 
-    def _get_bias_info(self, ia_model, bias_model, is_PT_bias):
+    def _get_bias_info(self, ia_model, bias_model, is_PT_bias,
+                       with_magnification_bias):
         # Extract additional per-sample information from the sacc
         # file needed for this likelihood.
         ind_bias = 0
@@ -160,10 +171,16 @@ class ClFinal(Theory):
                                           +'_'+bn)
                         inds.append(ind_bias)
                         ind_bias += 1
+                # Magnification bias
+                pn = self.input_params_prefix + '_'+ name +'_s'
+                if with_magnification_bias:
+                    bias_names.append(pn)
+                    inds.append(ind_bias)
+                    ind_bias += 1
                 bd['bias_ind'] = inds
+
                 # In the lagrangian picture there's an unbiased term.
                 bd['eps'] = (bias_model == 'LagrangianPT')
-                # No magnification bias yet
             elif quantity == 'galaxy_shear':
                 bd['eps'] = True
                 if ia_model == 'IAPerBin':
