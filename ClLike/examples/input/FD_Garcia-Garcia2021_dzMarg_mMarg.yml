@@ -197,10 +197,9 @@ params:
     latex: b^{eBOSS_1}_1
     proposal: 0.1
 
-  # Commented out because it is not implemented yet
   # Magnification biases
-  # bias_eBOSS__0_s: 0.2
-  # bias_eBOSS__1_s: 0.2
+  bias_eBOSS__0_s: 0.2
+  bias_eBOSS__1_s: 0.2
  
   # In this paper, the same IA was used for all wl samples
   bias_A_IA:
