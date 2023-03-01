@@ -95,6 +95,11 @@ class ClLike(Likelihood):
                 lmax = get_lmax_from_kmax(cosmo_lcdm,
                                           kmax, zmid)
                 self.defaults[b['name']]['lmax'] = lmax
+
+                # Do we want magnification bias for this tracer?
+                self.bin_properties[b['name']]['mag_bias'] = \
+                    self.defaults[b['name']].get("mag_bias", False)
+
             else:
                 # Make sure everything else has an ell_max
                 if 'lmax' not in self.defaults[b['name']]:

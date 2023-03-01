@@ -24,8 +24,8 @@ class Limber(Theory):
 
     # Sample type
     sample_type: str = "convolve"
-    # Magnification bias
-    with_magnification_bias: bool = False
+    # Magnification bias selected per tracer in defaults
+    # with_magnification_bias: bool = False
 
     def initialize(self):
         self.cl_meta = None
@@ -110,7 +110,7 @@ class Limber(Theory):
                         t1.append(tr)
                         t1n.append(dn)
                 # Magnification
-                if self.with_magnification_bias:
+                if self.bin_properties[name]['mag_bias']:
                     # We use s = 1/5 here so that (2-5s)=1 and we multiply by
                     # (2-5s) in cl_total
                     tr = ccl.NumberCountsTracer(cosmo, dndz=dndz,
@@ -391,10 +391,7 @@ class Limber(Theory):
         return l_sample
 
     def get_can_provide(self):
-        return ["ia_model", "with_magnification_bias"]
+        return ["ia_model"]
 
     def get_ia_model(self):
         return self.ia_model
-
-    def get_with_magnification_bias(self):
-        return self.with_magnification_bias
