@@ -116,15 +116,8 @@ class CCL_BLCDM(Theory):
         a_bhc = 1 / (bhc['z'] + 1)
         background = {'a': a_bhc, 'chi': bhc['comov. dist.'],
                       'h_over_h0':  H / H[-1]}
-        # Growth
-        # FIXME: growth factor f column is only valid for dust-only cosmologies
-        growth = {'a': a_bhc, 'growth_factor': bhc['gr.fac. D'],
-                  "growth_rate": bhc['gr.fac. f']}
-        # Pk
-        pkln_mm, k, z_pk = hc.get_pk_and_k_and_z(nonlinear=False)
-        a_pk = 1 / (1+z_pk)
-
-        pk_linear, pk_nonlin = self._get_pks_muSigma(hc, bhc)
+        # Growth & Pks
+        growth, pk_linear, pk_nonlin = self._get_growth_and_pks_muSigma(hc, bhc)
 
         sigma8 = hc.sigma8()
         Omega_m = hc.Omega_m()
@@ -157,9 +150,12 @@ class CCL_BLCDM(Theory):
             state['CCL'][req_res] = method(cosmo)
 
 
-    def _get_pks_muSigma(self, hc, bhc):
+    def _get_growth_and_pks_muSigma(self, hc, bhc):
         # Passing bhc to avoid overhead
         pkln_mm, k, z_pk = hc.get_pk_and_k_and_z(nonlinear=False)
+        # Removing last z to avoid going above z_max_pk when computing f
+        pkln_mm = pkln_mm[:, 1:]
+        z_pk = z_pk[1:]
         a_pk = 1 / (1+z_pk)
 
         mu = interp1d(bhc['z'], bhc['mgclass_dmu'] + 1)(z_pk)
@@ -174,10 +170,28 @@ class CCL_BLCDM(Theory):
                      'Weyl:Weyl': pkln_ww.T
                      }
 
+        # Growth measured from the transfers as recommended by Emilio
+        # The growth factor and rate columns in the background tables are only
+        # valid for dust-only cosmologies
+        # They solve: delta'' + 2H delta' + delta = 0
+        growth_factor = np.zeros(z_pk.size)
+        growth_rate = np.zeros(z_pk.size)
+        for i, zi in enumerate(z_pk):
+            growth_factor[i] = hc.scale_dependent_growth_factor_at_k_and_z(0.01, zi)
+            growth_rate[i] = hc.scale_dependent_growth_factor_f_at_k_and_z(0.01, zi)
+
+        growth = {'a': a_pk, 'growth_factor': growth_factor,
+                  "growth_rate": growth_rate}
+
+        # Non linear Pk
         if self.nonlinear_model == "Linear":
             pk_nonlin = pk_linear
         elif self.nonlinear_model == "muSigma":
             pk_mm, k, z = hc.get_pk_and_k_and_z(nonlinear=True)
+            # For consistency with pkln
+            pk_mm = pk_mm[:, 1:]
+            z_pk = z_pk[1:]
+
             pk_mw = Sigma * pk_mm
             pk_ww = Sigma**2 * pk_mm
 
@@ -189,7 +203,7 @@ class CCL_BLCDM(Theory):
             raise NotImplementedError("nonlinear_model = "
                                       f"{self.nonlinear_model} not Implemented")
 
-        return pk_linear, pk_nonlin
+        return growth, pk_linear, pk_nonlin
 
     # Commented out. Old way but could be useful for models that are not
     # mu/Sigma
