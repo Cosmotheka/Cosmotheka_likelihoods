@@ -153,9 +153,6 @@ class CCL_BLCDM(Theory):
     def _get_growth_and_pks_muSigma(self, hc, bhc):
         # Passing bhc to avoid overhead
         pkln_mm, k, z_pk = hc.get_pk_and_k_and_z(nonlinear=False)
-        # Removing last z to avoid going above z_max_pk when computing f
-        pkln_mm = pkln_mm[:, 1:]
-        z_pk = z_pk[1:]
         a_pk = 1 / (1+z_pk)
 
         mu = interp1d(bhc['z'], bhc['mgclass_dmu'] + 1)(z_pk)
@@ -188,9 +185,6 @@ class CCL_BLCDM(Theory):
             pk_nonlin = pk_linear
         elif self.nonlinear_model == "muSigma":
             pk_mm, k, z = hc.get_pk_and_k_and_z(nonlinear=True)
-            # For consistency with pkln
-            pk_mm = pk_mm[:, 1:]
-            z_pk = z_pk[1:]
 
             pk_mw = Sigma * pk_mm
             pk_ww = Sigma**2 * pk_mm
