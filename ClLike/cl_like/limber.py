@@ -120,7 +120,7 @@ class Limber(Theory):
                                                 bias=(z, z*0), has_rsd=False,
                                                 mag_bias=(z, oz/5.))
                     t1.append(tr)
-                    t1n.append("m")
+                    t1n.append("w")
             elif q == 'galaxy_shear':
                 dndz = self._get_nz(cosmo, name, **pars)
                 t0 = ccl.WeakLensingTracer(cosmo, dndz=dndz)
