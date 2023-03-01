@@ -51,7 +51,7 @@ class ClFinal(Theory):
         for i, k in enumerate(self.bias_names):
             if k[-2:] == "_s":
                 # Magnification i.e. (2 - 5s)
-                bias[i] = 2 - 5*pars.get(k, 2/5)
+                bias[i] = 2 - 5*pars[k]
             else:
                 bias[i] = pars[k]
 
