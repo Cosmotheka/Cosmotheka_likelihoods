@@ -38,9 +38,9 @@ class CCL_BLCDM(Theory):
         self.cosmo_class = Class()
         self.cosmo_class.set({'output': 'mPk',
                               'z_max_pk': 4,
-                              'P_k_max_1/Mpc': 2,
-                              'hmcode_min_k_max': 35,
-                              # 'hmcode_min_k_max' added to avoid this error:
+                              'P_k_max_1/Mpc': 100,
+                              # High k_max to prevent the following error. It
+                              # might be reduced, though. Needs exploration.
                               # Fails with
                               # CosmoSevereError("get_pk_and_k_and_z() is
                               # trying to return P(k,z) up to
@@ -59,6 +59,12 @@ class CCL_BLCDM(Theory):
 
         if "gravity_model" in self.classy_arguments:
             self.cosmo_class.set({'output_background_smg': 10})
+
+        nl = self.classy_arguments.get("non linear", '')
+        if (nl.lower() == "hmcode") and \
+                ("extrapolation_method" not in self.classy_arguments):
+            # Use extrap_hmcode in nonlinear.c
+            self.cosmo_class.set({"extrapolation_method": 4})
 
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
@@ -184,7 +190,30 @@ class CCL_BLCDM(Theory):
         if self.nonlinear_model == "Linear":
             pk_nonlin = pk_linear
         elif self.nonlinear_model == "muSigma":
-            pk_mm, k, z = hc.get_pk_and_k_and_z(nonlinear=True)
+            try:
+                pk_mm, k, z = hc.get_pk_and_k_and_z(nonlinear=True)
+            except CosmoSevereError as e:
+                # If get_pk_and_k_and_z fails because the nonlinear pk has not
+                # been requested up to a high k, check the reason. If k_max >=
+                # 100, we can safely return the linear Pk because those models
+                # will have a) a very low As or b) very high redshift. In both
+                # cases we do not care about what happens there.
+                pkmax = hc.pars.get('P_k_max_1/Mpc', 0)
+                hmkmax = hc.pars.get('hmcode_min_k_max', pkmax)
+                hfkmax = hc.pars.get('halofit_min_k_max', pkmax)
+                nonlin = hc.pars['non linear']
+                if "hmcode_min_k_max" not in str(e):
+                    raise e
+                elif ((nonlin == 'hmcode') and (hmkmax < 100)) or \
+                    ((nonlin == 'halofit') and (hfkmax < 100)):
+                    print("You need at least k_max=100 Mpc^-1 to default to "
+                          "the linear pk in case of failure")
+                    raise e
+                self.log.debug(str(e))
+                pk_mm = np.zeros_like(pkln_mm[:-1])
+                k = k[:-1]  # To avoid going out of boundaries
+                for i, zi in enumerate(z_pk):
+                    pk_mm[:, i] = [hc.pk(ki, zi) for ki in k]
 
             pk_mw = Sigma * pk_mm
             pk_ww = Sigma**2 * pk_mm
