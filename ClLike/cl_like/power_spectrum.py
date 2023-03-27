@@ -119,9 +119,12 @@ class Pk(Theory):
         return self._current_state['Pk']
 
     def _get_pk_data(self, cosmo):
-        cosmo.compute_nonlin_power()
-        pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        # cosmo.compute_nonlin_power()
+        # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        pkmm = None
         if self.bias_model == 'Linear':
+            cosmo.compute_nonlin_power()
+            pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
             pkd = {}
             pkd['pk_mm'] = pkmm
             pkd['pk_md1'] = pkmm
@@ -134,6 +137,8 @@ class Pk(Theory):
                 k_filter = None
             if self.bias_model == 'EulerianPT':
                 from .ept import EPTCalculator
+                cosmo.compute_nonlin_power()
+                pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
                 ptc = EPTCalculator(with_NC=True, with_IA=False,
                                     log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
@@ -142,6 +147,8 @@ class Pk(Theory):
                                     k_filter=k_filter)
             elif self.bias_model == 'LagrangianPT':
                 from .lpt import LPTCalculator
+                cosmo.compute_nonlin_power()
+                pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
                 ptc = LPTCalculator(log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
                                     nk_per_decade=self.nk_per_dex_pks,
