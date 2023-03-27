@@ -100,7 +100,7 @@ class Limber(Theory):
                                             has_rsd=False)
                 # Tracer for the unbiased component
                 t0 = None
-                if self.bias_model == 'LagrangianPT':
+                if self.bias_model in ['LagrangianPT', 'BaccoPT']:
                     t0 = tr
                 # Tracers for the biased components
                 t1 = [tr]

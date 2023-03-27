@@ -24,7 +24,15 @@ except ImportError as e:
     EPT_exception = e
     HAVE_EPT = False
 
+try:
+    from .bacco import BaccoCalculator
+    HAVE_BACCO = True
+    BACCO_exception = None
+except ImportError as e:
+    BACCO_exception = e
+    HAVE_BACCO = False
 
+    
 class Pk(Theory):
     """Computes the power spectrum"""
     # b(z) model name
@@ -44,7 +52,7 @@ class Pk(Theory):
 
     def initialize(self):
         # Bias model
-        self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT']
+        self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT', 'BaccoPT']
         # Pk sampling
         self.a_s_pks = 1./(1+np.linspace(0., self.zmax_pks, self.nz_pks)[::-1])
         self.nk_pks = int((self.l10k_max_pks - self.l10k_min_pks) *
@@ -91,6 +99,11 @@ class Pk(Theory):
             raise LPT_exception
         elif self.bias_model == 'EulerianPT' and not HAVE_EPT:
             raise EPT_exception
+        elif self.bias_model == 'BaccoPT' and not HAVE_BACCO:
+            raise BACCO_exception
+
+        if self.bias_model == 'BaccoPT':
+            self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks)
 
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
@@ -106,9 +119,12 @@ class Pk(Theory):
         return self._current_state['Pk']
 
     def _get_pk_data(self, cosmo):
-        cosmo.compute_nonlin_power()
-        pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        # cosmo.compute_nonlin_power()
+        # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        pkmm = None
         if self.bias_model == 'Linear':
+            cosmo.compute_nonlin_power()
+            pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
             pkd = {}
             pkd['pk_mm'] = pkmm
             pkd['pk_md1'] = pkmm
@@ -121,6 +137,8 @@ class Pk(Theory):
                 k_filter = None
             if self.bias_model == 'EulerianPT':
                 from .ept import EPTCalculator
+                cosmo.compute_nonlin_power()
+                pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
                 ptc = EPTCalculator(with_NC=True, with_IA=False,
                                     log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
@@ -129,16 +147,18 @@ class Pk(Theory):
                                     k_filter=k_filter)
             elif self.bias_model == 'LagrangianPT':
                 from .lpt import LPTCalculator
+                cosmo.compute_nonlin_power()
+                pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
                 ptc = LPTCalculator(log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
                                     nk_per_decade=self.nk_per_dex_pks,
                                     a_arr=self.a_s_pks, h=cosmo['h'],
                                     k_filter=k_filter)
+            elif self.bias_model == 'BaccoPT':
+                ptc = self.bacco_calc
             else:
                 raise NotImplementedError("Not yet: " + self.bias_model)
-            pk_lin_z0 = ccl.linear_matter_power(cosmo, ptc.ks, 1.)
-            Dz = ccl.growth_factor(cosmo, ptc.a_s)
-            ptc.update_pk(pk_lin_z0, Dz)
+            ptc.update_pk(cosmo)
             pkd = {}
             operators = ['m', 'd1', 'd2', 's2', 'k2']
             for i1, op1 in enumerate(operators):
