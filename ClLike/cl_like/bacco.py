@@ -40,7 +40,11 @@ class BaccoCalculator(object):
             'neutrino_mass': np.sum(cosmo['m_nu']),
             'w0': cosmo['w0'],
             'wa': cosmo['wa']}
+        k_for_bacco = self.ks/h
+        self.mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= 0.75))
+        k_for_bacco = k_for_bacco[self.mask_ks_for_bacco]
         self.pk_temp = np.array([self.lbias.get_nonlinear_pnn(k=self.ks/h,
+                                                              allow_high_k_extrapolation=False, #this is bad, should be improved
                                                               expfactor=a,
                                                               **cospar)[1]/h**3
                                  for a in self.a_s])
@@ -109,7 +113,7 @@ class BaccoCalculator(object):
         pk = pfac[kind]*self.pk_temp[:, inds[kind], :]
         if kind in ['mm']:
             pk = np.log(pk)
-        pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
+        pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks[self.mask_ks_for_bacco]),
                         pk_arr=pk, is_logp=kind in ['mm'])
         self.pk2d_computed[kind] = pk2d
         return pk2d
