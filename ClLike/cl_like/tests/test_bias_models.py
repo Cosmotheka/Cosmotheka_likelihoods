@@ -34,6 +34,7 @@ def get_info(bias, A_sE9=True):
                        "limber_sh1_dz": -0.2,
                        "limber_sh1_eta_IA": 1,
                        "bias_sh1_A_IA": 0.1,
+                       "bias_gc1_s": 2/5,
                        "sigma8": None},
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
@@ -63,7 +64,8 @@ def get_info(bias, A_sE9=True):
                                       "defaults": {"kmax": 0.5,
                                                    "lmin": 0,
                                                    "lmax": 2000,
-                                                   "gc1": {"lmin": 20}},
+                                                   "gc1": {"lmin": 20,
+                                                           "mag_bias": True}},
                                       "input_params_prefix": "cll",
                                       }
                            },

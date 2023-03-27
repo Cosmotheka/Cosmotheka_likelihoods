@@ -47,7 +47,14 @@ class ClFinal(Theory):
         cld = res['cl_data']
 
         # Construct bias vector
-        bias = np.array([pars[k] for k in self.bias_names])
+        bias = np.zeros(len(self.bias_names))
+        for i, k in enumerate(self.bias_names):
+            if k[-2:] == "_s":
+                # Magnification i.e. (2 - 5s)
+                bias[i] = 2 - 5*pars[k]
+            else:
+                bias[i] = pars[k]
+
         # Construct global bias vector
         global_bias = self._get_global_bias(**pars)
 
@@ -160,10 +167,18 @@ class ClFinal(Theory):
                                           +'_'+bn)
                         inds.append(ind_bias)
                         ind_bias += 1
+                # Magnification bias
+                if self.bin_properties[name]['mag_bias']:
+                    pn = self.input_params_prefix + '_'+ name +'_s'
+                    bias_names.append(pn)
+                    inds.append(ind_bias)
+                    ind_bias += 1
                 bd['bias_ind'] = inds
+
                 # In the lagrangian picture there's an unbiased term.
                 bd['eps'] = (bias_model in ['LagrangianPT', 'BaccoPT'])
                 # No magnification bias yet
+
             elif quantity == 'galaxy_shear':
                 bd['eps'] = True
                 if ia_model == 'IAPerBin':
