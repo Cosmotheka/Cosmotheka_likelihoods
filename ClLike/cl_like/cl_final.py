@@ -176,7 +176,9 @@ class ClFinal(Theory):
                 bd['bias_ind'] = inds
 
                 # In the lagrangian picture there's an unbiased term.
-                bd['eps'] = (bias_model == 'LagrangianPT')
+                bd['eps'] = (bias_model in ['LagrangianPT', 'BaccoPT'])
+                # No magnification bias yet
+
             elif quantity == 'galaxy_shear':
                 bd['eps'] = True
                 if ia_model == 'IAPerBin':

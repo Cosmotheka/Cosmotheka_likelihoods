@@ -4,7 +4,9 @@ theory:
     matter_pk: halofit
     transfer_function: eisenstein_hu
   cl_like.Pk:
+    # bias_model: "LagrangianPT"
     bias_model: "BaccoPT"
+    zmax_pks: 2.6
   cl_like.Limber:
     nz_model: "NzShift"
     ia_model: "IADESY1"
