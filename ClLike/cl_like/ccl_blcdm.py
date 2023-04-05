@@ -66,9 +66,22 @@ class CCL_BLCDM(Theory):
             # Use extrap_hmcode in nonlinear.c
             self.cosmo_class.set({"extrapolation_method": 4})
 
+        if 'mPk' not in self.cosmo_class.pars['output']:
+            del self.cosmo_class.pars['z_max_pk']
+            del self.cosmo_class.pars['P_k_max_1/Mpc']
+
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
         return ['S8', 'sigma8', "Omega_m", "A_s"]
+
+    def must_provide(self, **requirements):
+        lmax = requirements.get('Cl', 0)
+        lmax_pars = self.cosmo_class.pars.get("l_max_scalars", 0)
+        if lmax != 0:
+            lmax = max(lmax.values())
+        self.cosmo_class.pars["l_max_scalars"] = max(lmax, lmax_pars)
+        return {}
+
 
     def get_allow_agnostic(self):
         return True
@@ -116,6 +129,22 @@ class CCL_BLCDM(Theory):
                            state["params"])
             raise
 
+        output = hc.pars['output']
+        cosmo, params = \
+            self._get_cosmo_ccl(hc) if 'mPk' in output else (None, {})
+        cl = self._get_Cl(hc) if 'tCl' in output else None
+
+        self.cosmo_class.struct_cleanup()
+
+        state['CCL'] = {'cosmo': cosmo}
+        state['Cl'] = cl
+
+        # Derived
+        state['derived'] = params
+        for req_res, method in self._required_results.items():
+            state['CCL'][req_res] = method(cosmo)
+
+    def _get_cosmo_ccl(self, hc, derived=True):
         bhc = hc.get_background()
         # Background
         H = bhc['H [1/Mpc]']
@@ -134,14 +163,8 @@ class CCL_BLCDM(Theory):
                                         pk_linear=pk_linear,
                                         pk_nonlin=pk_nonlin,
                                         nonlinear_model=None)
-
-
-
-        self.cosmo_class.struct_cleanup()
-
-        state['CCL'] = {'cosmo': cosmo}
-
-        # Derived
+        if not derived:
+            return cosmo
 
         params = {}
         if 'A_s' in self.input_params:
@@ -150,11 +173,20 @@ class CCL_BLCDM(Theory):
             params.update({'A_s':
                            hc.get_current_derived_parameters(['A_s'])['A_s']})
         params.update({'S8': sigma8*np.sqrt(Omega_m/0.3), 'Omega_m': Omega_m})
+        return cosmo, params
 
-        state['derived'] = params
-        for req_res, method in self._required_results.items():
-            state['CCL'][req_res] = method(cosmo)
+    def _get_Cl(self, hc):
+        cl = hc.lensed_cl()
+        # This is the MontePython way. Note that Cobaya uses T = 2.7255e6,
+        # which is the same as long as you don't change T_cmb in classy.
+        T = hc.T_cmb()
+        for key in cl.keys():
+            if key not in ['pp', 'ell', 'tp', 'ep']:
+                cl[key] *= (T * 1e6)**2
+            elif key in ['tp', 'ep']:
+                cl[key] *= (T * 1e6)
 
+        return cl
 
     def _get_growth_and_pks_muSigma(self, hc, bhc):
         # Passing bhc to avoid overhead
@@ -278,3 +310,11 @@ class CCL_BLCDM(Theory):
         :return: dict of results
         """
         return self._current_state['CCL']
+
+    def get_Cl(self, units=None):
+        """
+        Get dictionary of Cls.
+
+        :return: dict of results
+        """
+        return self._current_state['Cl']

@@ -92,6 +92,53 @@ def get_info(non_linear="halofit", nonlinear_model="muSigma", pars_smg=(0, 0)):
 
     return info
 
+def get_info_P18(non_linear='hmcode', nonlinear_model="muSigma",
+                 pars_smg=(0, 0), classy=False):
+    params_lcdm = {"A_s": 2.23e-9,
+                       "Omega_cdm": 0.25,
+                       "Omega_b": 0.05,
+                       "h": 0.67,
+                       "n_s": 0.96}
+    params = params_lcdm.copy()
+    params.update({"parameters_smg__1": pars_smg[0],  # dmu
+                   "parameters_smg__2": pars_smg[1],  # dSigma
+                   "expansion_smg": 0.7,    # DE, tuned
+                  })
+
+    info = {"params": params,
+            "theory": {"ccl_blcdm": {"external": CCL_BLCDM,
+                                     "nonlinear_model": nonlinear_model,
+                                     "classy_arguments": {
+                                     "Omega_Lambda": 0,
+                                     "Omega_fld": 0,
+                                     "Omega_smg": -1,
+                                     "non linear": non_linear,
+                                     "gravity_model": "mgclass_fs",
+                                     "expansion_model": "lcdm",
+                                     "use_Sigma": "yes",
+                                     "output": "tCl, lCl, pCl",
+                                     "lensing": 'yes'}
+                               },
+                       },
+            "likelihood": {"planck_2018_lowl.TT": None,
+                           "planck_2018_lowl.EE": None,
+                           "planck_2018_highl_plik.TTTEEE": None,
+                           "planck_2018_lensing.clik": None
+                           },
+            "output": "dum",
+            "debug": True,
+            "sampler": "evaluate"}
+
+    if classy:
+         info["params"] = params_lcdm
+         # info["theory"] = {"classy": {"extra_args": {"lensing": "yeah",
+         #                                             "non linear": non_linear}}}
+         info["theory"]["ccl_blcdm"] = {"external": CCL_BLCDM,
+                                        "classy_arguments": {
+                                        "non linear": non_linear,
+                                        "output": "tCl, lCl, pCl",
+                                        "lensing": 'yes'}}
+    return info
 
 def get_pk_lin(cosmo, pair, z):
     Tks = cosmo.get_transfer(z)
@@ -233,3 +280,65 @@ def test_get_pks_muSigma(non_linear, pars_smg):
         assert pk_ww == pytest.approx(pk_ww2, 1e-2)
 
     cosmo.struct_cleanup()
+
+@pytest.mark.parametrize('non_linear', ['halofit', 'hmcode'])
+def test_dum_P18(non_linear):
+    # LCDM
+    # Commented out because it fails to load 2 different versions of classy and
+    # mgclass is in 2.9.4, instead of the minimum requirement of 3.2.0
+    #
+    # Note the z_reio = 11.357. This was changed to 7.6711 in CLASSv3 and makes
+    # the Cell to disagree
+    #
+    # info = {"params": {"A_s": 2.23e-9,
+    #                "Omega_cdm": 0.25,
+    #                "Omega_b": 0.05,
+    #                "h": 0.67,
+    #                "n_s": 0.96,
+    #                #"n_s": {"prior": {"min": 0.8, "max": 1.2}}
+    #                },
+    #     "theory": {"classy": {"extra_args": {"lensing": "yeah",
+    #                                          "non linear": "hmcode",
+    #                                          "z_reio": 11.357}}},
+    #     "likelihood": {"planck_2018_lowl.TT": None,
+    #                    "planck_2018_lowl.EE": None,
+    #                    "planck_2018_highl_plik.TTTEEE": None,
+    #                    "planck_2018_lensing.clik": None
+    #                    },
+    #     "output": "dum",
+    #     "debug": False}
+    # model = get_model(info)
+    # point = dict(zip(model.parameterization.sampled_params(),
+    #                  model.prior.sample(ignore_external=True,
+    #                  random_state=0)[0]))
+    # point = {'A_planck': 1.0044101308649191, 'calib_100T':
+    # 1.0014348366421773, 'calib_217T': 0.999196634024879, 'A_cib_217':
+    # 109.76270078546494, 'xi_sz_cib': 0.5488135039273248, 'A_sz':
+    # 5.4881350392732475, 'ksz_norm': 5.4881350392732475, 'gal545_A_100':
+    # 12.128104691935327, 'gal545_A_143': 14.128104691935327,
+    # 'gal545_A_143_217': 38.494444940725145, 'gal545_A_217':
+    # 127.18104691935329, 'ps_A_100_100': 219.5254015709299, 'ps_A_143_143':
+    # 219.5254015709299, 'ps_A_143_217': 219.5254015709299, 'ps_A_217_217':
+    # 219.5254015709299, 'galf_TE_A_100': 0.2040901985306419,
+    # 'galf_TE_A_100_143': 0.1935058844548359, 'galf_TE_A_100_217':
+    # 0.6187647111370898, 'galf_TE_A_143': 0.33401176890967177,
+    # 'galf_TE_A_143_217': 0.8487647111370897, 'galf_TE_A_217':
+    # 2.8905882668225384}
+    # loglikes, derived = model.loglikes(point)
+    # chi2_lcdm = loglikes[0]
+    if non_linear == 'halofit':
+        chi2_lcdm = np.array([-1.23658830e+01, -2.11195190e+02,
+                              -7.34882207e+03, -3.87749517e+00])
+    else:
+        chi2_lcdm = np.array([-1.23663866e+01, -2.11195190e+02,
+                              -7.35800207e+03, -3.90582303e+00])
+
+    # BLCDM
+    info = get_info_P18(non_linear, classy=False)
+    model = get_model(info)
+    point = dict(zip(model.parameterization.sampled_params(),
+                     model.prior.sample(ignore_external=True,
+                                        random_state=0)[0]))
+
+    loglikes, derived = model.loglikes(point)
+    assert chi2_lcdm == pytest.approx(loglikes, 1e-2)
