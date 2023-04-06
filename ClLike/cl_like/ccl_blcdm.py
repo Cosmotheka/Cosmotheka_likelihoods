@@ -36,25 +36,7 @@ class CCL_BLCDM(Theory):
 
         # Initialize Class
         self.cosmo_class = Class()
-        self.cosmo_class.set({'output': 'mPk',
-                              'z_max_pk': 4,
-                              'P_k_max_1/Mpc': 100,
-                              # High k_max to prevent the following error. It
-                              # might be reduced, though. Needs exploration.
-                              # Fails with
-                              # CosmoSevereError("get_pk_and_k_and_z() is
-                              # trying to return P(k,z) up to
-                              # z_max=5.000000e+00 (to encompass your requested
-                              # maximum value of z); but the input parameters
-                              # sent to CLASS were such that the non-linear
-                              # P(k,z) could only be consistently computed up
-                              # to z=4.710776e+00; increase the input parameter
-                              # 'P_k_max_h/Mpc' or 'P_k_max_1/Mpc', or increase
-                              # the precision parameters 'halofit_min_k_max'
-                              # and/or 'hmcode_min_k_max', or decrease your
-                              # requested z_max")
-                              })
-
+        self.cosmo_class.set({'output': ''})
         self.cosmo_class.set(self.classy_arguments)
 
         if "gravity_model" in self.classy_arguments:
@@ -66,20 +48,54 @@ class CCL_BLCDM(Theory):
             # Use extrap_hmcode in nonlinear.c
             self.cosmo_class.set({"extrapolation_method": 4})
 
-        if 'mPk' not in self.cosmo_class.pars['output']:
-            del self.cosmo_class.pars['z_max_pk']
-            del self.cosmo_class.pars['P_k_max_1/Mpc']
-
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
         return ['S8', 'sigma8', "Omega_m", "A_s"]
 
     def must_provide(self, **requirements):
-        lmax = requirements.get('Cl', 0)
-        lmax_pars = self.cosmo_class.pars.get("l_max_scalars", 0)
-        if lmax != 0:
-            lmax = max(lmax.values())
-        self.cosmo_class.pars["l_max_scalars"] = max(lmax, lmax_pars)
+        pars = self.cosmo_class.pars
+
+        Cl = requirements.get('Cl')
+        self.return_Cl = False if Cl is None else True
+        if self.return_Cl:
+            lmax = max(Cl.values())
+            lmax_pars = self.cosmo_class.pars.get("l_max_scalars", 0)
+            pars["l_max_scalars"] = max(lmax, lmax_pars)
+            cl_keys = ''.join(list(Cl.keys()))
+            if 't' in cl_keys and 'tCl' not in pars['output']:
+                pars['output'] = ','.join([pars['output'], 'tCl'])
+            if (('e' in cl_keys) or ('b' in cl_keys)) and \
+                    ('pCl' not in pars['output']):
+                pars['output'] = ','.join([pars['output'], 'pCl'])
+            if 'p' in cl_keys and 'lCl' not in pars['output']:
+                pars['output'] = ','.join([pars['output'], 'lCl'])
+
+            if "lensing" not in pars:
+                # This will add lensing if it hasn't been defined by the user
+                # Plik will fail if the user sets lensing to false, though.
+                pars["lensing"] = True
+
+        CCL = requirements.get('CCL')
+        self.return_CCL = False if CCL is None else True
+        if self.return_CCL:
+            if 'mPk' not in pars['output']:
+                pars['output'] = ','.join([pars['output'], 'mPk'])
+            if 'z_max_pk' not in pars:
+                pars['z_max_pk'] = 4
+            if 'P_k_max_1/Mpc' not in pars:
+                pars['P_k_max_1/Mpc'] = 100
+            # High k_max to prevent the following error. It might be reduced,
+            # though. Needs exploration.  Fails with
+            # CosmoSevereError("get_pk_and_k_and_z() is trying to return P(k,z)
+            # up to z_max=5.000000e+00 (to encompass your requested maximum
+            # value of z); but the input parameters sent to CLASS were such
+            # that the non-linear P(k,z) could only be consistently computed up
+            # to z=4.710776e+00; increase the input parameter 'P_k_max_h/Mpc'
+            # or 'P_k_max_1/Mpc', or increase the precision parameters
+            # 'halofit_min_k_max' and/or 'hmcode_min_k_max', or decrease your
+            # requested z_max")
+
+
         return {}
 
 
@@ -131,7 +147,7 @@ class CCL_BLCDM(Theory):
 
         output = hc.pars['output']
         cosmo, params = \
-            self._get_cosmo_ccl(hc) if 'mPk' in output else (None, {})
+            self._get_cosmo_ccl(hc) if self.return_CCL else (None, {})
         cl = self._get_Cl(hc) if 'tCl' in output else None
 
         self.cosmo_class.struct_cleanup()
