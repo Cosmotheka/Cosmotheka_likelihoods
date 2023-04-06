@@ -75,8 +75,7 @@ class CCL_BLCDM(Theory):
                 # Plik will fail if the user sets lensing to false, though.
                 pars["lensing"] = True
 
-        CCL = requirements.get('CCL')
-        self.return_CCL = False if CCL is None else True
+        self.return_CCL = True if 'CCL' in requirements else False
         if self.return_CCL:
             if 'mPk' not in pars['output']:
                 pars['output'] = ','.join([pars['output'], 'mPk'])
@@ -94,7 +93,6 @@ class CCL_BLCDM(Theory):
             # or 'P_k_max_1/Mpc', or increase the precision parameters
             # 'halofit_min_k_max' and/or 'hmcode_min_k_max', or decrease your
             # requested z_max")
-
 
         return {}
 
@@ -146,17 +144,28 @@ class CCL_BLCDM(Theory):
             raise
 
         output = hc.pars['output']
-        cosmo, params = \
-            self._get_cosmo_ccl(hc) if self.return_CCL else (None, {})
-        cl = self._get_Cl(hc) if 'tCl' in output else None
-
-        self.cosmo_class.struct_cleanup()
+        cosmo = self._get_cosmo_ccl(hc) if self.return_CCL else None
+        cl = self._get_Cl(hc) if 'Cl' in output else None
+        hc.struct_cleanup()
 
         state['CCL'] = {'cosmo': cosmo}
         state['Cl'] = cl
 
         # Derived
+        params = {}
+        Omega_m = hc.Omega_m()
+        params['Omega_m'] =  Omega_m
+        if 'mPk' in hc.pars['output']:
+            sigma8 = hc.sigma8()
+            params['S8'] = sigma8*np.sqrt(Omega_m/0.3)
+        if ('A_s' in self.input_params) and ('mPk' in hc.pars['output']):
+            params.update({'sigma8': sigma8})
+        else:
+            params.update({'A_s':
+                           hc.get_current_derived_parameters(['A_s'])['A_s']})
         state['derived'] = params
+
+        # Extra methods
         for req_res, method in self._required_results.items():
             state['CCL'][req_res] = method(cosmo)
 
@@ -179,17 +188,7 @@ class CCL_BLCDM(Theory):
                                         pk_linear=pk_linear,
                                         pk_nonlin=pk_nonlin,
                                         nonlinear_model=None)
-        if not derived:
-            return cosmo
-
-        params = {}
-        if 'A_s' in self.input_params:
-            params.update({'sigma8': sigma8})
-        else:
-            params.update({'A_s':
-                           hc.get_current_derived_parameters(['A_s'])['A_s']})
-        params.update({'S8': sigma8*np.sqrt(Omega_m/0.3), 'Omega_m': Omega_m})
-        return cosmo, params
+        return cosmo
 
     def _get_Cl(self, hc):
         cl = hc.lensed_cl()
