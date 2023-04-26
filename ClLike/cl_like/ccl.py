@@ -50,6 +50,7 @@ class CCL(Theory):
     transfer_function: str = 'boltzmann_camb'
     matter_pk: str = 'halofit'
     baryons_pk: str = 'nobaryons'
+    ccl_arguments: dict = {}
 
     def initialize(self):
         self._required_results = {}
@@ -114,7 +115,8 @@ class CCL(Theory):
                               T_CMB=2.7255,
                               transfer_function=self.transfer_function,
                               matter_power_spectrum=self.matter_pk,
-                              baryons_power_spectrum=self.baryons_pk)
+                              baryons_power_spectrum=self.baryons_pk,
+                              **self.ccl_arguments)
 
         state['CCL'] = {'cosmo': cosmo}
 
