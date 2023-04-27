@@ -34,7 +34,7 @@ class LPTCalculator(object):
         else:
             self.wk_low = np.ones(nk_total)
 
-    def update_pk(self, cosmo):
+    def update_pk(self, cosmo, bcmpar={}):
         """ Update the internal PT arrays.
 
         Args:

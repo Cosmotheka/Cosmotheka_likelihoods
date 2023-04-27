@@ -83,7 +83,7 @@ class EPTCalculator(object):
         self.ia_mix = None
         self.g4 = None
 
-    def update_pk(self, cosmo):
+    def update_pk(self, cosmo, bcmpar={}):
         """ Update the internal PT arrays.
 
         Args:

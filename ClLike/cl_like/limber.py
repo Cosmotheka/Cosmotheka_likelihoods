@@ -170,7 +170,7 @@ class Limber(Theory):
             dn_2 = dnames[n2]
             # 00: unbiased x unbiased
             if t0_1 and t0_2:
-                pk = pkd['pk_mm']
+                pk = pkd['pk_mm_sh_sh'] if 'pk_mm_sh_sh' in pkd.keys() else pkd['pk_mm']
                 cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
                 cls_00.append(cl00)
             else:

@@ -49,6 +49,9 @@ class Pk(Theory):
     nz_pks: int = 30
     # #k for 3D power spectra
     nk_per_dex_pks: int = 25
+    #for baccoemu
+    nonlinear_emu_path = None
+    nonlinear_emu_details = None
 
     def initialize(self):
         # Bias model
@@ -103,7 +106,9 @@ class Pk(Theory):
             raise BACCO_exception
 
         if self.bias_model == 'BaccoPT':
-            self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks)
+            self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks, 
+                                              nonlinear_emu_path=self.nonlinear_emu_path, 
+                                              nonlinear_emu_details=self.nonlinear_emu_details)
 
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
@@ -112,13 +117,15 @@ class Pk(Theory):
         return {"CCL": None}
 
     def calculate(self, state, want_derived=True, **params_values_dict):
-        cosmo = self.provider.get_CCL()["cosmo"]
-        state['Pk'] = {'pk_data': self._get_pk_data(cosmo)}
+        _state = self.provider.get_CCL()
+        cosmo = _state["cosmo"]
+        bcmpar = _state["bcmpar"] if "bcmpar" in _state else {}
+        state['Pk'] = {'pk_data': self._get_pk_data(cosmo, bcmpar=bcmpar)}
 
     def get_Pk(self):
         return self._current_state['Pk']
 
-    def _get_pk_data(self, cosmo):
+    def _get_pk_data(self, cosmo, bcmpar={}):
         # cosmo.compute_nonlin_power()
         # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
         pkmm = None
@@ -158,7 +165,7 @@ class Pk(Theory):
                 ptc = self.bacco_calc
             else:
                 raise NotImplementedError("Not yet: " + self.bias_model)
-            ptc.update_pk(cosmo)
+            ptc.update_pk(cosmo, bcmpar=bcmpar)
             pkd = {}
             operators = ['m', 'd1', 'd2', 's2', 'k2']
             for i1, op1 in enumerate(operators):
@@ -169,6 +176,8 @@ class Pk(Theory):
                     if op1 != op2:
                         comb_21 = op2+op1
                         pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
+            if self.bias_model == 'BaccoPT':
+                pkd['pk_mm_sh_sh'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
         return pkd
 
     def get_can_provide(self):

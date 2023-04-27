@@ -1,7 +1,7 @@
 import numpy as np
 import pyccl as ccl
 import baccoemu
-
+import warnings
 
 class BaccoCalculator(object):
     """ This class implements a set of methods that can be
@@ -15,15 +15,23 @@ class BaccoCalculator(object):
             growth/bias will be evaluated.
     """
     def __init__(self, log10k_min=np.log10(0.008), log10k_max=np.log10(0.5), nk_per_decade=20,
-                 a_arr=None):
+                 log10k_sh_sh_min=np.log10(0.008), log10k_sh_sh_max=np.log10(3), nk_sh_sh_per_decade=20,
+                 a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
+        nk_sh_sh_total = int((log10k_sh_sh_max - log10k_sh_sh_min) * nk_sh_sh_per_decade)
         self.ks = np.logspace(log10k_min, log10k_max, nk_total)
+        self.ks_sh_sh = np.logspace(log10k_sh_sh_min, log10k_sh_sh_max, nk_sh_sh_total)
         if a_arr is None:
             a_arr = 1./(1+np.linspace(0., 4., 30)[::-1])
         self.a_s = a_arr
-        self.lbias = baccoemu.Lbias_expansion(allow_extrapolate=False)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=UserWarning)
+            self.lbias = baccoemu.Lbias_expansion(allow_extrapolate=False)
+            self.mpk = baccoemu.Matter_powerspectrum(allow_extrapolate=False, 
+                                                     nonlinear_emu_path=nonlinear_emu_path, 
+                                                     nonlinear_emu_details=nonlinear_emu_details)
 
-    def update_pk(self, cosmo):
+    def update_pk(self, cosmo, bcmpar={}):
         """ Update the internal PT arrays.
 
         Args:
@@ -43,11 +51,17 @@ class BaccoCalculator(object):
         k_for_bacco = self.ks/h
         self.mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= 0.75))
         k_for_bacco = k_for_bacco[self.mask_ks_for_bacco]
-        self.pk_temp = np.array([self.lbias.get_nonlinear_pnn(k=self.ks/h,
+        self.pk_temp = np.array([self.lbias.get_nonlinear_pnn(k=k_for_bacco,
                                                               allow_high_k_extrapolation=False, #this is bad, should be improved
                                                               expfactor=a,
-                                                              **cospar)[1]/h**3
-                                 for a in self.a_s])
+                                                              **cospar)[1]/h**3 for a in self.a_s])
+        baryonic_boost = len(bcmpar) > 0
+        k_sh_sh_for_bacco = self.ks_sh_sh/h
+        self.mask_ks_sh_sh_for_bacco = np.squeeze(np.where(k_sh_sh_for_bacco <= 4.9))
+        k_sh_sh_for_bacco = k_sh_sh_for_bacco[self.mask_ks_sh_sh_for_bacco]
+        self.pk_temp_sh_sh = np.array([self.mpk.get_nonlinear_pk(baryonic_boost=baryonic_boost, 
+                                                                 k=k_sh_sh_for_bacco, expfactor=a, 
+                                                                 **{**cospar, **bcmpar})[1]/h**3 for a in self.a_s])
         self.pk2d_computed = {}
 
     def get_pk(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
@@ -110,10 +124,16 @@ class BaccoCalculator(object):
                 's2k2': 0.5,
                 'k2k2': 1.0}
 
-        pk = pfac[kind]*self.pk_temp[:, inds[kind], :]
-        if kind in ['mm']:
-            pk = np.log(pk)
-        pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks[self.mask_ks_for_bacco]),
-                        pk_arr=pk, is_logp=kind in ['mm'])
-        self.pk2d_computed[kind] = pk2d
+        if kind != 'mm_sh_sh':
+            pk = pfac[kind]*self.pk_temp[:, inds[kind], :]
+            if kind in ['mm']:
+                pk = np.log(pk)
+            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks[self.mask_ks_for_bacco]),
+                            pk_arr=pk, is_logp=kind in ['mm'])
+            self.pk2d_computed[kind] = pk2d
+        else:
+            pk = np.log(self.pk_temp_sh_sh)
+            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
+                            pk_arr=pk, is_logp=True)
+            self.pk2d_computed[kind] = pk2d
         return pk2d
