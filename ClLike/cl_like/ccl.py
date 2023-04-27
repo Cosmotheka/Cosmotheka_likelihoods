@@ -126,7 +126,7 @@ class CCL(Theory):
         state['derived'] = {}
         if 'A_sE9' in self.input_params:
             sigma8 = ccl.sigma8(cosmo)
-            state['derived'] = {'sigma8': sigma8}
+            state['derived']['sigma8'] = sigma8
         else:
             sigma8 = cosmo['sigma8']
 
