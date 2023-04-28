@@ -29,6 +29,7 @@ def get_info(bias, A_sE9=True):
                        "bias_gc1_b1p": 0.0,
                        "bias_gc1_b2": 0.0,
                        "bias_gc1_bs": 0.0,
+                       "bias_gc1_bk2": 0.0,
                        "bias_sh1_m": 0.3,
                        "limber_gc1_dz": -0.1,
                        "limber_sh1_dz": -0.2,
@@ -66,7 +67,6 @@ def get_info(bias, A_sE9=True):
                                                    "lmax": 2000,
                                                    "gc1": {"lmin": 20,
                                                            "mag_bias": True}},
-                                      "input_params_prefix": "cll",
                                       }
                            },
             "output": "dum",
