@@ -177,7 +177,12 @@ class Pk(Theory):
             for i1, op1 in enumerate(operators):
                 for op2 in operators[i1:]:
                     comb_12 = op1+op2
-                    pkd[f'pk_{comb_12}'] = ptc.get_pk(comb_12, pnl=pkmm, cosmo=cosmo)
+                    # Since PT models are not meant to work with Weyl and we
+                    # have already checked if Weyl is in cosmo._pk_nl, let's
+                    # fill pkd weyl pk's with matter ones.
+                    kind = comb_12.replace('w', 'm')
+                    pkd[f'pk_{comb_12}'] = ptc.get_pk(kind, pnl=pkmm,
+                                                      cosmo=cosmo)
                     # Symmetric terms for convenience
                     if op1 != op2:
                         comb_21 = op2+op1
