@@ -81,8 +81,10 @@ def get_info(bias, A_sE9=True):
     return info
 
 
-@pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT',
-                                  'BaccoPT'])
+# TODO: Update test to test BaccoPT. It uses its own matter Pk so one cannot
+# compare with the fits file above. We would need to generate a different one.
+@pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT'])
+#                                  'BaccoPT'])
 def test_dum(bias):
     info = get_info(bias)
 
