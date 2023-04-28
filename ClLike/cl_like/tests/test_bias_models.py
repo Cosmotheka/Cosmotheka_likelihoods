@@ -46,7 +46,8 @@ def get_info(bias, A_sE9=True):
                                   "input_params_prefix": "limber",
                                   "ia_model": "IADESY1_PerSurvey"},
                        "Pk": {"external": Pk,
-                             "bias_model": bias},
+                             "bias_model": bias,
+                              "zmax_pks": 2.6},  # For baccoemu
                        "clfinal": {"external": ClFinal,
                                    "input_params_prefix": "bias",
                                    "shape_model": "ShapeMultiplicative"}
@@ -79,7 +80,8 @@ def get_info(bias, A_sE9=True):
     return info
 
 
-@pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT'])
+@pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT',
+                                  'BaccoPT'])
 def test_dum(bias):
     info = get_info(bias)
 
