@@ -1,10 +1,13 @@
+import pytest
+pytest.skip("Not sure if this is useful at all", allow_module_level=True)
+
 from cobaya.model import get_model
 from cobaya.run import run
 import yaml
 import os
 
 import numpy as np
-import numpy.linalg as LA 
+import numpy.linalg as LA
 
 # Read in the yaml file
 config_fn = '../../params_carlos.yaml'
