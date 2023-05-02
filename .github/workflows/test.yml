@@ -48,13 +48,13 @@ jobs:
           # Installing numpy first to avoid CCL error
           pip install numpy
           # Install the likelihood
-          pip install -e ClLike
+          pip install -e ClLike\[full\]
           # For coeralls
           pip install -U pytest-cov coveralls
 
       - name: Test
         run: |
-          python3 -m pytest -vv ./ClLike/cl_like/tests --cov=tjpcov
+          python3 -m pytest -vv ./ClLike/cl_like/tests --cov=ClLike
 
      # Commented out for now since we are not using coveralls
      # - name: coveralls
