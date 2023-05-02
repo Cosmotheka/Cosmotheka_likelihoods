@@ -18,7 +18,8 @@ def run_clean_tmp():
 
 
 def get_info(bias, A_sE9=True):
-    data = "cl_like/tests/data/gc_kp_sh_linear_nuisances.fits.gz"
+    data = "" if "ClLike" in os.getcwd() else "ClLike/"
+    data += "cl_like/tests/data/gc_kp_sh_linear_nuisances.fits.gz"
     bias_gc1_b1 = 1.0 if bias not in ['LagrangianPT', 'BaccoPT'] else 0.0
     info = {"params": {"A_sE9": 2.23,
                        "Omega_c": 0.25,
