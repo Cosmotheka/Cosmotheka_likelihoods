@@ -25,6 +25,7 @@ dependencies = [
     "pytest",
     "pyccl>=2.5.0",
     "sacc>=0.7",
+    "camb"
 ]
 dynamic = ["version"]
 
