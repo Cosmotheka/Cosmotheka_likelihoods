@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cl_like"
+authors = [
+  {name="Check README"}
+]
+description = "Multi-tracer angular C_ell likelihood"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GPLv3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Physics"
+]
+dependencies = [
+    "cobaya>=3.0",
+    "scipy",
+    "numpy",
+    "pytest",
+    "pyccl>=2.5.0",
+    "sacc>=0.7",
+]
+dynamic = ["version"]
+
+# From https://github.com/pypa/setuptools_scm
+# Equivalent to use_scm_version = True in setup.py
+# [tool.setuptools_scm]
+
+[project.optional-dependencies]
+doc = [
+    "sphinx",
+    "sphinx-autoapi",
+    "sphinx_rtd_theme",
+]
+ept = [
+    "fast-pt"
+]
+lpt = [
+    "velocileptors @ git+https://github.com/sfschen/velocileptors.git@master"
+]
+baccoemu = [
+    "baccoemu",
+    # I think this is required by baccoemu and not automatically installed
+    "deepdish"  
+]
+full = [
+    "baccoemu",
+    "deepdish",
+    "velocileptors @ git+https://github.com/sfschen/velocileptors.git@master",
+    "fast-pt",
+    "sphinx",
+    "sphinx-autoapi",
+    "sphinx_rtd_theme",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/xC-ell/xCell-likelihoods"
+"Bug Tracker" = "https://github.com/xC-ell/xCell-likelihoods/issues"
+# "Documentation" = ""

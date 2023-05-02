@@ -1,3 +1,10 @@
+import os
+import pytest
+
+if os.getenv("GITHUB_ACTIONS") == "true":
+    pytest.skip("mgclass not available for GitHubb Actions",
+                allow_module_level=True)
+
 import cl_like as cll
 from cl_like.ccl_blcdm import CCL_BLCDM
 from cl_like.limber import Limber
@@ -5,8 +12,6 @@ from cl_like.power_spectrum import Pk
 from cl_like.cl_final import ClFinal
 import numpy as np
 from cobaya.model import get_model
-import pytest
-import os
 import shutil
 import sacc
 from classy import Class
