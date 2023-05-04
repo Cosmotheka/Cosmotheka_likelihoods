@@ -15,9 +15,9 @@ from scipy.interpolate import interp1d
 class CCL_BLCDM(Theory):
     """
     This implements CCL as a `Theory` object that takes in cosmological
-    parameters directly (i.e. cannot be used downstream from camb/CLASS.
+    parameters directly (i.e. cannot be used downstream from camb/CLASS).
     """
-    # CCL options
+    # hi_class options
     nonlinear_model: str = 'muSigma'
     classy_arguments: dict = {}
 
