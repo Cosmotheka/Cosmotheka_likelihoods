@@ -50,6 +50,7 @@ class CCL(Theory):
     transfer_function: str = 'boltzmann_camb'
     matter_pk: str = 'halofit'
     baryons_pk: str = 'nobaryons'
+    ccl_arguments: dict = {}
 
     def initialize(self):
         self._required_results = {}
@@ -114,16 +115,18 @@ class CCL(Theory):
                               T_CMB=2.7255,
                               transfer_function=self.transfer_function,
                               matter_power_spectrum=self.matter_pk,
-                              baryons_power_spectrum=self.baryons_pk)
+                              baryons_power_spectrum=self.baryons_pk,
+                              **self.ccl_arguments)
 
         state['CCL'] = {'cosmo': cosmo}
 
         # Compute derived parameters
         # (we should actually only do this if required -- TODO)
         # Compute sigma8 if it is not an input parameter
+        state['derived'] = {}
         if 'A_sE9' in self.input_params:
             sigma8 = ccl.sigma8(cosmo)
-            state['derived'] = {'sigma8': sigma8}
+            state['derived']['sigma8'] = sigma8
         else:
             sigma8 = cosmo['sigma8']
 

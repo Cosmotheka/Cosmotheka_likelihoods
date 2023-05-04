@@ -32,7 +32,7 @@ except ImportError as e:
     BACCO_exception = e
     HAVE_BACCO = False
 
-    
+
 class Pk(Theory):
     """Computes the power spectrum"""
     # b(z) model name
@@ -119,18 +119,31 @@ class Pk(Theory):
         return self._current_state['Pk']
 
     def _get_pk_data(self, cosmo):
-        # cosmo.compute_nonlin_power()
-        # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
         pkmm = None
         if self.bias_model == 'Linear':
             cosmo.compute_nonlin_power()
             pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+            if 'delta_matter:Weyl' in cosmo._pk_nl:
+                pkwm = pkmw = cosmo.get_nonlin_power(name='delta_matter:Weyl')
+            else:
+                pkwm = pkmw = pkmm
+            if 'Weyl:Weyl' in cosmo._pk_nl:
+                pkww = cosmo.get_nonlin_power(name='Weyl:Weyl')
+            else:
+                pkww = pkmm
             pkd = {}
             pkd['pk_mm'] = pkmm
             pkd['pk_md1'] = pkmm
             pkd['pk_d1m'] = pkmm
             pkd['pk_d1d1'] = pkmm
+            pkd['pk_d1w'] = pkd['pk_wd1'] = pkwm
+            pkd['pk_mw'] = pkd['pk_wm'] = pkwm
+            pkd['pk_ww'] = pkww
         elif self.is_PT_bias:
+            if ('delta_matter:Weyl' in cosmo._pk_nl) or \
+                    ('Weyl:Weyl' in cosmo._pk_nl):
+                raise RuntimeError('Pk involving the Weyl potential not '
+                                   'implemented for PT_bias')
             if self.k_SN_suppress > 0:
                 k_filter = self.k_SN_suppress
             else:
@@ -160,11 +173,16 @@ class Pk(Theory):
                 raise NotImplementedError("Not yet: " + self.bias_model)
             ptc.update_pk(cosmo)
             pkd = {}
-            operators = ['m', 'd1', 'd2', 's2', 'k2']
+            operators = ['m', 'w', 'd1', 'd2', 's2', 'k2']
             for i1, op1 in enumerate(operators):
                 for op2 in operators[i1:]:
                     comb_12 = op1+op2
-                    pkd[f'pk_{comb_12}'] = ptc.get_pk(comb_12, pnl=pkmm, cosmo=cosmo)
+                    # Since PT models are not meant to work with Weyl and we
+                    # have already checked if Weyl is in cosmo._pk_nl, let's
+                    # fill pkd weyl pk's with matter ones.
+                    kind = comb_12.replace('w', 'm')
+                    pkd[f'pk_{comb_12}'] = ptc.get_pk(kind, pnl=pkmm,
+                                                      cosmo=cosmo)
                     # Symmetric terms for convenience
                     if op1 != op2:
                         comb_21 = op2+op1

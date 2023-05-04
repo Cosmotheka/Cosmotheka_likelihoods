@@ -88,6 +88,7 @@ class Limber(Theory):
         and halo profiles where needed) for all used tracers given the
         current parameters."""
         trs0 = {}
+        trs0_dnames = {}
         trs1 = {}
         trs1_dnames = {}
         for name, q in self.tracer_qs.items():
@@ -100,8 +101,10 @@ class Limber(Theory):
                                             has_rsd=False)
                 # Tracer for the unbiased component
                 t0 = None
+                t0n = [None]
                 if self.bias_model in ['LagrangianPT', 'BaccoPT']:
                     t0 = tr
+                    t0n = ["m"]
                 # Tracers for the biased components
                 t1 = [tr]
                 t1n = ['d1']
@@ -117,29 +120,32 @@ class Limber(Theory):
                                                 bias=(z, z*0), has_rsd=False,
                                                 mag_bias=(z, oz/5.))
                     t1.append(tr)
-                    t1n.append("m")
+                    t1n.append("w")
             elif q == 'galaxy_shear':
                 dndz = self._get_nz(cosmo, name, **pars)
                 t0 = ccl.WeakLensingTracer(cosmo, dndz=dndz)
+                t0n = ["w"]
                 if self.ia_model == 'IANone':
                     t1 = None
-                    t1n = None
+                    t1n = [None]
                 else:
                     ia_bias = self._get_ia_bias(cosmo, name, **pars)
                     t1 = [ccl.WeakLensingTracer(cosmo, dndz=dndz,
                                                 has_shear=False,
                                                 ia_bias=ia_bias)]
-                    t1n = ['m']
+                    t1n = ['w']
             elif q == 'cmb_convergence':
                 # B.H. TODO: pass z_source as parameter to the YAML file
                 t0 = ccl.CMBLensingTracer(cosmo, z_source=1100)
+                t0n = ['w']
                 t1 = None
-                t1n = None
+                t1n = [None]
 
             trs0[name] = t0
             trs1[name] = t1
+            trs0_dnames[name] = t0n
             trs1_dnames[name] = t1n
-        return trs0, trs1, trs1_dnames
+        return trs0, trs1, trs0_dnames, trs1_dnames
 
     def _get_cl_data(self, cosmo, **pars):
         """ Compute all C_ells."""
@@ -147,7 +153,7 @@ class Limber(Theory):
         pkd = self.provider.get_Pk()["pk_data"]
 
         # Gather all tracers
-        trs0, trs1, dnames = self._get_tracers(cosmo, **pars)
+        trs0, trs1, trs0_dnames, trs1_dnames = self._get_tracers(cosmo, **pars)
 
         # Correlate all needed pairs of tracers
         cls_00 = []
@@ -159,6 +165,8 @@ class Limber(Theory):
                 ls = clm['l_eff']
             elif self.sample_bpw:
                 ls = self.l_sample
+            else:
+                raise RuntimeError("Something went wrong with the sampling!")
 
             n1 = clm['bin_1']
             n2 = clm['bin_2']
@@ -166,11 +174,15 @@ class Limber(Theory):
             t0_2 = trs0[n2]
             t1_1 = trs1[n1]
             t1_2 = trs1[n2]
-            dn_1 = dnames[n1]
-            dn_2 = dnames[n2]
+            # The unbiased tracers have only one element in the list "m" or
+            # "w".
+            t0dn_1 = trs0_dnames[n1][0]
+            t0dn_2 = trs0_dnames[n2][0]
+            t1dn_1 = trs1_dnames[n1]
+            t1dn_2 = trs1_dnames[n2]
             # 00: unbiased x unbiased
             if t0_1 and t0_2:
-                pk = pkd['pk_mm']
+                pk = pkd[f'pk_{t0dn_1}{t0dn_2}']
                 cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
                 cls_00.append(cl00)
             else:
@@ -178,8 +190,8 @@ class Limber(Theory):
             # 01: unbiased x biased
             if t0_1 and (t1_2 is not None):
                 cl01 = []
-                for t12, dn in zip(t1_2, dn_2):
-                    pk = pkd[f'pk_m{dn}']
+                for t12, dn in zip(t1_2, t1dn_2):
+                    pk = pkd[f'pk_{t0dn_1}{dn}']
                     if pk is not None:
                         cl = ccl.angular_cl(cosmo, t0_1, t12, ls, p_of_k_a=pk) * clm['pixbeam']
                     else:
@@ -195,8 +207,8 @@ class Limber(Theory):
             else:
                 if t0_2 and (t1_1 is not None):
                     cl10 = []
-                    for t11, dn in zip(t1_1, dn_1):
-                        pk = pkd[f'pk_m{dn}']
+                    for t11, dn in zip(t1_1, t1dn_1):
+                        pk = pkd[f'pk_{t0dn_2}{dn}']
                         if pk is not None:
                             cl = ccl.angular_cl(cosmo, t11, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
                         else:
@@ -210,8 +222,8 @@ class Limber(Theory):
             if (t1_1 is not None) and (t1_2 is not None):
                 cl11 = np.zeros([len(t1_1), len(t1_2), len(ls)])
                 autocorr = n1 == n2
-                for i1, (t11, dn1) in enumerate(zip(t1_1, dn_1)):
-                    for i2, (t12, dn2) in enumerate(zip(t1_2, dn_2)):
+                for i1, (t11, dn1) in enumerate(zip(t1_1, t1dn_1)):
+                    for i2, (t12, dn2) in enumerate(zip(t1_2, t1dn_2)):
                         if autocorr and i2 < i1:
                             cl11[i1, i2] = cl11[i2, i1]
                         else:

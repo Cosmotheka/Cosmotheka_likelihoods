@@ -18,8 +18,18 @@ class BaccoCalculator(object):
                  a_arr=None):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
         self.ks = np.logspace(log10k_min, log10k_max, nk_total)
+        # baccoemu only allows a's between 1 and 0.275.
+        amin = 0.275
         if a_arr is None:
-            a_arr = 1./(1+np.linspace(0., 4., 30)[::-1])
+            zmax = 1/amin - 1
+            # Only 20 a's to match the a's in the other PT classes with
+            # a < 0.275
+            a_arr = 1./(1+np.linspace(0., zmax, 20)[::-1])
+        if np.any(a_arr < amin):
+            # This check is done by baccoemu but is not printed by Cobaya, so I
+            # add the test here.
+            raise ValueError("baccoemu only defined for scale factors between "
+                             f"0 and {amin}")
         self.a_s = a_arr
         self.lbias = baccoemu.Lbias_expansion(allow_extrapolate=False)
 

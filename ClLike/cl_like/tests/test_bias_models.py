@@ -18,17 +18,20 @@ def run_clean_tmp():
 
 
 def get_info(bias, A_sE9=True):
-    data = "cl_like/tests/data/gc_kp_sh_linear_nuisances.fits.gz"
+    data = "" if "ClLike" in os.getcwd() else "ClLike/"
+    data += "cl_like/tests/data/gc_kp_sh_linear_nuisances.fits.gz"
+    bias_gc1_b1 = 1.0 if bias not in ['LagrangianPT', 'BaccoPT'] else 0.0
     info = {"params": {"A_sE9": 2.23,
                        "Omega_c": 0.25,
                        "Omega_b": 0.05,
                        "h": 0.67,
                        "n_s": 0.96,
                        "m_nu": 0.0,
-                       "bias_gc1_b1": 1.0,
+                       "bias_gc1_b1": bias_gc1_b1,
                        "bias_gc1_b1p": 0.0,
                        "bias_gc1_b2": 0.0,
                        "bias_gc1_bs": 0.0,
+                       "bias_gc1_bk2": 0.0,
                        "bias_sh1_m": 0.3,
                        "limber_gc1_dz": -0.1,
                        "limber_sh1_dz": -0.2,
@@ -45,7 +48,8 @@ def get_info(bias, A_sE9=True):
                                   "input_params_prefix": "limber",
                                   "ia_model": "IADESY1_PerSurvey"},
                        "Pk": {"external": Pk,
-                             "bias_model": bias},
+                             "bias_model": bias,
+                              "zmax_pks": 2.6},  # For baccoemu
                        "clfinal": {"external": ClFinal,
                                    "input_params_prefix": "bias",
                                    "shape_model": "ShapeMultiplicative"}
@@ -66,7 +70,6 @@ def get_info(bias, A_sE9=True):
                                                    "lmax": 2000,
                                                    "gc1": {"lmin": 20,
                                                            "mag_bias": True}},
-                                      "input_params_prefix": "cll",
                                       }
                            },
             "output": "dum",
@@ -79,7 +82,10 @@ def get_info(bias, A_sE9=True):
     return info
 
 
+# TODO: Update test to test BaccoPT. It uses its own matter Pk so one cannot
+# compare with the fits file above. We would need to generate a different one.
 @pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT'])
+#                                  'BaccoPT'])
 def test_dum(bias):
     info = get_info(bias)
 
@@ -141,6 +147,11 @@ def test_timing():
     model.measure_and_set_speeds(10)
     model.dump_timing()
     time = np.sum([c.timer.get_time_avg() for c in model.components])
-    # Before restructuring, the average evaluation time was ~0.54s in my laptop
-    # After the restructuration, it went to 0.56s.
-    assert time < 0.6
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        # First time it was 1.1, next 1.7. Choosing 2s to have enough margin.
+        # We might need to skip this test in GitHub it if it's not very stable
+        assert time < 2
+    else:
+        # Before restructuring, the average evaluation time was ~0.54s in my laptop
+        # After the restructuration, it went to 0.56s.
+        assert time < 0.6

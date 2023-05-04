@@ -1,9 +1,9 @@
 name: Tests
 on:
    push:
-     branches: [ master ]
+     branches: [ main ]
    pull_request:
-     branches: [ master ]
+     branches: [ main ]
 
 jobs:
   build:
@@ -49,12 +49,17 @@ jobs:
           pip install numpy
           # Install the likelihood
           pip install -e ClLike
+          # baccoemu depends on sklearn which is deprecated and the
+          # installation fails so I will install the other PT modules
+          # individually
+          pip install -e ClLike\[lpt\]
+          pip install -e ClLike\[ept\]
           # For coeralls
           pip install -U pytest-cov coveralls
 
       - name: Test
         run: |
-          python3 -m pytest -vv ./ClLike/cl_like/tests --cov=tjpcov
+          python3 -m pytest -vv ./ClLike/cl_like/tests --cov=ClLike
 
      # Commented out for now since we are not using coveralls
      # - name: coveralls
