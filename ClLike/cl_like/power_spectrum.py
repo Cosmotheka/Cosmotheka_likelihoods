@@ -52,6 +52,7 @@ class Pk(Theory):
     #for baccoemu
     nonlinear_emu_path = None
     nonlinear_emu_details = None
+    use_baryon_boost : bool = False
 
     def initialize(self):
         # Bias model
@@ -108,18 +109,40 @@ class Pk(Theory):
         if self.bias_model == 'BaccoPT':
             self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks, 
                                               nonlinear_emu_path=self.nonlinear_emu_path, 
-                                              nonlinear_emu_details=self.nonlinear_emu_details)
+                                              nonlinear_emu_details=self.nonlinear_emu_details,
+                                              use_baryon_boost=self.use_baryon_boost
+                                             )
 
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
             return {}
 
         return {"CCL": None}
+    
+    def get_can_support_params(self):
+        return ["M_c", "eta", "beta", "M1_z0_cen", "theta_out", "theta_inn", "M_inn"]
 
     def calculate(self, state, want_derived=True, **params_values_dict):
-        _state = self.provider.get_CCL()
-        cosmo = _state["cosmo"]
-        bcmpar = _state["bcmpar"] if "bcmpar" in _state else {}
+        cosmo = self.provider.get_CCL()["cosmo"]
+        bcmpar = {}
+        if self.use_baryon_boost:
+            M_c = self.provider.get_param('M_c')
+            eta = self.provider.get_param('eta')
+            beta = self.provider.get_param('beta')
+            M1_z0_cen = self.provider.get_param('M1_z0_cen')
+            theta_out = self.provider.get_param('theta_out')
+            theta_inn = self.provider.get_param('theta_inn')
+            M_inn = self.provider.get_param('M_inn')
+            bcmpar = {
+                'M_c'  : M_c,
+                'eta' : eta,
+                'beta' : beta,
+                'M1_z0_cen' : M1_z0_cen,
+                'theta_out' : theta_out,
+                'theta_inn' : theta_inn,
+                'M_inn' : M_inn
+            }
+
         state['Pk'] = {'pk_data': self._get_pk_data(cosmo, bcmpar=bcmpar)}
 
     def get_Pk(self):

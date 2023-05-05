@@ -16,11 +16,12 @@ class BaccoCalculator(object):
     """
     def __init__(self, log10k_min=np.log10(0.008), log10k_max=np.log10(0.5), nk_per_decade=20,
                  log10k_sh_sh_min=np.log10(0.0001), log10k_sh_sh_max=np.log10(50), nk_sh_sh_per_decade=20,
-                 a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None):
+                 a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None, use_baryon_boost=False):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
         nk_sh_sh_total = int((log10k_sh_sh_max - log10k_sh_sh_min) * nk_sh_sh_per_decade)
         self.ks = np.logspace(log10k_min, log10k_max, nk_total)
         self.ks_sh_sh = np.logspace(log10k_sh_sh_min, log10k_sh_sh_max, nk_sh_sh_total)
+        self.use_baryon_boost = use_baryon_boost
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=UserWarning)
@@ -31,7 +32,7 @@ class BaccoCalculator(object):
         
         # check with the currently loaded version of baccoemu if the a array is
         # all within the allowed ranges
-        emu_kind = 'nonlinear'
+        emu_kind = 'baryon' if self.use_baryon_boost else 'nonlinear'
         amin = self.mpk.emulator[emu_kind]['bounds'][-1][0]
         if a_arr is None:
             zmax = 1/amin - 1

@@ -92,7 +92,7 @@ class CCL(Theory):
 
     def get_can_support_params(self):
         # return any nuisance parameters that CCL can support
-        return ["sigma8", "A_sE9", "M_c", "eta", "beta", "M1_z0_cen", "theta_out", "theta_inn", "M_inn"]
+        return ["sigma8", "A_sE9"]
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
@@ -119,27 +119,6 @@ class CCL(Theory):
                               **self.ccl_arguments)
 
         state['CCL'] = {'cosmo': cosmo}
-
-        M_c = self.provider.get_param('M_c')
-        eta = self.provider.get_param('eta')
-        beta = self.provider.get_param('beta')
-        M1_z0_cen = self.provider.get_param('M1_z0_cen')
-        theta_out = self.provider.get_param('theta_out')
-        theta_inn = self.provider.get_param('theta_inn')
-        M_inn = self.provider.get_param('M_inn')
-        if (M_c != 0) & (eta != 0) & (beta != 0) & (M1_z0_cen != 0) & (theta_out != 0) & (theta_inn != 0) & (M_inn != 0):
-            bcmpar = {
-                'M_c'  : M_c,
-                'eta' : eta,
-                'beta' : beta,
-                'M1_z0_cen' : M1_z0_cen,
-                'theta_out' : theta_out,
-                'theta_inn' : theta_inn,
-                'M_inn' : M_inn
-            }
-        else:
-            bcmpar = {}
-        state['CCL']['bcmpar'] = bcmpar
 
         # Compute derived parameters
         # (we should actually only do this if required -- TODO)
