@@ -21,15 +21,29 @@ class BaccoCalculator(object):
         nk_sh_sh_total = int((log10k_sh_sh_max - log10k_sh_sh_min) * nk_sh_sh_per_decade)
         self.ks = np.logspace(log10k_min, log10k_max, nk_total)
         self.ks_sh_sh = np.logspace(log10k_sh_sh_min, log10k_sh_sh_max, nk_sh_sh_total)
-        if a_arr is None:
-            a_arr = 1./(1+np.linspace(0., 4., 30)[::-1])
-        self.a_s = a_arr
+
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=UserWarning)
             self.lbias = baccoemu.Lbias_expansion(allow_extrapolate=False)
             self.mpk = baccoemu.Matter_powerspectrum(allow_extrapolate=False, 
                                                      nonlinear_emu_path=nonlinear_emu_path, 
                                                      nonlinear_emu_details=nonlinear_emu_details)
+        
+        # check with the currently loaded version of baccoemu if the a array is
+        # all within the allowed ranges
+        emu_kind = 'nonlinear'
+        amin = self.mpk.emulator[emu_kind]['bounds'][-1][0]
+        if a_arr is None:
+            zmax = 1/amin - 1
+            # Only 20 a's to match the a's in the other PT classes with
+            # a < ~0.275
+            a_arr = 1./(1+np.linspace(0., zmax, 20)[::-1])
+        if np.any(a_arr < amin):
+            # This check is done by baccoemu but is not printed by Cobaya, so I
+            # add the test here.
+            raise ValueError("baccoemu only defined for scale factors between "
+                             f"1 and {amin}")
+        self.a_s = a_arr
 
     def update_pk(self, cosmo, bcmpar={}):
         """ Update the internal PT arrays.

@@ -8,9 +8,6 @@ from scipy.optimize import minimize
 
 
 class ClLike(Likelihood):
-    # All parameters starting with this will be
-    # identified as belonging to this stage.
-    input_params_prefix: str = ""
     # Input sacc file
     input_file: str = ""
     # Angular resolution
