@@ -25,9 +25,8 @@ class BaccoCalculator(object):
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=UserWarning)
-            self.lbias = baccoemu.Lbias_expansion(allow_extrapolate=False)
-            self.mpk = baccoemu.Matter_powerspectrum(allow_extrapolate=False, 
-                                                     nonlinear_emu_path=nonlinear_emu_path, 
+            self.lbias = baccoemu.Lbias_expansion()
+            self.mpk = baccoemu.Matter_powerspectrum(nonlinear_emu_path=nonlinear_emu_path, 
                                                      nonlinear_emu_details=nonlinear_emu_details)
         
         # check with the currently loaded version of baccoemu if the a array is
