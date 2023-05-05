@@ -15,7 +15,7 @@ class BaccoCalculator(object):
             growth/bias will be evaluated.
     """
     def __init__(self, log10k_min=np.log10(0.008), log10k_max=np.log10(0.5), nk_per_decade=20,
-                 log10k_sh_sh_min=np.log10(0.008), log10k_sh_sh_max=np.log10(3), nk_sh_sh_per_decade=20,
+                 log10k_sh_sh_min=np.log10(0.0001), log10k_sh_sh_max=np.log10(50), nk_sh_sh_per_decade=20,
                  a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
         nk_sh_sh_total = int((log10k_sh_sh_max - log10k_sh_sh_min) * nk_sh_sh_per_decade)
@@ -57,7 +57,8 @@ class BaccoCalculator(object):
                                                               **cospar)[1]/h**3 for a in self.a_s])
         baryonic_boost = len(bcmpar) > 0
         k_sh_sh_for_bacco = self.ks_sh_sh/h
-        self.mask_ks_sh_sh_for_bacco = np.squeeze(np.where(k_sh_sh_for_bacco <= 4.9))
+        emu_type_for_setting_kmax = 'baryon' if baryonic_boost else 'nonlinear'
+        self.mask_ks_sh_sh_for_bacco = np.squeeze(np.where(k_sh_sh_for_bacco <= self.mpk.emulator[emu_type_for_setting_kmax]['k'].max()))
         k_sh_sh_for_bacco = k_sh_sh_for_bacco[self.mask_ks_sh_sh_for_bacco]
         self.pk_temp_sh_sh = np.array([self.mpk.get_nonlinear_pk(baryonic_boost=baryonic_boost, 
                                                                  k=k_sh_sh_for_bacco, expfactor=a, 
