@@ -52,8 +52,8 @@ jobs:
           # baccoemu depends on sklearn which is deprecated and the
           # installation fails so I will install the other PT modules
           # individually
-          pip install -e ClLike\[lpt\]
-          pip install -e ClLike\[ept\]
+          pip install -e ClLike\[full\]
+          # pip install -e ClLike\[ept\]
           # For coeralls
           pip install -U pytest-cov coveralls
 
