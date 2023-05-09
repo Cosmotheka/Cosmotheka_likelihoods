@@ -69,7 +69,7 @@ class BaccoCalculator(object):
                                                               allow_high_k_extrapolation=False, #this is bad, should be improved
                                                               expfactor=a,
                                                               **cospar)[1]/h**3 for a in self.a_s])
-        baryonic_boost = bcmpar is None
+        baryonic_boost = bcmpar is not None
         if baryonic_boost:
             cospar.update(bcmpar)
         k_sh_sh_for_bacco = self.ks_sh_sh/h
