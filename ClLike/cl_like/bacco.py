@@ -26,9 +26,9 @@ class BaccoCalculator(object):
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=UserWarning)
             self.lbias = baccoemu.Lbias_expansion()
-            self.mpk = baccoemu.Matter_powerspectrum(nonlinear_emu_path=nonlinear_emu_path, 
+            self.mpk = baccoemu.Matter_powerspectrum(nonlinear_emu_path=nonlinear_emu_path,
                                                      nonlinear_emu_details=nonlinear_emu_details)
-        
+
         # check with the currently loaded version of baccoemu if the a array is
         # all within the allowed ranges
         emu_kind = 'baryon' if self.use_baryon_boost else 'nonlinear'
@@ -45,7 +45,7 @@ class BaccoCalculator(object):
                              f"1 and {amin}")
         self.a_s = a_arr
 
-    def update_pk(self, cosmo, bcmpar={}):
+    def update_pk(self, cosmo, bcmpar={}, **kwargs):
         """ Update the internal PT arrays.
 
         Args:
@@ -74,8 +74,8 @@ class BaccoCalculator(object):
         emu_type_for_setting_kmax = 'baryon' if baryonic_boost else 'nonlinear'
         self.mask_ks_sh_sh_for_bacco = np.squeeze(np.where(k_sh_sh_for_bacco <= self.mpk.emulator[emu_type_for_setting_kmax]['k'].max()))
         k_sh_sh_for_bacco = k_sh_sh_for_bacco[self.mask_ks_sh_sh_for_bacco]
-        self.pk_temp_sh_sh = np.array([self.mpk.get_nonlinear_pk(baryonic_boost=baryonic_boost, 
-                                                                 k=k_sh_sh_for_bacco, expfactor=a, 
+        self.pk_temp_sh_sh = np.array([self.mpk.get_nonlinear_pk(baryonic_boost=baryonic_boost,
+                                                                 k=k_sh_sh_for_bacco, expfactor=a,
                                                                  **{**cospar, **bcmpar})[1]/h**3 for a in self.a_s])
         self.pk2d_computed = {}
 
