@@ -126,7 +126,7 @@ def test_dum(bias):
                             1.64757585e-11, 1.63164157e-11, 1.61579110e-11, 1.60002354e-11,
                             1.58433804e-11, 1.56873376e-11, 1.55320984e-11, 1.53776548e-11,
                             1.52239985e-11, 1.50711217e-11, 1.49190163e-11, 1.47676748e-11])
-    
+
     info = get_info(bias)
     model = get_model(info)
     loglikes, derived = model.loglikes()
@@ -137,5 +137,5 @@ def test_dum(bias):
         t1, t2 = bins['bins']
         inds = ll.cl_meta[i]['inds']
         cls_bin.append(cls_th[inds])
-    assert np.fabs(np.sum(cls_bin[0] - fiducial_cls)) < 2E-3
+    assert cls_bin[0] == pytest.approx(fiducial_cls, rel=2E-3)
 
