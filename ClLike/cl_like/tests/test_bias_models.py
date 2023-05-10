@@ -96,7 +96,8 @@ def test_dum(bias):
         # Until we don't regenerate the Cells with Bacco's Pks, we cannot check
         # the chi2 as the others
         assert np.fabs(loglikes[0]) < 80  # Note that there are ~1000 points
-    assert np.fabs(loglikes[0]) < 2E-3
+    else:
+        assert np.fabs(loglikes[0]) < 2E-3
 
 
 # TODO: Move this test to another file or rename this one
