@@ -107,8 +107,8 @@ class Pk(Theory):
             raise BACCO_exception
 
         if self.bias_model == 'BaccoPT':
-            self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks, 
-                                              nonlinear_emu_path=self.nonlinear_emu_path, 
+            self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks,
+                                              nonlinear_emu_path=self.nonlinear_emu_path,
                                               nonlinear_emu_details=self.nonlinear_emu_details,
                                               use_baryon_boost=self.use_baryon_boost
                                              )
@@ -118,13 +118,13 @@ class Pk(Theory):
             return {}
 
         return {"CCL": None}
-    
+
     def get_can_support_params(self):
         return ["M_c", "eta", "beta", "M1_z0_cen", "theta_out", "theta_inn", "M_inn"]
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
-        bcmpar = {}
+        bcmpar = None
         if self.use_baryon_boost:
             M_c = self.provider.get_param('M_c')
             eta = self.provider.get_param('eta')
@@ -148,7 +148,7 @@ class Pk(Theory):
     def get_Pk(self):
         return self._current_state['Pk']
 
-    def _get_pk_data(self, cosmo, bcmpar={}):
+    def _get_pk_data(self, cosmo, bcmpar=None):
         # cosmo.compute_nonlin_power()
         # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
         pkmm = None

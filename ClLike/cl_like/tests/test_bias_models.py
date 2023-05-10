@@ -49,7 +49,7 @@ def get_info(bias, A_sE9=True):
                                   "ia_model": "IADESY1_PerSurvey"},
                        "Pk": {"external": Pk,
                              "bias_model": bias,
-                              "zmax_pks": 2.6},  # For baccoemu
+                              "zmax_pks": 1.5},  # For baccoemu
                        "clfinal": {"external": ClFinal,
                                    "input_params_prefix": "bias",
                                    "shape_model": "ShapeMultiplicative"}
@@ -84,14 +84,18 @@ def get_info(bias, A_sE9=True):
 
 # TODO: Update test to test BaccoPT. It uses its own matter Pk so one cannot
 # compare with the fits file above. We would need to generate a different one.
-@pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT'])
-#                                  'BaccoPT'])
+@pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT',
+                                  'BaccoPT'])
 def test_dum(bias):
     info = get_info(bias)
 
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
+    if bias == 'BaccoPT':
+        # Until we don't regenerate the Cells with Bacco's Pks, we cannot check
+        # the chi2 as the others
+        assert np.fabs(loglikes[0]) < 80  # Note that there are ~1000 points
     assert np.fabs(loglikes[0]) < 2E-3
 
 
