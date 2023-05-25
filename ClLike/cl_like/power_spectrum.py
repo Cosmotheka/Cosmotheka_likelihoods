@@ -53,6 +53,9 @@ class Pk(Theory):
     nonlinear_emu_path = None
     nonlinear_emu_details = None
     use_baryon_boost : bool = False
+    ignore_lbias : bool = False 
+    allow_bcm_emu_extrapolation_for_shear : bool = True
+    allow_halofit_extrapolation_for_shear : bool = False
 
     def initialize(self):
         # Bias model
@@ -110,7 +113,10 @@ class Pk(Theory):
             self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks,
                                               nonlinear_emu_path=self.nonlinear_emu_path,
                                               nonlinear_emu_details=self.nonlinear_emu_details,
-                                              use_baryon_boost=self.use_baryon_boost
+                                              use_baryon_boost=self.use_baryon_boost,
+                                              ignore_lbias=self.ignore_lbias,
+                                              allow_bcm_emu_extrapolation_for_shear=self.allow_bcm_emu_extrapolation_for_shear,
+                                              allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear
                                              )
 
     def must_provide(self, **requirements):
