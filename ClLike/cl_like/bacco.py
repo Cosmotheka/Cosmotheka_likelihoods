@@ -4,7 +4,6 @@ import baccoemu
 import warnings
 import copy
 from scipy import optimize
-import bacco
 
 class BaccoCalculator(object):
     """ This class implements a set of methods that can be
