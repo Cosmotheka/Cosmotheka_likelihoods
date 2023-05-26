@@ -21,6 +21,8 @@ class Limber(Theory):
     # just flags, but we could turn them into
     # homogeneous systematic classes.
     ia_model: str = "IANone"
+    # Limber integration method
+    limber_integ: str = "qag_quad"
 
     # Sample type
     sample_type: str = "convolve"
@@ -96,8 +98,12 @@ class Limber(Theory):
                 dndz = self._get_nz(cosmo, name, **pars)
                 z = dndz[0]
                 oz = np.ones_like(z)
+                if self.bias_model=='QuasarEvo':
+                    bz = 0.278*((1+z)**2-6.565)+2.393
+                else:
+                    bz = oz
 
-                tr = ccl.NumberCountsTracer(cosmo, dndz=dndz, bias=(z, oz),
+                tr = ccl.NumberCountsTracer(cosmo, dndz=dndz, bias=(z, bz),
                                             has_rsd=False)
                 # Tracer for the unbiased component
                 t0 = None
@@ -183,7 +189,9 @@ class Limber(Theory):
             # 00: unbiased x unbiased
             if t0_1 and t0_2:
                 pk = pkd['pk_mm_sh_sh'] if 'pk_mm_sh_sh' in pkd.keys() else pkd[f'pk_{t0dn_1}{t0dn_2}']
-                cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
+                cl00 = ccl.angular_cl(
+                    cosmo, t0_1, t0_2, ls, p_of_k_a=pk,
+                    limber_integration_method=self.limber_integ) * clm['pixbeam']
                 cls_00.append(cl00)
             else:
                 cls_00.append(None)
@@ -193,7 +201,9 @@ class Limber(Theory):
                 for t12, dn in zip(t1_2, t1dn_2):
                     pk = pkd[f'pk_{t0dn_1}{dn}']
                     if pk is not None:
-                        cl = ccl.angular_cl(cosmo, t0_1, t12, ls, p_of_k_a=pk) * clm['pixbeam']
+                        cl = ccl.angular_cl(
+                            cosmo, t0_1, t12, ls, p_of_k_a=pk,
+                            limber_integration_method=self.limber_integ) * clm['pixbeam']
                     else:
                         cl = np.zeros_like(ls)
                     cl01.append(cl)
@@ -210,7 +220,9 @@ class Limber(Theory):
                     for t11, dn in zip(t1_1, t1dn_1):
                         pk = pkd[f'pk_{t0dn_2}{dn}']
                         if pk is not None:
-                            cl = ccl.angular_cl(cosmo, t11, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
+                            cl = ccl.angular_cl(
+                                cosmo, t11, t0_2, ls, p_of_k_a=pk,
+                                limber_integration_method=self.limber_integ) * clm['pixbeam']
                         else:
                             cl = np.zeros_like(ls)
                         cl10.append(cl)
@@ -229,7 +241,9 @@ class Limber(Theory):
                         else:
                             pk = pkd[f'pk_{dn1}{dn2}']
                             if pk is not None:
-                                cl = ccl.angular_cl(cosmo, t11, t12, ls, p_of_k_a=pk) * clm['pixbeam']
+                                cl = ccl.angular_cl(
+                                    cosmo, t11, t12, ls, p_of_k_a=pk,
+                                    limber_integration_method=self.limber_integ) * clm['pixbeam']
                             else:
                                 cl = np.zeros_like(ls)
                             cl11[i1, i2, :] = cl

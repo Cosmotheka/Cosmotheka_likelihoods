@@ -63,9 +63,8 @@ class CCL(Theory):
     def get_requirements(self):
         # Specify A_sE9 and sigma8 in get_can_support_params to allow both
         # inputs.
-        params = {'Omega_c': None,
-                  'Omega_b': None,
-                  'h': None,
+        params = {'Omega_m': None,
+                  'omega_b': None,
                   'n_s': None,
                   'm_nu': None}
 
@@ -88,21 +87,25 @@ class CCL(Theory):
 
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
-        return ['S8', 'sigma8', "Omega_m"]
+        return ['S8', 'sigma8', "Omega_c", "Omega_b", "h"]
 
     def get_can_support_params(self):
         # return any nuisance parameters that CCL can support
-        return ["sigma8", "A_sE9"]
+        return ["sigma8", "A_sE9", "h", "Omh3"]
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
-        Ob = self.provider.get_param('Omega_b')
-        Oc = self.provider.get_param('Omega_c')
-        Om = Ob + Oc
+        Om = self.provider.get_param('Omega_m')
+        if 'Omh3' in self.input_params:
+            Omh3 = self.provider.get_param('Omh3')
+            h = (Omh3/Om)**(1./3.)
+        else:
+            h = self.provider.get_param('h')
+        ob = self.provider.get_param('omega_b')
+        Ob = ob/h**2
+        Oc = Om-Ob
 
-        params = {'Omega_c': Oc,
-                  'Omega_b': Ob,
-                  'h': self.provider.get_param('h'),
+        params = {'Omega_c': Oc, 'Omega_b': Ob, 'h': h,
                   'n_s': self.provider.get_param('n_s'),
                   'm_nu': self.provider.get_param('m_nu')}
 
@@ -130,8 +133,11 @@ class CCL(Theory):
         else:
             sigma8 = cosmo['sigma8']
 
+        if 'Omh3' in self.input_params:
+            state['derived']['h'] = h
+
         state['derived'].update({'S8': sigma8*np.sqrt(Om/0.3),
-                                 'Omega_m': Om})
+                                 'Omega_c': Oc, 'Omega_b': Ob})
 
         for req_res, method in self._required_results.items():
             state['CCL'][req_res] = method(cosmo)
