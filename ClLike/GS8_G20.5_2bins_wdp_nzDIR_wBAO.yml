@@ -1,0 +1,138 @@
+sampler:
+  mcmc:
+    burn_in: 0
+    max_tries: 1000
+    drag: True
+    learn_proposal: true
+    Rminus1_stop: 0.01
+    measure_speeds: true
+
+params:
+  # Cosmological parameters
+  sigma8:
+    prior:
+      min: 0.5
+      max: 1.2
+    ref:
+      dist: norm
+      loc: 0.8
+      scale: 0.01
+    latex: \sigma_8
+    proposal: 0.001
+
+  Omega_m:
+    prior: 
+      min: 0.05
+      max: 0.70
+    ref:
+      dist: norm
+      loc: 0.3
+      scale: 0.01
+    latex: \Omega_m
+    proposal: 0.01
+
+  h:
+    prior: 
+      min: 0.4
+      max: 1.0
+    ref:
+      dist: norm
+      loc: 0.674
+      scale: 0.01
+    latex: h
+    proposal: 0.01
+
+  omega_b: 0.02242
+  n_s: 0.965
+  m_nu: 0.
+
+  S8:
+    latex: S_8
+
+  # Nuisance parameters
+  bias_qso0_b1:
+    prior: 
+        min: 0.8
+        max: 6.0
+    ref:
+      dist: norm
+      loc: 2.22
+      scale: 0.1
+    latex: b^1_1
+    proposal: 0.1
+
+  bias_qso1_b1:
+    prior: 
+        min: 0.8
+        max: 6.0
+    ref:
+      dist: norm
+      loc: 4.0
+      scale: 0.1
+    latex: b^2_1
+    proposal: 0.1
+
+  # Magnification biases
+  bias_qso0_s: 0.388
+  bias_qso1_s: 0.420
+
+# CCL settings
+theory:
+  cl_like.CCL:
+    transfer_function: boltzmann_camb
+    matter_pk: halofit
+    baryons_pk: nobaryons
+  cl_like.Pk:
+    # Linear, EulerianPT, LagrangianPT
+    bias_model: "Linear"
+  cl_like.Limber:
+    nz_model: "NzNone"
+    ia_model: "IANone"
+    input_params_prefix: "limber"
+  cl_like.ClFinal:
+    input_params_prefix: "bias"
+    shape_model: ShapeNone
+
+# Likelihood settings
+likelihood:
+  cl_like.ClLike:
+    # Input sacc file
+    input_file: ../data_GAIA/cls_g_k_2bins_G20.5_nzdir_deproj.fits
+
+    # Include BAO prior
+    with_bao: True
+
+    # List all relevant bins. The clustering
+    # bins are clX, the shear bins are shX.
+    bins:
+      - name: qso0
+      - name: qso1
+      - name: kappa
+
+    # List all 2-points that should go into the
+    # data vector.
+    twopoints:
+      - bins: [qso0, qso0]
+      - bins: [qso1, qso1]
+      - bins: [qso0, kappa]
+      - bins: [qso1, kappa]
+
+    defaults:
+      # Scale cut for galaxy clustering
+      # (ignored for shear-shear)
+      kmax: 0.15
+      # These ones will apply to all power
+      # spectra (unless the lmax corresponding
+      # to the chosen kmax is smaller).
+      lmin: 0
+      lmax: 2000
+
+      qso0:
+        lmin: 30
+        mag_bias: True
+      qso1:
+        lmin: 30
+        mag_bias: True
+
+debug: False
+output: '../results_GS8/G20.5_2bins_wdp_nzDIR_wBAO'
