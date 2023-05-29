@@ -7,9 +7,74 @@ from cobaya.log import LoggedError
 from scipy.optimize import minimize
 
 
+class BAOLike(object):
+    # All data in:
+    #  https://svn.sdss.org/public/data/eboss/DR16cosmo/tags/v1_0_1/likelihoods/BAO-only/
+    def __init__(self, bins=[0, 1, 2, 3]):
+        bincov = np.array([[2*b, 2*b+1] for b in bins]).flatten()
+        self.r_d_fid = 147.78
+        self.a_s = 1/(1+self.zs_all[bins])
+        dMs = self.dMs_all[bins]
+        dHs = self.dHs_all[bins]
+        self.cov = self.cov_all[bincov][:, bincov]
+        self.mean = np.concatenate((dMs, dHs)).T.flatten()
+        self.icov = np.linalg.inv(self.cov)
+
+    @property
+    def dMs_all(self):
+        return np.array([10.23406, 13.36595, 17.85824, 30.68760])
+
+    @property
+    def dHs_all(self):
+        return np.array([24.98058, 22.31656, 19.32575, 13.26090])
+
+    @property
+    def zs_all(self):
+        return np.array([0.38, 0.51, 0.698, 1.48])
+
+    @property
+    def cov_all(self):
+        return np.array([[ 2.860520e-02, -4.939281e-02,  1.489688e-02, -1.387079e-02,
+                          0.0000000000,  0.0000000000,  0.0000000000, 0.0000000000],
+                         [-4.939281e-02,  5.307187e-01, -2.423513e-02,  1.767087e-01,
+                          0.0000000000,  0.0000000000,  0.0000000000, 0.0000000000],
+                         [ 1.489688e-02, -2.423513e-02,  4.147534e-02, -4.873962e-02,
+                          0.0000000000,  0.0000000000,  0.0000000000, 0.0000000000],
+                         [-1.387079e-02,  1.767087e-01, -4.873962e-02,  3.268589e-01,
+                          0.0000000000,  0.0000000000,  0.0000000000, 0.0000000000],
+                         [ 0.0000000000,  0.0000000000,  0.0000000000,  0.0000000000,
+                          0.1076634008, -0.0583182034,  0.0000000000, 0.0000000000],
+                         [ 0.0000000000,  0.0000000000,  0.0000000000,  0.0000000000,
+                          -0.0583182034, 0.28381763863,  0.0000000000, 0.0000000000],
+                         [ 0.0000000000,  0.0000000000,  0.0000000000,  0.0000000000,
+                          0.0000000000,  0.0000000000,  0.6373160400, 0.1706891000],
+                         [ 0.0000000000,  0.0000000000,  0.0000000000,  0.0000000000,
+                          0.0000000000,  0.0000000000,  0.1706891000, 0.3046841500]])
+
+    def get_rd(self, cosmo):
+        om = cosmo['Omega_m']*cosmo['h']**2
+        ob = cosmo['Omega_b']*cosmo['h']**2
+        rd = 45.5337*np.log(7.20376/om)/np.sqrt(1+9.98592*ob**0.801347)
+        return rd
+
+    def get_theory(self, cosmo):
+        r_d = self.get_rd(cosmo)
+        H0 = cosmo['h']/ccl.physical_constants.CLIGHT_HMPC
+        dM = ccl.comoving_radial_distance(cosmo, self.a_s)/r_d
+        dH = 1/(H0*ccl.h_over_h0(cosmo, self.a_s)*r_d)
+        return np.concatenate((dM, dH)).T.flatten()
+
+    def chi2(self, cosmo):
+        theory = self.get_theory(cosmo)
+        res = theory-self.mean
+        return np.dot(res, np.dot(self.icov, res))
+
+
 class ClLike(Likelihood):
     # Input sacc file
     input_file: str = ""
+    # With BAO prior?
+    with_bao: bool = False
     # Angular resolution
     nside: int = -1
     # List of bin names
@@ -24,6 +89,9 @@ class ClLike(Likelihood):
     def initialize(self):
         # Deep copy defaults to avoid modifying the input yaml
         self.defaults = copy.deepcopy(self.defaults)
+        if self.with_bao:
+            # Only LRG data
+            self.baolike = BAOLike(bins=[0, 1, 2])
         # Read SACC file
         self._read_data()
 
@@ -197,6 +265,9 @@ class ClLike(Likelihood):
     def calculate(self, state, want_derived=True, **pars):
         # Calculate chi2
         chi2, dchi2_jeffrey = self._get_chi2(**pars)
+        if self.with_bao:
+            cosmo = self.provider.get_CCL()["cosmo"]
+            chi2 += self.baolike.chi2(cosmo)
         state['logp'] = -0.5*(chi2+dchi2_jeffrey)
         state['derived'] = {'dchi2_jeffrey': dchi2_jeffrey}
 
