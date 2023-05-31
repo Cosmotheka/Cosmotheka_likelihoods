@@ -2,6 +2,8 @@ import numpy as np
 import pyccl as ccl
 import baccoemu
 import warnings
+import copy
+from scipy import optimize
 
 class BaccoCalculator(object):
     """ This class implements a set of methods that can be
@@ -16,12 +18,17 @@ class BaccoCalculator(object):
     """
     def __init__(self, log10k_min=np.log10(0.008), log10k_max=np.log10(0.5), nk_per_decade=20,
                  log10k_sh_sh_min=np.log10(0.0001), log10k_sh_sh_max=np.log10(50), nk_sh_sh_per_decade=20,
-                 a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None, use_baryon_boost=False):
+                 a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None, use_baryon_boost=False,
+                 ignore_lbias=False, allow_bcm_emu_extrapolation_for_shear=True, 
+                 allow_halofit_extrapolation_for_shear=False):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
         nk_sh_sh_total = int((log10k_sh_sh_max - log10k_sh_sh_min) * nk_sh_sh_per_decade)
         self.ks = np.logspace(log10k_min, log10k_max, nk_total)
         self.ks_sh_sh = np.logspace(log10k_sh_sh_min, log10k_sh_sh_max, nk_sh_sh_total)
         self.use_baryon_boost = use_baryon_boost
+        self.ignore_lbias = ignore_lbias
+        self.allow_bcm_emu_extrapolation_for_shear = allow_bcm_emu_extrapolation_for_shear
+        self.allow_halofit_extrapolation_for_shear = allow_halofit_extrapolation_for_shear
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=UserWarning)
@@ -45,6 +52,60 @@ class BaccoCalculator(object):
                              f"1 and {amin}")
         self.a_s = a_arr
 
+    def _check_baccoemu_baryon_pars_for_extrapolation(self, cosmopars):
+        """ Check passed parameters, if pars for baryon emu out of range, 
+        return a new dictionary apt for extrapolation.
+
+        Extrapolation of the bcm emulator in cosmology is done by evaluating
+        the emu at the closest cosmology within the allowed parameter space,
+        while modifying Ob and Oc to keep the baryon fraction fixed
+        """        
+        within_bounds = []
+        within_bounds_mpk = []
+        for i, parname in enumerate(self.mpk.emulator['nonlinear']['keys']):
+            if parname != 'expfactor':
+                val = cosmopars[parname]
+            else:
+                val = copy.deepcopy(self.a_s)
+            within_bounds.append(np.all(val >= self.mpk.emulator['baryon']['bounds'][i][0]) & np.all(val <= self.mpk.emulator['baryon']['bounds'][i][1]))
+            within_bounds_mpk.append(np.all(val >= self.mpk.emulator['nonlinear']['bounds'][i][0]) & np.all(val <= self.mpk.emulator['nonlinear']['bounds'][i][1]))
+        self.within_bounds_mpk = np.all(within_bounds_mpk)
+        if (not self.allow_bcm_emu_extrapolation_for_shear) | (np.all(within_bounds)):
+            return copy.deepcopy(cosmopars), copy.deepcopy(self.a_s)
+
+        cosmopars_out = copy.deepcopy(cosmopars)
+        
+        b_frac_orig = cosmopars['omega_baryon']/cosmopars['omega_cold']
+
+        emulator = self.mpk.emulator['baryon']
+
+        for i, par in enumerate(emulator['keys']):
+            if (par in self.mpk.emulator['nonlinear']['keys']):
+                if par in cosmopars:
+                    if cosmopars[par] is None:
+                        del cosmopars_out[par]
+                    else:
+                        if (cosmopars[par] < emulator['bounds'][i][0]):
+                            cosmopars_out[par] = emulator['bounds'][i][0]
+                        elif (cosmopars[par] > emulator['bounds'][i][1]):
+                            cosmopars_out[par] = emulator['bounds'][i][1]
+                
+        b_frac = cosmopars_out['omega_baryon']/cosmopars_out['omega_cold']
+        if np.round(b_frac_orig, 4) != np.round(b_frac, 4):
+            min_func = lambda o: np.abs(o[1] / o[0] - b_frac_orig)
+            Oc_bounds = emulator['bounds'][0]
+            Ob_bounds = emulator['bounds'][2]
+            res = optimize.minimize(min_func, 
+                                    np.array([cosmopars_out['omega_cold'], cosmopars_out['omega_baryon']]), 
+                                    bounds=(Oc_bounds, Ob_bounds))
+            cosmopars_out['omega_cold'] = res.x[0]
+            cosmopars_out['omega_baryon'] = res.x[1]
+
+        a_s_out = copy.deepcopy(self.a_s)
+        a_s_out[a_s_out < emulator['bounds'][-1][0]] = emulator['bounds'][-1][0]
+
+        return cosmopars_out, a_s_out
+
     def update_pk(self, cosmo, bcmpar=None, **kwargs):
         """ Update the internal PT arrays.
 
@@ -65,20 +126,35 @@ class BaccoCalculator(object):
         k_for_bacco = self.ks/h
         self.mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= 0.75))
         k_for_bacco = k_for_bacco[self.mask_ks_for_bacco]
-        self.pk_temp = np.array([self.lbias.get_nonlinear_pnn(k=k_for_bacco,
-                                                              allow_high_k_extrapolation=False, #this is bad, should be improved
-                                                              expfactor=a,
-                                                              **cospar)[1]/h**3 for a in self.a_s])
+        if self.ignore_lbias:
+            self.pk_temp = None
+        else:
+            self.pk_temp = np.array([self.lbias.get_nonlinear_pnn(k=k_for_bacco,
+                                                                allow_high_k_extrapolation=False, #this is bad, should be improved
+                                                                expfactor=a,
+                                                                **cospar)[1]/h**3 for a in self.a_s])
         baryonic_boost = bcmpar is not None
+        these_a_s = self.a_s
+        cospar_for_bcm, these_a_s = self._check_baccoemu_baryon_pars_for_extrapolation(cospar)
         if baryonic_boost:
-            cospar.update(bcmpar)
+            cospar_for_bcm.update(bcmpar)
         k_sh_sh_for_bacco = self.ks_sh_sh/h
         emu_type_for_setting_kmax = 'baryon' if baryonic_boost else 'nonlinear'
         self.mask_ks_sh_sh_for_bacco = np.squeeze(np.where(k_sh_sh_for_bacco <= self.mpk.emulator[emu_type_for_setting_kmax]['k'].max()))
         k_sh_sh_for_bacco = k_sh_sh_for_bacco[self.mask_ks_sh_sh_for_bacco]
-        self.pk_temp_sh_sh = np.array([self.mpk.get_nonlinear_pk(baryonic_boost=baryonic_boost,
-                                                                 k=k_sh_sh_for_bacco, expfactor=a,
-                                                                 **cospar)[1]/h**3 for a in self.a_s])
+        if (not self.within_bounds_mpk) & self.allow_halofit_extrapolation_for_shear:
+            cosmo.compute_nonlin_power()
+            pknl = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+            pk = np.array([pknl.eval(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco], a, cosmo) for a in self.a_s])
+        else:
+            pk = np.array([self.mpk.get_nonlinear_pk(baryonic_boost=False,
+                                                     k=k_sh_sh_for_bacco, expfactor=a,
+                                                     **cospar)[1]/h**3 for a in self.a_s])
+        if baryonic_boost:
+            Sk = np.array([self.mpk.get_baryonic_boost(k=k_sh_sh_for_bacco, expfactor=a, **cospar_for_bcm)[1] for a in these_a_s])
+        else:
+            Sk = 1
+        self.pk_temp_sh_sh = pk * Sk
         self.pk2d_computed = {}
 
     def get_pk(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
@@ -142,12 +218,15 @@ class BaccoCalculator(object):
                 'k2k2': 1.0}
 
         if kind != 'mm_sh_sh':
-            pk = pfac[kind]*self.pk_temp[:, inds[kind], :]
-            if kind in ['mm']:
-                pk = np.log(pk)
-            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks[self.mask_ks_for_bacco]),
-                            pk_arr=pk, is_logp=kind in ['mm'])
-            self.pk2d_computed[kind] = pk2d
+            if not self.ignore_lbias:
+                pk = pfac[kind]*self.pk_temp[:, inds[kind], :]
+                if kind in ['mm']:
+                    pk = np.log(pk)
+                pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks[self.mask_ks_for_bacco]),
+                                pk_arr=pk, is_logp=kind in ['mm'])
+                self.pk2d_computed[kind] = pk2d
+            else:
+                pk2d = None
         else:
             pk = np.log(self.pk_temp_sh_sh)
             pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
