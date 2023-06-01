@@ -12,6 +12,8 @@ if [[ $queue == "cmb" ]]; then
     cores=24
 elif  [[ $queue == "berg" ]]; then
     cores=28
+elif  [[ $queue == "normal" ]]; then
+    cores=1
 else
     echo "queue not recognized. Choose cmb or berg"
     exit 1
@@ -31,18 +33,52 @@ fi
 
 # Launcher
 #########
+create_launcher() {
+    param=$1
+
+    if [[ ! -d "./tmp" ]]; then
+        mkdir ./tmp
+    fi
+
+    code=$(mktemp -p ./tmp)
+    chmod +x $code
+    cat <<EOF > $code
+#!/bin/bash
+export OMP_NUM_THREADS=$threads
+export COBAYA_USE_FILE_LOCKING=false
+
+/usr/local/shared/slurm/bin/srun -N $nodes -n $chains --ntasks-per-node $chains_per_node -m cyclic --mpi=pmi2 cobaya-run $param
+EOF
+    echo $code
+
+}
+
+add_job_to_queue() {
+    param=$1
+    logname=$2
+    launcher=$(create_launcher $param)
+    addqueue -n ${nodes}x${cores} -s -q $queue -m 1  -c $name -o log/$logname.log $launcher
+}
+
 launch_chain() {
     name=$1
-
+    logname=$name
     param=input/$name.yml
-    addqueue -n ${nodes}x${cores} -s -q $queue -m 1  -c $name -o log/$name.log ./launch_cobaya.sh $param $nodes $chains $threads
+    add_job_to_queue $param $logname
 }
 
 resume_chain() {
     name=$1
-
     param=input/$name/$name
-    addqueue -n ${nodes}x${cores} -s -q $queue -m 1  -c $name -o log/${name}_resume.log ./launch_cobaya.sh $param $nodes $chains $threads
+    logname=${name}_resume
+    add_job_to_queue $param $logname
+}
+
+minimize_chain() {
+    name=$1
+    logname=${name}_minimize
+    param=input/$name.yml
+    add_job_to_queue $param $logname
 }
 
 # Chains

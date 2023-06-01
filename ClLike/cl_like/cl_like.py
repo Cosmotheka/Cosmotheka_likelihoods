@@ -20,6 +20,8 @@ class ClLike(Likelihood):
     twopoints: list = []
     # Jeffreys prior for bias params?
     jeffrey_bias: bool = False
+    # Null negative covariance eigenvalues when computing inverse cov?
+    null_negative_cov_eigvals_in_icov: bool = False
 
     def initialize(self):
         # Deep copy defaults to avoid modifying the input yaml
@@ -164,8 +166,20 @@ class ClLike(Likelihood):
         self.data_vec = s.mean[indices]
         self.cov = s.covariance.dense[indices][:, indices]
         # Invert covariance
-        self.inv_cov = np.linalg.inv(self.cov)
+        self.inv_cov = self.get_inv_cov(self.cov)
         self.ndata = len(self.data_vec)
+
+    def get_inv_cov(self, cov):
+        if self.null_negative_cov_eigvals_in_icov:
+            evals, evecs = np.linalg.eigh(cov)
+            inv_evals = 1/evals
+            sel = evals<0
+            print(f'Nulling {np.sum(sel)} negative eigenvalues:', evals[sel])
+            inv_evals[sel] = 0
+            inv_cov = evecs.dot(np.diag(inv_evals).dot(evecs.T))
+        else:
+            inv_cov = np.linalg.inv(cov)
+        return inv_cov
 
     def _get_jeffrey_bias_dchi2(self):
         g = self.provider.get_cl_theory_deriv()
