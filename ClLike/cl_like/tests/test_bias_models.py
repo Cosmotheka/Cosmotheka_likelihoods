@@ -160,3 +160,35 @@ def test_timing():
         # Before restructuring, the average evaluation time was ~0.54s in my laptop
         # After the restructuration, it went to 0.56s.
         assert time < 0.6
+
+
+def test_null_negative_eigvals_in_icov():
+    info = get_info(bias="Linear", A_sE9=False)
+
+    # The original cov does not have negative eigval. So the chi2 should be ok
+    info['likelihood']['ClLike']['null_negative_cov_eigvals_in_icov'] = True
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    loglike0 = loglikes[0]
+    assert np.fabs(loglike0) < 2E-3
+
+    # Let's change the covariance
+    s = sacc.Sacc.load_fits(info['likelihood']['ClLike']['input_file'])
+    cov = s.covariance.covmat
+    evals, evecs = np.linalg.eigh(cov)
+    evals[np.argmin(evals)] *= -1
+    cov = evecs.dot(np.diag(evals).dot(evecs.T))
+    s.add_covariance(cov, overwrite=True)
+    os.makedirs('dum', exist_ok=True)
+    s.save_fits('dum/cls.fits')
+
+    info['likelihood']['ClLike']['input_file'] = 'dum/cls.fits'
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+
+    # The chi2 cannot be the same as before because the inv cov is (slightly)
+    # different
+    assert np.fabs(loglikes[0]) != pytest.approx(loglike0, rel=1e-3)
+
+    # The determinant now is 0 because it has a 0 eigenvalue
+    assert np.linalg.det(model.likelihood['ClLike'].inv_cov) == 0
