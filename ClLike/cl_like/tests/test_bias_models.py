@@ -192,3 +192,24 @@ def test_null_negative_eigvals_in_icov():
 
     # The determinant now is 0 because it has a 0 eigenvalue
     assert np.linalg.det(model.likelihood['ClLike'].inv_cov) == 0
+
+
+def test_get_theory_cl_sacc():
+    info = get_info('Linear')
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    lkl = model.likelihood['ClLike']
+
+    s = lkl.get_cl_theory_sacc()
+    assert s.mean == pytest.approx(model.provider.get_cl_theory(), rel=1e-5)
+    for trn, tr in s.tracers.items():
+        assert lkl.tracer_qs[trn] == tr.quantity
+        if tr.quantity in ['galaxy_density', 'galaxy_shear']:
+            assert tr.z == pytest.approx(lkl.bin_properties[trn]['z_fid'], rel=1e-5)
+            assert tr.nz == pytest.approx(lkl.bin_properties[trn]['nz_fid'], rel=1e-5)
+        # Not testing the gc and sh tracers because spin is not an attribute of
+        # the NzTracer
+        if tr.quantity == 'cmb_lensing':
+            assert tr.spin == 0
+

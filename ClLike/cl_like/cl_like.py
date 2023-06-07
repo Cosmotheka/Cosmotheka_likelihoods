@@ -5,6 +5,7 @@ import copy
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 from scipy.optimize import minimize
+import sacc
 
 
 class ClLike(Likelihood):
@@ -37,7 +38,6 @@ class ClLike(Likelihood):
         Reads tracer metadata (N(z))
         Reads covariance
         """
-        import sacc
 
         def get_cl_type(tr1, tr2):
             cltyp = 'cl_'
@@ -213,6 +213,39 @@ class ClLike(Likelihood):
         chi2, dchi2_jeffrey = self._get_chi2(**pars)
         state['logp'] = -0.5*(chi2+dchi2_jeffrey)
         state['derived'] = {'dchi2_jeffrey': dchi2_jeffrey}
+
+    def get_cl_theory_sacc(self):
+        # Create empty file
+        s = sacc.Sacc()
+
+        # Add tracers
+        for n, p in self.bin_properties.items():
+            if n not in self.tracer_qs:
+                continue
+            q = self.tracer_qs[n]
+            spin = 2 if q == 'galaxy_shear' else 0
+            if q in ['galaxy_density', 'galaxy_shear']:
+                # TODO: These would better be the shifted Nz
+                s.add_tracer('NZ', n, quantity=q, spin=spin,
+                             z=p['z_fid'], nz=p['nz_fid'])
+            else:
+                s.add_tracer('Map', n, quantity=q, spin=spin,
+                             ell=np.arange(10), beam=np.ones(10))
+
+        # Calculate power spectra
+        cl = self.provider.get_cl_theory()
+        for clm in self.cl_meta:
+            p1 = 'e' if self.tracer_qs[clm['bin_1']] == 'galaxy_shear' else '0'
+            p2 = 'e' if self.tracer_qs[clm['bin_2']] == 'galaxy_shear' else '0'
+            cltyp = f'cl_{p1}{p2}'
+            if cltyp == 'cl_e0':
+                cltyp = 'cl_0e'
+            bpw = sacc.BandpowerWindow(clm['l_bpw'], clm['w_bpw'].T)
+            s.add_ell_cl(cltyp, clm['bin_1'], clm['bin_2'],
+                         clm['l_eff'], cl[clm['inds']], window=bpw)
+
+        return s
+
 
 
 class ClLikeFastBias(ClLike):
