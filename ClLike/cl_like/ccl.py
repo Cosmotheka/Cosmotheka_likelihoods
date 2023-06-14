@@ -98,7 +98,8 @@ class CCL(Theory):
         # Generate the CCL cosmology object which can then be used downstream
         Ob = self.provider.get_param('Omega_b')
         Oc = self.provider.get_param('Omega_c')
-        Om = Ob + Oc
+        Onu = np.sum(self.provider.get_param('m_nu')) / 93.14 / self.provider.get_param('h')**2 # check consistency with ccl
+        Om = Ob + Oc + Onu
 
         params = {'Omega_c': Oc,
                   'Omega_b': Ob,
