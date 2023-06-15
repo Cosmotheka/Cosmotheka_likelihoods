@@ -168,6 +168,8 @@ class ClLike(Likelihood):
         # Invert covariance
         self.inv_cov = self.get_inv_cov(self.cov)
         self.ndata = len(self.data_vec)
+        # Keep indices in case we want so slice the original sacc file
+        self.indices = indices
 
     def get_inv_cov(self, cov):
         if self.null_negative_cov_eigvals_in_icov:
@@ -246,6 +248,18 @@ class ClLike(Likelihood):
 
         return s
 
+    def get_cl_data_sacc(self):
+        s = self.sacc_file.copy()
+        s.keep_indices(self.indices)
+
+        tracers = []
+        for trs in s.get_tracer_combinations():
+            tracers.extend(trs)
+
+        # Use list(set()) to remove duplicates
+        s.keep_tracers(list(set(tracers)))
+
+        return s
 
 
 class ClLikeFastBias(ClLike):
