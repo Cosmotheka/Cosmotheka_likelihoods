@@ -52,24 +52,24 @@ params:
   # Nuisance parameters
   bias_qso0_b1:
     prior: 
-        min: 0.8
-        max: 6.0
+        min: 0.1
+        max: 3.0
     ref:
       dist: norm
-      loc: 2.22
+      loc: 1.00
       scale: 0.1
-    latex: b^1_1
+    latex: b^1_g
     proposal: 0.1
 
   bias_qso1_b1:
     prior: 
-        min: 0.8
-        max: 6.0
+        min: 0.1
+        max: 3.0
     ref:
       dist: norm
-      loc: 4.0
+      loc: 1.0
       scale: 0.1
-    latex: b^2_1
+    latex: b^2_g
     proposal: 0.1
 
   # Magnification biases
@@ -84,7 +84,7 @@ theory:
     baryons_pk: nobaryons
   cl_like.Pk:
     # Linear, EulerianPT, LagrangianPT
-    bias_model: "Linear"
+    bias_model: "QuasarEvo"
   cl_like.Limber:
     nz_model: "NzNone"
     ia_model: "IANone"
@@ -97,7 +97,7 @@ theory:
 likelihood:
   cl_like.ClLike:
     # Input sacc file
-    input_file: ../data_GAIA/cls_g_k_2bins_G20.5_nzdir_deproj.fits
+    input_file: ../data_GAIA/cls_g_k_2bins_G20.5_PR4_nzdir_deproj.fits
 
     # Include BAO prior
     with_bao: True

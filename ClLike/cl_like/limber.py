@@ -99,7 +99,20 @@ class Limber(Theory):
                 z = dndz[0]
                 oz = np.ones_like(z)
                 if self.bias_model=='QuasarEvo':
+                    # Laurent et al. 1705.04718
                     bz = 0.278*((1+z)**2-6.565)+2.393
+                elif self.bias_model=='QuasarEvo1':
+                    # Shen et al. 0810.4144
+                    bz = 1.254+0.521*z**2
+                elif self.bias_model=='QuasarEvo2':
+                    # Croom et al. /astro-ph/0409314
+                    bz = 0.53 + 0.289*(1 + z)**2
+                elif self.bias_model=='QuasarEvo3':
+                    # Chehade et al. 1603.04849
+                    bz = 0.59 + 0.23*(1 + z)**2
+                elif self.bias_model=='QuasarEvo4':
+                    # Leistedt et al. 
+                    bz = 1+((1+z)/2.5)**5
                 else:
                     bz = oz
 
