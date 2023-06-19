@@ -163,6 +163,7 @@ class CCL(Theory):
 
         cosmo = ccl.Cosmology(**params,
                               T_CMB=T_CMB,
+                              # T_ncdm=T_ncdm, v2.8.0
                               transfer_function=self.transfer_function,
                               matter_power_spectrum=self.matter_pk,
                               baryons_power_spectrum=self.baryons_pk,
