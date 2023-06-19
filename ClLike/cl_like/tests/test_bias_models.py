@@ -229,3 +229,31 @@ def test_get_cl_data_sacc():
     s.reorder(indices)
     assert s.mean == pytest.approx(lkl.data_vec, rel=1e-5)
     assert np.all(s.covariance.covmat == lkl.cov)
+
+
+def test_Omega_m():
+    info = get_info('Linear')
+    pars = info['params']
+    pars['Omega_m'] = pars['Omega_c'] + pars['Omega_b']
+    del pars['Omega_c']
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    assert np.fabs(loglikes[0]) < 2E-3
+
+def test_neutrinos():
+    info = get_info('Linear')
+    pars = info['params']
+    pars['m_nu'] = 0.4
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+
+
+    Onu = pars['m_nu'] / (93.14 * pars['h']**2)
+    pars['Omega_m'] = pars['Omega_c'] + pars['Omega_b'] + Onu
+    del pars['Omega_c']
+    model = get_model(info)
+    loglikes2, derived = model.loglikes()
+
+    assert np.fabs(loglikes[0]/loglikes2[0] -1) < 1E-4
