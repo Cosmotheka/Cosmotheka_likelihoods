@@ -57,7 +57,6 @@ class CCL(Theory):
         self._required_results = {}
 
     def initialize_with_params(self):
-        print(self.input_params)
         if ('A_sE9' not in self.input_params) and \
             ('sigma8' not in self.input_params):
             raise ValueError("One of A_sE9 or sigma8 must be set")
