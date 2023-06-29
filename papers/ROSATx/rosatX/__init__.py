@@ -4,5 +4,6 @@ from .profiles import (HaloProfilePressureBattaglia,
                        HaloProfileDensityNFW,
                        HaloProfileDensityHydrostaticEquilibrium,
                        HaloProfileTemperatureHydrostaticEquilibrium,
+                       HaloProfileTemperatureSpectroscopicLike,
                        HaloProfileXray,
                        XrayTracer)

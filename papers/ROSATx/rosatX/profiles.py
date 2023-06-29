@@ -689,9 +689,6 @@ class HaloProfileTemperatureHydrostaticEquilibrium(ccl.halos.HaloProfile):
 
     Default values of all parameters correspond to the values
     found in Mead et al. 2020.
-
-    This is currently calculated for one halo, need to check
-    how to do for the two halo term!!
     """
 
     def __init__(self,
@@ -737,6 +734,48 @@ class HaloProfileTemperatureHydrostaticEquilibrium(ccl.halos.HaloProfile):
             prof = np.squeeze(prof, axis=-1)
         if np.ndim(M) == 0:
             prof = np.squeeze(prof, axis=0)
+        return prof
+
+
+class HaloProfileTemperatureSpectroscopicLike(ccl.halos.HaloProfile):
+    """Gas temperature profile from Lee et al. 2020.
+
+    Profile is calculated in units of eV, following eq (18).
+
+    Default values of all parameters correspond to the mean
+    values found in Lee et al. 2020 for a Spectroscopic-like
+    temperature, T_{sl}.
+    """
+
+    def __init__(self, 
+                 par_A=4.295, 
+                 par_B=0.514, 
+                 par_C=-0.039, 
+                 m_fid=3e14):
+    
+        self.par_A = par_A
+        self.par_B = par_B
+        self.par_C = par_C
+        self.m_fid = m_fid
+        super(HaloProfileTemperatureSpectroscopicLike, self).__init__()
+
+    def _real(self, cosmo, r, M, a, mass_def):
+        # Real-space profile.
+        # Output in units of eV
+        M_use = np.atleast_1d(M)
+
+        m_ratio = M_use / self.m_fid
+        exponent = self.par_B + self.par_C * np.log10(m_ratio)
+        cosmo_model = ccl.h_over_h0(cosmo, a) ** (2 / 3)
+
+        prof = cosmo_model * self.par_A * m_ratio ** exponent
+        prof *= 1e3
+
+        if np.ndim(r) == 0:
+            prof = np.squeeze(prof, axis=-1)
+        if np.ndim(M) == 0:
+            prof = np.squeeze(prof, axis=0)
+        prof = np.repeat(prof,len(r))
         return prof
 
 
