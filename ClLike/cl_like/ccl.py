@@ -63,7 +63,7 @@ class CCL(Theory):
     def get_requirements(self):
         # Specify A_sE9 and sigma8 in get_can_support_params to allow both
         # inputs.
-        params = {'Omega_c': None,
+        params = {'Omega_m': None,
                   'Omega_b': None,
                   'h': None,
                   'n_s': None,
@@ -88,7 +88,7 @@ class CCL(Theory):
 
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
-        return ['S8', 'sigma8', "Omega_m"]
+        return ['S8', 'sigma8', "Omega_c"]
 
     def get_can_support_params(self):
         # return any nuisance parameters that CCL can support
@@ -97,8 +97,8 @@ class CCL(Theory):
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
         Ob = self.provider.get_param('Omega_b')
-        Oc = self.provider.get_param('Omega_c')
-        Om = Ob + Oc
+        Om = self.provider.get_param('Omega_m')
+        Oc = Om - Ob
 
         params = {'Omega_c': Oc,
                   'Omega_b': Ob,
@@ -131,7 +131,7 @@ class CCL(Theory):
             sigma8 = cosmo['sigma8']
 
         state['derived'].update({'S8': sigma8*np.sqrt(Om/0.3),
-                                 'Omega_m': Om})
+                                 'Omega_c': Oc})
 
         for req_res, method in self._required_results.items():
             state['CCL'][req_res] = method(cosmo)

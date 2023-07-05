@@ -1,0 +1,132 @@
+sampler:
+  mcmc:
+    burn_in: 0
+    max_tries: 1000
+    drag: True
+    learn_proposal: true
+    Rminus1_stop: 0.01
+    measure_speeds: true
+
+params:
+  # Cosmological parameters
+  sigma8:
+    prior:
+      min: 0.5
+      max: 1.2
+    ref:
+      dist: norm
+      loc: 0.8
+      scale: 0.01
+    latex: \sigma_8
+    proposal: 0.001
+
+  Omega_m:
+    prior: 
+      min: 0.05
+      max: 0.70
+    ref:
+      dist: norm
+      loc: 0.3
+      scale: 0.01
+    latex: \Omega_m
+    proposal: 0.01
+
+  h: 0.7
+  Omega_b: 0.05
+  n_s: 0.96
+  m_nu: 0.
+
+  bias_sh1_m: 0.0
+  bias_sh2_m: 0.0
+  bias_sh3_m: 0.0
+  bias_sh4_m: 0.0
+  bias_sh5_m: 0.0
+  limber_sh1_dz: 0.0
+  limber_sh2_dz: 0.0
+  limber_sh3_dz: 0.0
+  limber_sh4_dz: 0.0
+  limber_sh5_dz: 0.0
+
+  bias_A_IA:
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    latex: A_{IA}
+    proposal: 0.1
+
+  limber_eta_IA: 
+    prior: 
+      min: -5
+      max: 5
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+    latex: \eta_{IA}
+    proposal: 0.1
+
+# CCL settings
+theory:
+  cl_like.CCL:
+    transfer_function: eisenstein_hu
+    matter_pk: halofit
+    baryons_pk: nobaryons
+  cl_like.Pk:
+    bias_model: "Linear"
+  cl_like.Limber:
+    nz_model: "NzShift"
+    ia_model: "IADESY1"
+    input_params_prefix: "limber"
+  cl_like.ClFinal:
+    input_params_prefix: "bias"
+    shape_model: ShapeMultiplicative
+
+# Likelihood settings
+likelihood:
+  cl_like.ClLike:
+    # Input sacc file
+    input_file: ../papers/IAPrec/test_simple.fits
+
+    # List all relevant bins.
+    bins:
+      - name: sh1
+      - name: sh2
+      - name: sh3
+      - name: sh4
+      - name: sh5
+
+    # List all 2-points that should go into the
+    # data vector.
+    twopoints:
+      - bins: [sh1, sh1]
+      - bins: [sh1, sh2]
+      - bins: [sh1, sh3]
+      - bins: [sh1, sh4]
+      - bins: [sh1, sh5]
+      - bins: [sh2, sh2]
+      - bins: [sh2, sh3]
+      - bins: [sh2, sh4]
+      - bins: [sh2, sh5]
+      - bins: [sh3, sh3]
+      - bins: [sh3, sh4]
+      - bins: [sh3, sh5]
+      - bins: [sh4, sh4]
+      - bins: [sh4, sh5]
+      - bins: [sh5, sh5]
+
+    defaults:
+      # Scale cut for galaxy clustering
+      # (ignored for shear-shear)
+      kmax: 0.15
+      # These ones will apply to all power
+      # spectra (unless the lmax corresponding
+      # to the chosen kmax is smaller).
+      lmin: 30
+      lmax: 2000
+
+debug: False
+output: 'outtest'
