@@ -53,7 +53,7 @@ class Pk(Theory):
     nonlinear_emu_path = None
     nonlinear_emu_details = None
     use_baryon_boost : bool = False
-    ignore_lbias : bool = False 
+    ignore_lbias : bool = False
     allow_bcm_emu_extrapolation_for_shear : bool = True
     allow_halofit_extrapolation_for_shear : bool = False
 
@@ -226,6 +226,8 @@ class Pk(Theory):
                         comb_21 = op2+op1
                         pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
             if self.bias_model == 'BaccoPT':
+                # TODO: Find a better solution to the pk_mm_sh_sh stuff. This
+                # will not allow us to include galaxy clustering.
                 pkd['pk_mm_sh_sh'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
         return pkd
 
