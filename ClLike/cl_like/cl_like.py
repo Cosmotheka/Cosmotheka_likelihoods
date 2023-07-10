@@ -252,6 +252,12 @@ class ClLike(Likelihood):
         s = self.sacc_file.copy()
         s.keep_indices(self.indices)
 
+        # Reorder
+        indices = []
+        for clm in self.cl_meta:
+            indices.extend(list(s.indices(tracers=(clm['bin_1'], clm['bin_2']))))
+        s.reorder(indices)
+
         tracers = []
         for trs in s.get_tracer_combinations():
             tracers.extend(trs)

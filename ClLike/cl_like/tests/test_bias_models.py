@@ -223,10 +223,6 @@ def test_get_cl_data_sacc():
 
     s = lkl.get_cl_data_sacc()
     assert s.mean.size == lkl.ndata
-    indices = []
-    for clm in lkl.cl_meta:
-        indices.extend(list(s.indices(tracers=(clm['bin_1'], clm['bin_2']))))
-    s.reorder(indices)
     assert s.mean == pytest.approx(lkl.data_vec, rel=1e-5)
     assert np.all(s.covariance.covmat == lkl.cov)
 
