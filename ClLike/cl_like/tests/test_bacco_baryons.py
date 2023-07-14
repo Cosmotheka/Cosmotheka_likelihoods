@@ -139,3 +139,14 @@ def test_dum(bias):
         cls_bin.append(cls_th[inds])
     assert cls_bin[0] == pytest.approx(fiducial_cls, rel=2E-3)
 
+
+def test_A_s_sigma8():
+    info = get_info('BaccoPT', A_sE9=False)
+    model = get_model(info)
+    loglikes_sigma8, derived = model.loglikes()
+
+    info = get_info('BaccoPT', A_sE9=True)
+    model = get_model(info)
+    loglikes_A_s, derived = model.loglikes()
+
+    assert np.fabs(loglikes_sigma8[0] / loglikes_A_s[0] - 1) < 2e-2

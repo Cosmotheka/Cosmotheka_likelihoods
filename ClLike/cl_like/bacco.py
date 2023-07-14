@@ -19,7 +19,7 @@ class BaccoCalculator(object):
     def __init__(self, log10k_min=np.log10(0.008), log10k_max=np.log10(0.5), nk_per_decade=20,
                  log10k_sh_sh_min=np.log10(0.0001), log10k_sh_sh_max=np.log10(50), nk_sh_sh_per_decade=20,
                  a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None, use_baryon_boost=False,
-                 ignore_lbias=False, allow_bcm_emu_extrapolation_for_shear=True, 
+                 ignore_lbias=False, allow_bcm_emu_extrapolation_for_shear=True,
                  allow_halofit_extrapolation_for_shear=False):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
         nk_sh_sh_total = int((log10k_sh_sh_max - log10k_sh_sh_min) * nk_sh_sh_per_decade)
@@ -53,13 +53,13 @@ class BaccoCalculator(object):
         self.a_s = a_arr
 
     def _check_baccoemu_baryon_pars_for_extrapolation(self, cosmopars_in):
-        """ Check passed parameters, if pars for baryon emu out of range, 
+        """ Check passed parameters, if pars for baryon emu out of range,
         return a new dictionary apt for extrapolation.
 
         Extrapolation of the bcm emulator in cosmology is done by evaluating
         the emu at the closest cosmology within the allowed parameter space,
         while modifying Ob and Oc to keep the baryon fraction fixed
-        """        
+        """
         cosmopars = copy.deepcopy(cosmopars_in)
         if 'A_s' in cosmopars:
             cosmopars['sigma8_cold'] = self.mpk.get_sigma8(**cosmopars_in, cold=True)
@@ -78,7 +78,7 @@ class BaccoCalculator(object):
             return copy.deepcopy(cosmopars), copy.deepcopy(self.a_s)
 
         cosmopars_out = copy.deepcopy(cosmopars)
-        
+
         b_frac_orig = cosmopars['omega_baryon']/cosmopars['omega_cold']
 
         emulator = self.mpk.emulator['baryon']
@@ -93,14 +93,14 @@ class BaccoCalculator(object):
                             cosmopars_out[par] = emulator['bounds'][i][0]
                         elif (cosmopars[par] > emulator['bounds'][i][1]):
                             cosmopars_out[par] = emulator['bounds'][i][1]
-                
+
         b_frac = cosmopars_out['omega_baryon']/cosmopars_out['omega_cold']
         if np.round(b_frac_orig, 4) != np.round(b_frac, 4):
             min_func = lambda o: np.abs(o[1] / o[0] - b_frac_orig)
             Oc_bounds = emulator['bounds'][0]
             Ob_bounds = emulator['bounds'][2]
-            res = optimize.minimize(min_func, 
-                                    np.array([cosmopars_out['omega_cold'], cosmopars_out['omega_baryon']]), 
+            res = optimize.minimize(min_func,
+                                    np.array([cosmopars_out['omega_cold'], cosmopars_out['omega_baryon']]),
                                     bounds=(Oc_bounds, Ob_bounds))
             cosmopars_out['omega_cold'] = res.x[0]
             cosmopars_out['omega_baryon'] = res.x[1]
@@ -109,6 +109,23 @@ class BaccoCalculator(object):
         a_s_out[a_s_out < emulator['bounds'][-1][0]] = emulator['bounds'][-1][0]
 
         return cosmopars_out, a_s_out
+
+
+    def _sigma8tot_2_sigma8cold(self, emupars, sigma8tot):
+        """Use baccoemu to convert sigma8 total matter to sigma8 cdm+baryons
+        """
+        if hasattr(emupars['omega_cold'], '__len__'):
+            _emupars = {}
+            for pname in emupars:
+                _emupars[pname] = emupars[pname][0]
+        else:
+            _emupars = emupars
+        A_s_fid = 2.1e-9
+        sigma8tot_fid = self.mpk.get_sigma8(cold=False,
+                                            A_s=A_s_fid, **_emupars)
+        A_s = (sigma8tot / sigma8tot_fid)**2 * A_s_fid
+        return self.mpk.get_sigma8(cold=True, A_s=A_s, **_emupars)
+
 
     def update_pk(self, cosmo, bcmpar=None, **kwargs):
         """ Update the internal PT arrays.
@@ -127,10 +144,10 @@ class BaccoCalculator(object):
             'w0': cosmo['w0'],
             'wa': cosmo['wa']}
         if np.isnan(cosmo['A_s']):
-            cospar['sigma8_cold'] = cosmo.sigma8() # in this case sigma8 is being varied, here it is interpreted as sigma8_cold
+            cospar['sigma8_cold'] = self._sigma8tot_2_sigma8cold(cospar, cosmo.sigma8())
         else:
             cospar['A_s'] = cosmo['A_s']
-        
+
         k_for_bacco = self.ks/h
         self.mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= 0.75))
         k_for_bacco = k_for_bacco[self.mask_ks_for_bacco]
