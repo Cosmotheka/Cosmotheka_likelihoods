@@ -253,3 +253,16 @@ def test_neutrinos():
     loglikes2, derived = model.loglikes()
 
     assert np.fabs(loglikes[0]/loglikes2[0] -1) < 1E-4
+
+def test_S8():
+    info = get_info('Linear', False)
+    sigma8 = info['params']['sigma8']
+    # No neutrinos in the info dict
+    Omega_m = info['params']['Omega_c'] + info['params']['Omega_b']
+    del info['params']['sigma8']
+    info['params']['S8'] = sigma8 * np.sqrt(Omega_m/0.3)
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    assert np.fabs(loglikes[0]) < 2E-3

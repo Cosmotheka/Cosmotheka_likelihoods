@@ -58,8 +58,9 @@ class CCL(Theory):
 
     def initialize_with_params(self):
         if ('A_sE9' not in self.input_params) and \
-            ('sigma8' not in self.input_params):
-            raise ValueError("One of A_sE9 or sigma8 must be set")
+            ('sigma8' not in self.input_params) and \
+                ('S8' not in self.input_params):
+            raise ValueError("One of A_sE9, sigma8 or S8 must be set")
         if ('Omega_m' not in self.input_params) and \
                 ('Omega_c' not in self.input_params):
             raise ValueError("One of Omega_c or Omega_m must be set")
@@ -98,7 +99,7 @@ class CCL(Theory):
 
     def get_can_support_params(self):
         # return any nuisance parameters that CCL can support
-        return ["sigma8", "A_sE9", "Omega_m", "Omega_c"]
+        return ["sigma8", "A_sE9", "Omega_m", "Omega_c", "S8"]
 
     def _get_ccl_param_or_arg(self, param_name, default):
         if param_name in self.ccl_arguments:
@@ -157,6 +158,9 @@ class CCL(Theory):
 
         if 'A_sE9' in self.input_params:
             params.update({'A_s': self.provider.get_param('A_sE9')*1E-9})
+        elif 'S8' in self.input_params:
+            sigma8 = self.provider.get_param('S8') * np.sqrt(0.3 / Om)
+            params.update({'sigma8': sigma8})
         else:
             params.update({'sigma8': self.provider.get_param('sigma8')})
 
@@ -180,8 +184,10 @@ class CCL(Theory):
         else:
             sigma8 = cosmo['sigma8']
 
-        state['derived'].update({'S8': sigma8*np.sqrt(Om/0.3),
-                                 'Omega_m': Om,
+        if 'S8' not in self.input_params:
+            state['derived']['S8'] = sigma8*np.sqrt(Om/0.3),
+
+        state['derived'].update({'Omega_m': Om,
                                  'Omega_nu': Onu,
                                  })
         if 'Omega_c' not in self.input_params:
