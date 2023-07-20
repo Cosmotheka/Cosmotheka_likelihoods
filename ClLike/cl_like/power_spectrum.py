@@ -226,9 +226,10 @@ class Pk(Theory):
                         comb_21 = op2+op1
                         pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
             if self.bias_model == 'BaccoPT':
-                # TODO: Find a better solution to the pk_mm_sh_sh stuff. This
-                # will not allow us to include galaxy clustering.
-                pkd['pk_mm_sh_sh'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
+                # TODO: This assumes LCDM, but as above. BACCOemu is trained
+                # only in LCDM, anyway. What to do with the cross pk's? At the
+                # moment they don't have the correction.
+                pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
         return pkd
 
     def get_can_provide(self):
