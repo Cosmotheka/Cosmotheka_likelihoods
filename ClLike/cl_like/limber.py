@@ -180,11 +180,9 @@ class Limber(Theory):
             t0dn_2 = trs0_dnames[n2][0]
             t1dn_1 = trs1_dnames[n1]
             t1dn_2 = trs1_dnames[n2]
-            # TODO: Find a better solution to the pk_mm_sh_sh stuff. This will
-            # not allow us to include galaxy clustering.
             # 00: unbiased x unbiased
             if t0_1 and t0_2:
-                pk = pkd['pk_mm_sh_sh'] if 'pk_mm_sh_sh' in pkd.keys() else pkd[f'pk_{t0dn_1}{t0dn_2}']
+                pk = pkd[f'pk_{t0dn_1}{t0dn_2}']
                 cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
                 cls_00.append(cl00)
             else:
@@ -193,7 +191,7 @@ class Limber(Theory):
             if t0_1 and (t1_2 is not None):
                 cl01 = []
                 for t12, dn in zip(t1_2, t1dn_2):
-                    pk = pkd['pk_mm_sh_sh'] if 'pk_mm_sh_sh' in pkd.keys() else pkd[f'pk_{t0dn_1}{dn}']
+                    pk = pkd[f'pk_{t0dn_1}{dn}']
                     if pk is not None:
                         cl = ccl.angular_cl(cosmo, t0_1, t12, ls, p_of_k_a=pk) * clm['pixbeam']
                     else:
@@ -210,7 +208,7 @@ class Limber(Theory):
                 if t0_2 and (t1_1 is not None):
                     cl10 = []
                     for t11, dn in zip(t1_1, t1dn_1):
-                        pk = pkd['pk_mm_sh_sh'] if 'pk_mm_sh_sh' in pkd.keys() else pkd[f'pk_{t0dn_2}{dn}']
+                        pk = pkd[f'pk_{t0dn_2}{dn}']
                         if pk is not None:
                             cl = ccl.angular_cl(cosmo, t11, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
                         else:
@@ -229,7 +227,7 @@ class Limber(Theory):
                         if autocorr and i2 < i1:
                             cl11[i1, i2] = cl11[i2, i1]
                         else:
-                            pk = pkd['pk_mm_sh_sh'] if 'pk_mm_sh_sh' in pkd.keys() else pkd[f'pk_{dn1}{dn2}']
+                            pk = pkd[f'pk_{dn1}{dn2}']
                             if pk is not None:
                                 cl = ccl.angular_cl(cosmo, t11, t12, ls, p_of_k_a=pk) * clm['pixbeam']
                             else:
