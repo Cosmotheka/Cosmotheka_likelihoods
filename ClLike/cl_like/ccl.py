@@ -185,7 +185,7 @@ class CCL(Theory):
             sigma8 = cosmo['sigma8']
 
         if 'S8' not in self.input_params:
-            state['derived']['S8'] = sigma8*np.sqrt(Om/0.3),
+            state['derived']['S8'] = sigma8*np.sqrt(Om/0.3)
 
         state['derived'].update({'Omega_m': Om,
                                  'Omega_nu': Onu,
