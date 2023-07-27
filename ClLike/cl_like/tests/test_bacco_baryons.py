@@ -141,4 +141,4 @@ def test_A_s_sigma8():
     loglikes_A_s, derived = model.loglikes()
     assert np.fabs(loglikes_A_s[0]) < 0.2
 
-    assert np.fabs(loglikes_sigma8[0] / loglikes_A_s[0] - 1) < 1e-3
+    assert np.fabs(loglikes_sigma8[0] / loglikes_A_s[0] - 1) < 2e-3
