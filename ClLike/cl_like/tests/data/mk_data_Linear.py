@@ -71,10 +71,13 @@ if args.non_linear == 'baccopt':
 
     # pk_linear = {'a': a, 'k': k_emu, 'delta_matter:delta_matter': pklin_emu}
     pk_linear = None
-    pk_nonlinear = {'a': a, 'k': k_emu,
-                    'delta_matter:delta_matter': pk_emu[:, 0, :]}
+    # pk_nonlinear = {'a': a, 'k': k_emu,
+    #                 'delta_matter:delta_matter': pk_emu[:, 0, :]}
+    pk_nonlinear = {'a': a, 'k': k_emu, 'pk_mm': pk_emu[:, 0, :],
+                    'pk_md1': pk_emu[:, 1, :], 'pk_d1d1': pk_emu[:, 5, :]}
 
-    np.savez_compressed('pk_nonlinear_baccopt.npz', **pk_nonlinear)
+
+    # np.savez_compressed('pk_nonlinear_baccopt.npz', **pk_nonlinear)
 
     cosmo = ccl.CosmologyCalculator(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
                                     Omega_b=cosmopars['omega_baryon'],
@@ -84,8 +87,8 @@ if args.non_linear == 'baccopt':
                                     m_nu = cosmopars['neutrino_mass'],
                                     w0=cosmopars['w0'],
                                     wa=cosmopars['wa'],
-                                    pk_linear=pk_linear,
-                                    pk_nonlin=pk_nonlinear,
+                                    pk_linear=None, # pk_linear,
+                                    pk_nonlin=None, # pk_nonlinear,
                                     T_CMB=2.7255)
     fname = "linear_baccopt_5x2pt.fits"
 elif args.non_linear == 'halofit':
@@ -202,12 +205,33 @@ lbpw = np.dot(bpws, l_all)
 
 sls = np.zeros([n_tracers, n_tracers, nbpw])
 for i1, i2, ix, _ in get_pairs():
-    cl = interp_bin(ccl.angular_cl(cosmo, tracers[i1],
-                                   tracers[i2], ls))
-    if i1 in [0, 1]:
-        cl *= biases[i1]
-    if i2 in [0, 1]:
-        cl *= biases[i2]
+    if args.non_linear == 'baccopt':
+        # The extrapolation of pkm1d1 & pkd1d1 is different in the code and
+        # this will cause a O(1%) difference at large scales.
+        pkmm = pk_nonlinear['pk_mm']
+        pkmd1 = pk_nonlinear['pk_md1']
+        pkd1d1 = pk_nonlinear['pk_d1d1']
+        bias1 = bias2 = 0
+        if i1 in [0, 1]:
+            bias1 = biases[i1] - 1
+        if i2 in [0, 1]:
+            bias2 = biases[i2] - 1
+        if (bias1 != 0) and (bias2 != 0):
+            pk = pkmm + (bias1+bias2)*pkmd1 + bias1*bias2*pkd1d1
+        else:
+            bias1 = max(bias1, bias2)
+            pk = pkmm + bias1*pkmd1
+        pk = ccl.Pk2D(a_arr=pk_nonlinear['a'],
+                      lk_arr=np.log(pk_nonlinear['k']),
+                      pk_arr=np.log(pk), is_logp=True)
+        cl = interp_bin(ccl.angular_cl(cosmo, tracers[i1], tracers[i2], ls,
+                                       p_of_k_a=pk))
+    else:
+        cl = interp_bin(ccl.angular_cl(cosmo, tracers[i1], tracers[i2], ls))
+        if i1 in [0, 1]:
+            cl *= biases[i1]
+        if i2 in [0, 1]:
+            cl *= biases[i2]
 
     if i1 in [2, 3, 4]:
         cl *= (1+m_sh[i1-2])

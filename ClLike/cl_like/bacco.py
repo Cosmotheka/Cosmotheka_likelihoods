@@ -149,6 +149,7 @@ class BaccoCalculator(object):
             cospar['A_s'] = cosmo['A_s']
 
         k_for_bacco = self.ks/h
+        # TODO: Use lbias.emulator['nonlinear']['k'].max() instead of 0.75?
         self.mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= 0.75))
         k_for_bacco = k_for_bacco[self.mask_ks_for_bacco]
         if self.ignore_lbias:
@@ -171,6 +172,8 @@ class BaccoCalculator(object):
             pknl = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
             pk = np.array([pknl.eval(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco], a, cosmo) for a in self.a_s])
         else:
+            # TODO: This is going to be called even if no baryons are
+            # requested. Shouldn't it have a flag?
             pk = np.array([self.mpk.get_nonlinear_pk(baryonic_boost=False, cold=False,
                                                      k=k_sh_sh_for_bacco, expfactor=a,
                                                      **cospar)[1]/h**3 for a in self.a_s])

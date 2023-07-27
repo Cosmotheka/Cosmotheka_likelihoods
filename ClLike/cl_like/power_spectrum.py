@@ -225,7 +225,7 @@ class Pk(Theory):
                     if op1 != op2:
                         comb_21 = op2+op1
                         pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
-            if self.bias_model == 'BaccoPT':
+            if (self.bias_model == 'BaccoPT') and self.use_baryon_boost:
                 # TODO: This assumes LCDM, but as above. BACCOemu is trained
                 # only in LCDM, anyway. What to do with the cross pk's? At the
                 # moment they don't have the correction.
