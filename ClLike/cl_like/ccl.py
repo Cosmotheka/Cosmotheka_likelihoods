@@ -178,7 +178,7 @@ class CCL(Theory):
         # (we should actually only do this if required -- TODO)
         # Compute sigma8 if it is not an input parameter
         state['derived'] = {}
-        if 'A_sE9' in self.input_params:
+        if 'sigma8' not in self.input_params:
             sigma8 = ccl.sigma8(cosmo)
             state['derived']['sigma8'] = sigma8
         else:
