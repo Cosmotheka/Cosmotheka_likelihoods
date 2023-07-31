@@ -107,24 +107,9 @@ class ClLike(Likelihood):
         # Additional information specific for this likelihood
         # self._get_bin_info_extra(s)
 
-        # 2. Iterate through two-point functions and apply scale cuts
-        indices = []
-        for cl in self.twopoints:
-            tn1, tn2 = cl['bins']
-            lmin = np.max([self.defaults[tn1].get('lmin', 2),
-                           self.defaults[tn2].get('lmin', 2)])
-            lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
-                           self.defaults[tn2].get('lmax', 1E30)])
-            # Get the suffix for both tracers
-            cltyp = get_cl_type(s.tracers[tn1], s.tracers[tn2])
-            ind = s.indices(cltyp, (tn1, tn2),
-                            ell__gt=lmin, ell__lt=lmax)
-            indices += list(ind)
-        s.keep_indices(np.array(indices))
-
-        # 3. Iterate through two-point functions, collect information about
-        # them (tracer names, bandpower windows etc.), and put all C_ells in
-        # the right order
+        # 2. Iterate through two-point functions, apply scale cuts and collect
+        # information about them (tracer names, bandpower windows etc.), and
+        # put all C_ells in the right order
         indices = []
         self.cl_meta = []
         id_sofar = 0
@@ -134,14 +119,29 @@ class ClLike(Likelihood):
             # Get the suffix for both tracers
             tn1, tn2 = cl['bins']
             cltyp = get_cl_type(s.tracers[tn1], s.tracers[tn2])
+            # Get data
             l, c_ell, cov, ind = s.get_ell_cl(cltyp, tn1, tn2,
                                               return_cov=True,
                                               return_ind=True)
-            if c_ell.size > 0:
-                if tn1 not in self.tracer_qs:
-                    self.tracer_qs[tn1] = s.tracers[tn1].quantity
-                if tn2 not in self.tracer_qs:
-                    self.tracer_qs[tn2] = s.tracers[tn2].quantity
+            # Check it is not empty
+            if c_ell.size == 0:
+                continue
+
+            # Scale cuts
+            lmin = np.max([self.defaults[tn1].get('lmin', 2),
+                           self.defaults[tn2].get('lmin', 2)])
+            lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
+                           self.defaults[tn2].get('lmax', 1E30)])
+            sel = (l > lmin) * (l < lmax)
+            l = l[sel]
+            c_ell = c_ell[sel]
+            cov = cov[sel][:, sel]
+            ind = ind[sel]
+
+            if tn1 not in self.tracer_qs:
+                self.tracer_qs[tn1] = s.tracers[tn1].quantity
+            if tn2 not in self.tracer_qs:
+                self.tracer_qs[tn2] = s.tracers[tn2].quantity
 
             bpw = s.get_bandpower_windows(ind)
             l_bpw = bpw.values
@@ -251,6 +251,12 @@ class ClLike(Likelihood):
     def get_cl_data_sacc(self):
         s = self.sacc_file.copy()
         s.keep_indices(self.indices)
+
+        # Reorder
+        indices = []
+        for clm in self.cl_meta:
+            indices.extend(list(s.indices(tracers=(clm['bin_1'], clm['bin_2']))))
+        s.reorder(indices)
 
         tracers = []
         for trs in s.get_tracer_combinations():

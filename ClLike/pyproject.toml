@@ -23,7 +23,7 @@ dependencies = [
     "scipy",
     "numpy",
     "pytest",
-    "pyccl>=2.5.0",
+    "pyccl>=2.5.0,<2.8.0",
     "sacc>=0.7",
     "camb"
 ]

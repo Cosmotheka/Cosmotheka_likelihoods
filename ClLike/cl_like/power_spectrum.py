@@ -53,7 +53,7 @@ class Pk(Theory):
     nonlinear_emu_path = None
     nonlinear_emu_details = None
     use_baryon_boost : bool = False
-    ignore_lbias : bool = False 
+    ignore_lbias : bool = False
     allow_bcm_emu_extrapolation_for_shear : bool = True
     allow_halofit_extrapolation_for_shear : bool = False
 
@@ -225,8 +225,11 @@ class Pk(Theory):
                     if op1 != op2:
                         comb_21 = op2+op1
                         pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
-            if self.bias_model == 'BaccoPT':
-                pkd['pk_mm_sh_sh'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
+            if (self.bias_model == 'BaccoPT') and self.use_baryon_boost:
+                # TODO: This assumes LCDM, but as above. BACCOemu is trained
+                # only in LCDM, anyway. What to do with the cross pk's? At the
+                # moment they don't have the correction.
+                pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
         return pkd
 
     def get_can_provide(self):

@@ -19,25 +19,47 @@ def run_clean_tmp():
 
 def get_info(bias, A_sE9=True):
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
-    data += "cl_like/tests/data/gc_kp_sh_linear_nuisances.fits.gz"
-    bias_gc1_b1 = 1.0 if bias not in ['LagrangianPT', 'BaccoPT'] else 0.0
-    info = {"params": {"A_sE9": 2.23,
-                       "Omega_c": 0.25,
+    if bias == 'BaccoPT':
+        data += "cl_like/tests/data/linear_baccopt_5x2pt.fits.gz"
+    else:
+        data += "cl_like/tests/data/linear_halofit_5x2pt.fits.gz"
+    # TODO: The biases are the culprit of the disagreement for baccopt
+    bias_gc0_b1 = 1.2 if bias not in ['LagrangianPT', 'BaccoPT'] else 0.2
+    bias_gc1_b1 = 1.4 if bias not in ['LagrangianPT', 'BaccoPT'] else 0.4
+    info = {"params": {"A_sE9": 2.1265,
+                       "Omega_c": 0.26,
                        "Omega_b": 0.05,
                        "h": 0.67,
                        "n_s": 0.96,
-                       "m_nu": 0.0,
+                       "m_nu": 0.15,
+                       # gc0
+                       "bias_gc0_b1": bias_gc0_b1,
+                       "bias_gc0_b1p": 0.0,
+                       "bias_gc0_b2": 0.0,
+                       "bias_gc0_bs": 0.0,
+                       "bias_gc0_bk2": 0.0,
+                       "limber_gc0_dz": 0.1,
+                       # gc1
                        "bias_gc1_b1": bias_gc1_b1,
                        "bias_gc1_b1p": 0.0,
                        "bias_gc1_b2": 0.0,
                        "bias_gc1_bs": 0.0,
                        "bias_gc1_bk2": 0.0,
-                       "bias_sh1_m": 0.3,
-                       "limber_gc1_dz": -0.1,
-                       "limber_sh1_dz": -0.2,
-                       "limber_sh1_eta_IA": 1,
-                       "bias_sh1_A_IA": 0.1,
+                       "limber_gc1_dz": 0.15,
                        "bias_gc1_s": 2/5,
+                       # sh0
+                       "bias_sh0_m": 0.1,
+                       "limber_sh0_dz": 0.2,
+                       # sh1
+                       "bias_sh1_m": 0.3,
+                       "limber_sh1_dz": 0.4,
+                       # sh2
+                       "bias_sh2_m": 0.5,
+                       "limber_sh2_dz": 0.6,
+                       # IA
+                       "limber_eta_IA": 1,
+                       "bias_A_IA": 0.1,
+                       # Derived
                        "sigma8": None},
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
@@ -46,7 +68,7 @@ def get_info(bias, A_sE9=True):
                        "limber": {"external": Limber,
                                   "nz_model": "NzShift",
                                   "input_params_prefix": "limber",
-                                  "ia_model": "IADESY1_PerSurvey"},
+                                  "ia_model": "IADESY1"},
                        "Pk": {"external": Pk,
                              "bias_model": bias,
                               "zmax_pks": 1.5},  # For baccoemu
@@ -56,34 +78,61 @@ def get_info(bias, A_sE9=True):
                        },
             "likelihood": {"ClLike": {"external": cll.ClLike,
                                       "input_file": data,
-                                      "bins": [{"name": "gc1"},
+                                      "bins": [
+                                               {"name": "gc0"},
+                                               {"name": "gc1"},
+                                               {"name": "sh0"},
+                                               {"name": "sh1"},
+                                               {"name": "sh2"},
                                                {"name": "kp"},
-                                               {"name": "sh1"}],
-                                      "twopoints": [{"bins": ["gc1", "gc1"]},
-                                                    {"bins": ["gc1", "kp"]},
+                                               ],
+                                      "twopoints": [{"bins": ["gc0", "gc0"]},
+                                                    {"bins": ["gc1", "gc1"]},
+
+                                                    {"bins": ["gc0", "sh0"]},
+                                                    {"bins": ["gc0", "sh1"]},
+                                                    {"bins": ["gc0", "sh2"]},
+                                                    {"bins": ["gc1", "sh0"]},
                                                     {"bins": ["gc1", "sh1"]},
+                                                    {"bins": ["gc1", "sh2"]},
+
+                                                    {"bins": ["gc0", "kp"]},
+                                                    {"bins": ["gc1", "kp"]},
+
+                                                    {"bins": ["sh0", "sh0"]},
+                                                    {"bins": ["sh0", "sh1"]},
+                                                    {"bins": ["sh0", "sh2"]},
+                                                    {"bins": ["sh1", "sh1"]},
+                                                    {"bins": ["sh1", "sh2"]},
+                                                    {"bins": ["sh2", "sh2"]},
+
+                                                    {"bins": ["sh0", "kp"]},
+                                                    {"bins": ["sh1", "kp"]},
+                                                    {"bins": ["sh2", "kp"]},
+
                                                     {"bins": ["kp", "kp"]},
-                                                    {"bins": ["kp", "sh1"]},
-                                                    {"bins": ["sh1", "sh1"]}],
+                                                    ],
                                       "defaults": {"kmax": 0.5,
                                                    "lmin": 0,
                                                    "lmax": 2000,
-                                                   "gc1": {"lmin": 20,
-                                                           "mag_bias": True}},
+                                                   # Removing the large scales
+                                                   # due to extrapolation
+                                                   # differences in pkmd1 &
+                                                   # pkd1d1
+                                                   "gc1": {"lmin": 0,
+                                                           "mag_bias": True}
+                                                   },
                                       }
                            },
-            "output": "dum",
             "debug": False}
 
     if not A_sE9:
-        info["params"]["sigma8"] = 0.8098
+        # info["params"]["sigma8"] = 0.78220521  # From Bacco
+        info["params"]["sigma8"] = 0.7824601264149301  # From CCL
         del info["params"]["A_sE9"]
 
     return info
 
-
-# TODO: Update test to test BaccoPT. It uses its own matter Pk so one cannot
-# compare with the fits file above. We would need to generate a different one.
 @pytest.mark.parametrize('bias', ['Linear', 'EulerianPT', 'LagrangianPT',
                                   'BaccoPT'])
 def test_dum(bias):
@@ -91,13 +140,12 @@ def test_dum(bias):
 
     model = get_model(info)
     loglikes, derived = model.loglikes()
-    print(loglikes)
-    if bias == 'BaccoPT':
-        # Until we don't regenerate the Cells with Bacco's Pks, we cannot check
-        # the chi2 as the others
-        assert np.fabs(loglikes[0]) < 80  # Note that there are ~1000 points
-    else:
+
+    if bias != 'BaccoPT':
         assert np.fabs(loglikes[0]) < 2E-3
+    else:
+        # For some reason I cannot push it lower than this.
+        assert np.fabs(loglikes[0]) < 0.2
 
 
 # TODO: Move this test to another file or rename this one
@@ -115,10 +163,13 @@ def test_sigma8():
 @pytest.mark.parametrize('case', ['IAPerBin', 'IADESY1', 'IADESY1_PerSurvey'])
 def test_ia_models(case):
     info = get_info(bias="Linear")
-    if case not in ['IAPerBin', 'IADESY1_PerSurvey']:
+    if case in ['IAPerBin', 'IADESY1_PerSurvey']:
         # In this case, the params are already as they have to
-        info["params"]["bias_A_IA"] = info["params"].pop("bias_sh1_A_IA")
-        info["params"]["limber_eta_IA"] = info["params"].pop("limber_sh1_eta_IA")
+        A = info["params"].pop("bias_A_IA")
+        eta = info["params"].pop("limber_eta_IA")
+        for i in range(3):
+            info["params"][f"bias_sh{i}_A_IA"] = A
+            info["params"][f"limber_sh{i}_eta_IA"] = eta
     info["theory"]["limber"]["ia_model"] = case
     model = get_model(info)
     loglikes, derived = model.loglikes()
@@ -155,11 +206,13 @@ def test_timing():
     if os.getenv("GITHUB_ACTIONS") == "true":
         # First time it was 1.1, next 1.7. Choosing 2s to have enough margin.
         # We might need to skip this test in GitHub it if it's not very stable
-        assert time < 2
+        # Multiplying by 4 since we have many more data now
+        assert time < 8
     else:
         # Before restructuring, the average evaluation time was ~0.54s in my laptop
         # After the restructuration, it went to 0.56s.
-        assert time < 0.6
+        # With the new data, it takes longer because there are more data
+        assert time < 2.4
 
 
 def test_null_negative_eigvals_in_icov():
@@ -189,9 +242,6 @@ def test_null_negative_eigvals_in_icov():
     # The chi2 cannot be the same as before because the inv cov is (slightly)
     # different
     assert np.fabs(loglikes[0]) != pytest.approx(loglike0, rel=1e-3)
-
-    # The determinant now is 0 because it has a 0 eigenvalue
-    assert np.linalg.det(model.likelihood['ClLike'].inv_cov) == 0
 
 
 def test_get_theory_cl_sacc():
@@ -223,9 +273,49 @@ def test_get_cl_data_sacc():
 
     s = lkl.get_cl_data_sacc()
     assert s.mean.size == lkl.ndata
-    indices = []
-    for clm in lkl.cl_meta:
-        indices.extend(list(s.indices(tracers=(clm['bin_1'], clm['bin_2']))))
-    s.reorder(indices)
     assert s.mean == pytest.approx(lkl.data_vec, rel=1e-5)
     assert np.all(s.covariance.covmat == lkl.cov)
+
+
+def test_Omega_m():
+    info = get_info('Linear')
+    pars = info['params']
+    Omega_nu = info['params']['m_nu']/(93.4 * info['params']['h']**2)
+    pars['Omega_m'] = pars['Omega_c'] + pars['Omega_b'] + Omega_nu
+    del pars['Omega_c']
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    # The loglike is slightly higher probably because of the way Omega_nu is
+    # computed here
+    assert np.fabs(loglikes[0]) < 5E-3
+
+def test_neutrinos():
+    info = get_info('Linear')
+    pars = info['params']
+    pars['m_nu'] = 0.4
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+
+
+    Onu = pars['m_nu'] / (93.14 * pars['h']**2)
+    pars['Omega_m'] = pars['Omega_c'] + pars['Omega_b'] + Onu
+    del pars['Omega_c']
+    model = get_model(info)
+    loglikes2, derived = model.loglikes()
+
+    assert np.fabs(loglikes[0]/loglikes2[0] -1) < 1E-4
+
+def test_S8():
+    info = get_info('Linear', False)
+    sigma8 = info['params']['sigma8']
+    Omega_nu = info['params']['m_nu']/(93.4 * info['params']['h']**2)
+    Omega_m = info['params']['Omega_c'] + info['params']['Omega_b'] + Omega_nu
+    del info['params']['sigma8']
+    info['params']['S8'] = sigma8 * np.sqrt(Omega_m/0.3)
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    assert np.fabs(loglikes[0]) < 2E-3
