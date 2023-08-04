@@ -68,15 +68,9 @@ class CCL(Theory):
                 ('Omega_c' in self.input_params):
             raise ValueError("Only one of Omega_c or Omega_m must be set")
 
-    def get_requirements(self):
-        # Specify A_sE9 and sigma8 in get_can_support_params to allow both
-        # inputs.
-        params = {'Omega_b': None,
-                  'h': None,
-                  'n_s': None,
-                  'm_nu': None}
-
-        return params
+    def get_allow_agnostic(self):
+        # Pass all parameters without unknown prefix to this class
+        return True
 
     def must_provide(self, **requirements):
         # requirements is dictionary of things requested by likelihoods
@@ -135,18 +129,30 @@ class CCL(Theory):
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
+
+        # Copy input_params. We will be removing elements that we extract from
+        # it to pass to ccl.Cosmology all the remaining parameters.
+        input_params = list(self.input_params)
+
+        #
         h = self.provider.get_param('h')
+        input_params.remove('h')
         Ob = self.provider.get_param('Omega_b')
+        input_params.remove('Omega_b')
         m_nu = self.provider.get_param('m_nu')
-        T_CMB = self._get_ccl_param_or_arg('T_CMB', 2.7255)
+        input_params.remove('m_nu')
+        T_CMB = self._get_ccl_param_or_arg('T_CMB',
+                                           ccl.physical_constants.T_CMB)
         T_ncdm = self._get_ccl_param_or_arg('T_ncdm', 0.71611)
 
         Onu = self._get_Onuh2(m_nu, T_CMB, T_ncdm) / h**2 if m_nu != 0 else 0
         if 'Omega_c' in self.input_params:
             Oc = self.provider.get_param('Omega_c')
+            input_params.remove('Omega_c')
             Om = Ob + Oc + Onu
         else:
             Om = self.provider.get_param('Omega_m')
+            input_params.remove('Omega_m')
             Oc = Om - Ob - Onu
 
         # Parameters accepted by CCL
@@ -158,11 +164,17 @@ class CCL(Theory):
 
         if 'A_sE9' in self.input_params:
             params.update({'A_s': self.provider.get_param('A_sE9')*1E-9})
+            input_params.remove('A_sE9')
         elif 'S8' in self.input_params:
             sigma8 = self.provider.get_param('S8') * np.sqrt(0.3 / Om)
+            input_params.remove('S8')
             params.update({'sigma8': sigma8})
         else:
             params.update({'sigma8': self.provider.get_param('sigma8')})
+            input_params.remove('sigma8')
+
+        for p in input_params:
+            params[p] = self.provider.get_param(p)
 
         cosmo = ccl.Cosmology(**params,
                               T_CMB=T_CMB,
