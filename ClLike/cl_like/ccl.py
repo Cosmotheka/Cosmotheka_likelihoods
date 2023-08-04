@@ -143,6 +143,8 @@ class CCL(Theory):
         input_params.remove('m_nu')
         T_CMB = self._get_ccl_param_or_arg('T_CMB',
                                            ccl.physical_constants.T_CMB)
+        if 'T_CMB' in input_params:
+            input_params.remove('T_CMB')
         T_ncdm = self._get_ccl_param_or_arg('T_ncdm', 0.71611)
 
         Onu = self._get_Onuh2(m_nu, T_CMB, T_ncdm) / h**2 if m_nu != 0 else 0

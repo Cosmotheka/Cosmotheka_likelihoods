@@ -32,6 +32,7 @@ def get_info(bias, A_sE9=True):
                        "h": 0.67,
                        "n_s": 0.96,
                        "m_nu": 0.15,
+                       "T_CMB": 2.7255,
                        # gc0
                        "bias_gc0_b1": bias_gc0_b1,
                        "bias_gc0_b1p": 0.0,
