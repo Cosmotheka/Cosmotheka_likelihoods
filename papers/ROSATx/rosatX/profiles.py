@@ -412,6 +412,8 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         r_esc = 0.5 * np.sqrt(delta200) * r200
         eta_a = 0.75 * self.eta_b
         Re2 = (eta_a * r_esc)**2
+        Re2 = Re2[:, None]
+        M = M[:, None]
         return M / (2 * np.pi * Re2)**(3 / 2) * np.exp(-(x**2 / (2 * Re2)))
 
     def _get_rho0(self, cosmo, M, r, c_M):
@@ -440,9 +442,13 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         x = r_use[None, :] / R_s[:, None]
 
         rho0 = self._get_rho0(cosmo, M_use, R_s, c_M)
-        rho_bound = self._rho_bound(x) * rho0
+        #print("rho0", np.shape(rho0))
+        #print("rho_bound", np.shape(self._rho_bound(x)))
+        rho_bound = self._rho_bound(x) * rho0[:, None]
+        fb_ejected = self._fb_ejected(cosmo, M_use)
+        fb_ejected = fb_ejected[:, None]
         rho_ejected = self._rho_ejected(
-            r_use[None, :], cosmo, M_use, a) * self._fb_ejected(cosmo, M_use)
+            r_use[None, :], cosmo, M_use, a) * fb_ejected
 
         if self.quantity == 'density':
             prof = (rho_bound + rho_ejected) * self.prefac_rho
@@ -454,11 +460,12 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
 
             # Physical radius in Mpc
             R_phys = a * R_M
+            R_phys = R_phys[:, None]
 
             # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
             G = 1.81805235e-27
 
-            factor = self._factor(x) * 2 * G * M_use
+            factor = self._factor(x) * 2 * G * M_use[:, None]
             T_bound = factor * self.alpha_T * self.prefac_T / (3 * R_phys)
 
             # Put them together
