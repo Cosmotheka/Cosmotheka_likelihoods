@@ -610,7 +610,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         r_esc = 0.5 * np.sqrt(delta200) * r200
         eta_a = 0.75 * self.eta_b
         Re2 = ((eta_a * r_esc)**2)[:, None]
-        return M[:, None] / (2 * np.pi * Re2)**(3 / 2) * np.exp(-(x**2 / (2 * Re2)))
+        return M[:, None] / (2*np.pi*Re2)**1.5 * np.exp(-(x**2/(2*Re2)))
 
     def _get_rho0(self, cosmo, M, r, c_M):
         # This integral can be precomputed if it's too slow
@@ -635,20 +635,22 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         x = r_use[None, :] / R_s[:, None]
         rho0 = self._get_rho0(cosmo, M_use, R_s, c_M)
         rho_bound = self._rho_bound(x) * rho0[:, None]
-        rho_ejected = self._rho_ejected(
-            r_use[None, :], cosmo, M_use, a) * self._fb_ejected(cosmo, M_use)[:, None]
+        rho_ejected = (self._rho_ejected(r_use[None, :], cosmo, M_use, a) *
+                       self._fb_ejected(cosmo, M_use)[:, None])
 
         if self.quantity == 'density':
             prof = (rho_bound + rho_ejected) * self.prefac_rho
         elif self.quantity == 'pressure':
-            # Boltmann constant which, when multiplied by T in Kelvin gives you eV
+            # Boltmann constant which, when multiplied by T in Kelvin
+            # gives you eV
             k_boltz = 8.61732814974493e-05
             T_ejected = 10**6.5*k_boltz
 
             # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
             G = 1.81805235e-27
             factor = np.log(1+x)/x
-            T_bound = factor * self.alpha_T * 2 * G * M_use[:, None] * self.prefac_T / (3 * a * R_M[:, None])
+            T_bound = factor * self.alpha_T * 2 * G * M_use[:, None]
+            T_bound *= self.prefac_T / (3 * a * R_M[:, None])
 
             # Put them together
             prof = (rho_bound*T_bound+rho_ejected*T_ejected)*self.prefac_rho
@@ -710,9 +712,9 @@ class _HaloProfileNFW(ccl.halos.HaloProfile):
     """
     def __init__(self, *, mass_def, concentration,
                  truncated=True,
-                 par_A=4.295, 
-                 par_B=0.514, 
-                 par_C=-0.039, 
+                 par_A=4.295,
+                 par_B=0.514,
+                 par_C=-0.039,
                  m_fid=3e14,
                  kind="rho_gas",
                  quantity="density"):
@@ -741,7 +743,7 @@ class _HaloProfileNFW(ccl.halos.HaloProfile):
         cosmo_model = ccl.h_over_h0(cosmo, a) ** (2 / 3)
 
         return 1E3*cosmo_model * self.par_A * m_ratio ** exponent
-        
+
     def _real(self, cosmo, r, M, a):
         r_use = np.atleast_1d(r)
         M_use = np.atleast_1d(M)
@@ -758,7 +760,7 @@ class _HaloProfileNFW(ccl.halos.HaloProfile):
         if np.ndim(M) == 0:
             prof = np.squeeze(prof, axis=0)
         return prof
-        
+
     def _fourier(self, cosmo, k, M, a):
         k_use = np.atleast_1d(k)
         M_use = np.atleast_1d(M)
@@ -777,14 +779,12 @@ class _HaloProfileNFW(ccl.halos.HaloProfile):
         return prof
 
 
-
-
 class HaloProfileDensityNFW(_HaloProfileNFW):
     def __init__(self, *, mass_def, concentration,
                  truncated=True,
-                 par_A=4.295, 
-                 par_B=0.514, 
-                 par_C=-0.039, 
+                 par_A=4.295,
+                 par_B=0.514,
+                 par_C=-0.039,
                  m_fid=3e14,
                  kind="rho_gas"):
         super().__init__(mass_def=mass_def, concentration=concentration,
@@ -796,9 +796,9 @@ class HaloProfileDensityNFW(_HaloProfileNFW):
 class HaloProfilePressureNFW(_HaloProfileNFW):
     def __init__(self, *, mass_def, concentration,
                  truncated=True,
-                 par_A=4.295, 
-                 par_B=0.514, 
-                 par_C=-0.039, 
+                 par_A=4.295,
+                 par_B=0.514,
+                 par_C=-0.039,
                  m_fid=3e14,
                  kind="rho_gas"):
         super().__init__(mass_def=mass_def, concentration=concentration,
@@ -1057,17 +1057,21 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         ev = np.array([lkT, np.full_like(lkT, z)]).T
         J = np.exp(self.Jinterp(ev))
         # Clumping factor
+        c2r = np.ones([nM, nr])
         if self.with_clumping:
             M_c2r = M_use.copy()
             M_c2r[M_c2r < 7e13] = 7e13
             M_c2r[M_c2r > 1e15] = 1e15
             xc = 9.91e5 * (1e-14 * M_c2r) ** (-4.87)
-            beta = (0.185 * (1e-14 * M_c2r) ** 0.547)[:, None]
-            gamma = (1.16e6 * (1e-14 * M_c2r) ** (-4.86))[:, None]
-            xxc = r_use[None, :] / (xc * rDelta)[:, None]
-            c2r = 1 + xxc**beta * (1 + xxc) ** (gamma - beta)
-        else:
-            c2r = 1
+            beta = (0.185 * (1e-14 * M_c2r) ** 0.547)
+            gamma = (1.16e6 * (1e-14 * M_c2r) ** (-4.86))
+            for im in range(nM):
+                rD = rDelta[im]
+                # Only use fitting function up to 3 times virial radius
+                # Constant afterwards
+                x = np.minimum(r_use/rDelta[im], 3.0)
+                xxc = x / xc[im]
+                c2r[im, :] = 1 + xxc**beta[im] * (1+xxc)**(gamma[im]-beta[im])
         # Final profile in cm^-1
         prof = c2r * (ndens**2 * J).reshape([nM, nr])
         # Transform to Mpc^-1
