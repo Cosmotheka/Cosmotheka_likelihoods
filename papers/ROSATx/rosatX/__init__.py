@@ -3,7 +3,7 @@ from .profiles import (HaloProfilePressureBattaglia,
                        HaloProfileDensityBattaglia,
                        HaloProfileDensityNFW,
                        HaloProfileDensityHydrostaticEquilibrium,
-                       HaloProfileTemperatureHydrostaticEquilibrium,
+                       HaloProfilePressureHydrostaticEquilibrium,
                        HaloProfileTemperatureSpectroscopicLike,
                        HaloProfileXray,
                        XrayTracer)
