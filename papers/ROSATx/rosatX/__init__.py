@@ -1,9 +1,9 @@
 from .rosat import ROSATResponse
-from .profiles import (HaloProfilePressureBattaglia,
-                       HaloProfileDensityBattaglia,
-                       HaloProfileDensityNFW,
+from .profiles import (HaloProfileDensityBattaglia,
+                       HaloProfilePressureBattaglia,
                        HaloProfileDensityHydrostaticEquilibrium,
                        HaloProfilePressureHydrostaticEquilibrium,
+                       HaloProfileDensityNFW,
                        HaloProfileTemperatureSpectroscopicLike,
                        HaloProfileXray,
                        XrayTracer)

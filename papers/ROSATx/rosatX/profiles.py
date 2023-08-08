@@ -334,20 +334,8 @@ class HaloProfileDensityBattaglia(ccl.halos.HaloProfile):
         return prof
 
 
-class _HaloProfileHydrostaticEquilibrium(ccl.halos.HaloProfile):
-    """Gas density profile given by the sum of the density profile for
-    the bound and the ejected gas, each modelled separetely for a halo
-    in hydrostatic equilibrium.
-
-    The density and mass fraction of the bound gas as well as the mass
-    fraction of the ejected gas taken from Mead 2020, and the density
-    of the ejected gas taken from Schneider & Teyssier 2016.
-
-    Profile is calculated in units of M_sun Mpc^-3 if
-    requesting mass density (`kind == 'rho_gas'`), or in cm^-3
-    if requesting a number density. Allowed values for `kind`
-    in the latter case are `'n_total'`, `'n_baryon'`, `'n_H'`,
-    `'n_electron'`.
+class _HaloProfileHE(ccl.halos.HaloProfile):
+    """Halo Profile for Hydrostatic Equilibrium
 
     Default values of all parameters correspond to the values
     found in Mead et al. 2020.
@@ -435,6 +423,9 @@ class _HaloProfileHydrostaticEquilibrium(ccl.halos.HaloProfile):
         rho0 = M * fb / (4 * np.pi * r**3 * integral)
         return rho0
 
+    def _factor(self, x):
+        return np.log(1 + x) / x
+
     def _real(self, cosmo, r, M, a):
         # Real-space profile.
         # Output in units of eV/cm^3
@@ -447,6 +438,7 @@ class _HaloProfileHydrostaticEquilibrium(ccl.halos.HaloProfile):
         R_s = R_M / c_M
 
         x = r_use[None, :] / R_s[:, None]
+
         rho0 = self._get_rho0(cosmo, M_use, R_s, c_M)
         rho_bound = self._rho_bound(x) * rho0
         rho_ejected = self._rho_ejected(
@@ -455,14 +447,19 @@ class _HaloProfileHydrostaticEquilibrium(ccl.halos.HaloProfile):
         if self.quantity == 'density':
             prof = (rho_bound + rho_ejected) * self.prefac_rho
         elif self.quantity == 'pressure':
-            # Boltmann constant which, when multiplied by T in Kelvin gives you eV
+            # Boltmann constant which, when
+            # multiplied by T in Kelvin, gives you eV
             k_boltz = 8.61732814974493e-05
             T_ejected = 10**6.5*k_boltz
 
+            # Physical radius in Mpc
+            R_phys = a * R_M
+
             # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
             G = 1.81805235e-27
-            factor = np.log(1+x)/x
-            T_bound = factor * self.alpha_T * 2 * G * M_use * self.prefac_T / (3 * a * R_M)
+
+            factor = self._factor(x) * 2 * G * M_use
+            T_bound = factor * self.alpha_T * self.prefac_T / (3 * R_phys)
 
             # Put them together
             prof = (rho_bound*T_bound+rho_ejected*T_ejected)*self.prefac_rho
@@ -474,9 +471,21 @@ class _HaloProfileHydrostaticEquilibrium(ccl.halos.HaloProfile):
         return prof
 
 
+class HaloProfileDensityHydrostaticEquilibrium(_HaloProfileHE):
+    """Gas density profile given by the sum of the density profile for
+    the bound and the ejected gas, each modelled separetely for a halo
+    in hydrostatic equilibrium.
 
+    The density and mass fraction of the bound gas as well as the mass
+    fraction of the ejected gas taken from Mead 2020, and the density
+    of the ejected gas taken from Schneider & Teyssier 2016.
 
-class HaloProfileDensityHydrostaticEquilibrium(_HaloProfileHydrostaticEquilibrium):
+    Profile is calculated in units of M_sun Mpc^-3 if
+    requesting mass density (`kind == 'rho_gas'`), or in cm^-3
+    if requesting a number density. Allowed values for `kind`
+    in the latter case are `'n_total'`, `'n_baryon'`, `'n_H'`,
+    `'n_electron'`.
+    """
 
     def __init__(self, *, mass_def, concentration,
                  beta=0.6,
@@ -499,7 +508,15 @@ class HaloProfileDensityHydrostaticEquilibrium(_HaloProfileHydrostaticEquilibriu
                          quantity="density")
 
 
-class HaloProfilePressureHydrostaticEquilibrium(_HaloProfileHydrostaticEquilibrium):
+class HaloProfilePressureHydrostaticEquilibrium(_HaloProfileHE):
+    """Gas pressure profile from Mead et al. 2020.
+
+    Uses the temperature profile in units of eV . Allowed values
+    for `kind` are `'T_total'`, `'bahamas'`. The 'bahamas'
+    option is the value taken be compatible with gas metallicity
+    in the simulations and the way the electron pressure
+    field was measured in post processesing.
+    """
     def __init__(self, *, mass_def, concentration,
                  beta=0.6,
                  gamma=1.17,
@@ -757,11 +774,11 @@ class HaloProfileTemperatureSpectroscopicLike(ccl.halos.HaloProfile):
     """
 
     def __init__(self, *, mass_def,
-                 par_A=4.295, 
-                 par_B=0.514, 
-                 par_C=-0.039, 
+                 par_A=4.295,
+                 par_B=0.514,
+                 par_C=-0.039,
                  m_fid=3e14):
-    
+
         self.par_A = par_A
         self.par_B = par_B
         self.par_C = par_C
@@ -784,7 +801,7 @@ class HaloProfileTemperatureSpectroscopicLike(ccl.halos.HaloProfile):
             prof = np.squeeze(prof, axis=-1)
         if np.ndim(M) == 0:
             prof = np.squeeze(prof, axis=0)
-        prof = np.repeat(prof,len(r))
+        prof = np.repeat(prof, len(r))
         return prof
 
 
@@ -1029,8 +1046,6 @@ class HaloProfileXray(ccl.halos.HaloProfile):
 
         rDelta = self.mass_def.get_radius(cosmo, M_use, a) / a
         # Number density in cm^-3
-        ndens = self.dens.real(cosmo, r_use, M_use, a).flatten()
-        # Pressure in eV * cm^-
         ndens = self.dens.real(cosmo, r_use, M_use, a).flatten()
         if self.pres is not None:
             # Pressure in eV * cm^-3
