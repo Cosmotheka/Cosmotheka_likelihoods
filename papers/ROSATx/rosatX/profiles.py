@@ -4,44 +4,44 @@ from scipy.integrate import quad, simps
 from scipy.interpolate import RegularGridInterpolator, interp1d
 
 
-def get_prefac_rho(rho_kind, XH=0.76):
+def get_prefac_rho(kind, XH=0.76):
     """Prefactor that transforms gas mas density into
     other types of density, depending on the hydrogen mass
     fraction XH (BBN value by default).
     """
-    if rho_kind == "rho_gas":
+    if kind == "rho_gas":
         return 1.0
     else:
         # Transforms density in M_sun/Mpc^3 into m_p/cm^3
         MsunMpc2Mprotcm = 4.04768956e-17
-        if rho_kind == "n_baryon":
+        if kind == "n_baryon":
             return MsunMpc2Mprotcm * (3 * XH + 1) / 4
-        if rho_kind == "n_H":
+        if kind == "n_H":
             return MsunMpc2Mprotcm * XH
-        elif rho_kind == "n_electron":
+        elif kind == "n_electron":
             return MsunMpc2Mprotcm * (XH + 1) / 2
-        elif rho_kind == "n_total":
+        elif kind == "n_total":
             return MsunMpc2Mprotcm * (5 * XH + 3) / 4
         else:
-            raise NotImplementedError(f"Density type {rho_kind} \
+            raise NotImplementedError(f"Density type {kind} \
                                       not implemented")
 
 
-def get_prefac_P(P_kind, XH=0.76):
+def get_prefac_P(kind, XH=0.76):
     """Prefactor that transforms gas Pressure into
     other types of density, depending on the hydrogen mass
     fraction XH (BBN value by default).
     """
-    if P_kind == "P_total":
+    if kind == "n_total":
         return 1.0
-    elif P_kind == "P_H":
+    elif kind == "n_H":
         return 4 * XH / (5 * XH + 3)
-    elif P_kind == "P_baryon":
+    elif kind == "n_baryon":
         return (3 * XH + 1) / (5 * XH + 3)
-    elif P_kind == "P_electron":
+    elif kind == "n_electron":
         return (2 * (XH + 1)) / (5 * XH + 3)
     else:
-        raise NotImplementedError(f"Pressure type {P_kind} not implemented")
+        raise NotImplementedError(f"Pressure type {kind} not implemented")
 
 
 def get_prefac_T(T_kind, XH=0.76):
@@ -63,41 +63,6 @@ def get_prefac_T(T_kind, XH=0.76):
 def get_fb(cosmo):
     """Returns baryon fraction."""
     return cosmo["Omega_b"] / (cosmo["Omega_b"] + cosmo["Omega_c"])
-
-
-class HaloProfileDensityNFW(ccl.halos.HaloProfile):
-    """Simple gas density profile assuming NFW (times cosmic
-    baryon fraction).
-    """
-
-    def __init__(self, *, mass_def, concentration,
-                 fourier_analytic=True,
-                 projected_analytic=False,
-                 cumul2d_analytic=False,
-                 truncated=True,
-                 kind="rho_gas"):
-
-        self.nfw = ccl.halos.HaloProfileNFW(
-            mass_def=mass_def,
-            concentration=concentration,
-            fourier_analytic=fourier_analytic,
-            projected_analytic=projected_analytic,
-            cumul2d_analytic=cumul2d_analytic,
-            truncated=truncated)
-        self.rho_kind = kind
-        self.prefac_rho = get_prefac_rho(self.rho_kind)
-        super().__init__(mass_def=mass_def, concentration=concentration)
-
-    def _norm(self, cosmo):
-        return get_fb(cosmo) * self.prefac_rho
-
-    def _real(self, cosmo, r, M, a):
-        norm = self._norm(cosmo)
-        return norm * self.nfw._real(cosmo, r, M, a)
-
-    def _fourier(self, cosmo, k, M, a):
-        norm = self._norm(cosmo)
-        return norm * self.nfw._fourier(cosmo, k, M, a)
 
 
 class HaloProfileDensityBattaglia(ccl.halos.HaloProfile):
@@ -144,8 +109,8 @@ class HaloProfileDensityBattaglia(ccl.halos.HaloProfile):
         self.beta_az = beta_az
         self.gamma = gamma
         self.xc = xc
-        self.rho_kind = kind
-        self.prefac_rho = get_prefac_rho(self.rho_kind)
+        self.kind = kind
+        self.prefac_rho = get_prefac_rho(self.kind)
 
         self.alpha_interp_spacing = alpha_interp_spacing
         self.beta_interp_spacing = beta_interp_spacing
@@ -334,204 +299,16 @@ class HaloProfileDensityBattaglia(ccl.halos.HaloProfile):
         return prof
 
 
-class _HaloProfileHydrostaticEquilibrium(ccl.halos.HaloProfile):
-    """Gas density profile given by the sum of the density profile for
-    the bound and the ejected gas, each modelled separetely for a halo
-    in hydrostatic equilibrium.
-
-    The density and mass fraction of the bound gas as well as the mass
-    fraction of the ejected gas taken from Mead 2020, and the density
-    of the ejected gas taken from Schneider & Teyssier 2016.
-
-    Profile is calculated in units of M_sun Mpc^-3 if
-    requesting mass density (`kind == 'rho_gas'`), or in cm^-3
-    if requesting a number density. Allowed values for `kind`
-    in the latter case are `'n_total'`, `'n_baryon'`, `'n_H'`,
-    `'n_electron'`.
-
-    Default values of all parameters correspond to the values
-    found in Mead et al. 2020.
-    """
-
-    def __init__(self, *, mass_def, concentration,
-                 beta=0.6,
-                 gamma=1.17,
-                 A_star=0.03,
-                 sigma_star=1.2,
-                 eta_b=0.5,
-                 alpha_T=1.0,
-                 kind="rho_gas",
-                 kind_T="T_total",
-                 quantity="density"):
-        self.beta = beta
-        self.gamma = gamma
-        self.A_star = A_star
-        self.eta_b = eta_b
-        self.alpha_T = alpha_T
-        self.sigma_star = sigma_star
-        self.rho_kind = kind
-        self.P_kind = 'P'+kind[1:]
-        self.quantity = quantity
-        self.prefac_rho = get_prefac_rho(self.rho_kind)
-        self.prefac_T = get_prefac_T(kind_T)
-
-        super().__init__(mass_def=mass_def, concentration=concentration)
-
-    def update_parameters(self,
-                          beta=None,
-                          gamma=None,
-                          A_star=None,
-                          sigma_star=None,
-                          alpha_T=None,
-                          eta_b=None):
-        if beta is not None:
-            self.beta = beta
-        if gamma is not None:
-            self.gamma = gamma
-        if A_star is not None:
-            self.A_star = A_star
-        if eta_b is not None:
-            self.eta_b = eta_b
-        if sigma_star is not None:
-            self.sigma_star = sigma_star
-        if alpha_T is not None:
-            self.alpha_T = alpha_T
-
-    def _fb_bound(self, cosmo, M):
-        part1 = get_fb(cosmo)
-        part2 = (cosmo["h"] * M * 1e-14) ** self.beta
-        part3 = part2 / (1 + part2)
-        return part1 * part3
-
-    def _fb_ejected(self, cosmo, M):
-        part1 = get_fb(cosmo)
-        part2 = self._fb_bound(cosmo, M)
-        part3 = self.A_star * np.exp(
-            -(
-                (np.log10(cosmo["h"] * M * 10 ** (-12.5)) ** 2)
-                / (2 * self.sigma_star**2)
-            )
-        )
-        return part1 - part2 - part3
-
-    def _rho_bound(self, x):
-        return (np.log(1 + x) / x) ** (1 / (self.gamma - 1))
-
-    def _rho_ejected(self, x, cosmo, M, a):
-        # Eq. (2.13) of Schneider & Teyssier 2016
-        r200 = self.mass_def.get_radius(cosmo, M, a) / a
-        delta200 = self.mass_def.get_Delta(cosmo, a)
-        r_esc = 0.5 * np.sqrt(delta200) * r200
-        eta_a = 0.75 * self.eta_b
-        Re2 = (eta_a * r_esc)**2
-        return M / (2 * np.pi * Re2)**(3 / 2) * np.exp(-(x**2 / (2 * Re2)))
-
-    def _get_rho0(self, cosmo, M, r, c_M):
-        # This integral can be precomputed if it's too slow
-        integral = np.array(
-            [quad(lambda x: self._rho_bound(x) * x**2, 0, c)[0] for c in c_M]
-        )
-        fb = self._fb_bound(cosmo, M)
-        rho0 = M * fb / (4 * np.pi * r**3 * integral)
-        return rho0
-
-    def _real(self, cosmo, r, M, a):
-        # Real-space profile.
-        # Output in units of eV/cm^3
-        r_use = np.atleast_1d(r)
-        M_use = np.atleast_1d(M)
-
-        # Comoving virial radius
-        R_M = self.mass_def.get_radius(cosmo, M_use, a) / a
-        c_M = self.concentration(cosmo, M_use, a)
-        R_s = R_M / c_M
-
-        x = r_use[None, :] / R_s[:, None]
-        rho0 = self._get_rho0(cosmo, M_use, R_s, c_M)
-        rho_bound = self._rho_bound(x) * rho0
-        rho_ejected = self._rho_ejected(
-            r_use[None, :], cosmo, M_use, a) * self._fb_ejected(cosmo, M_use)
-
-        if self.quantity == 'density':
-            prof = (rho_bound + rho_ejected) * self.prefac_rho
-        elif self.quantity == 'pressure':
-            # Boltmann constant which, when multiplied by T in Kelvin gives you eV
-            k_boltz = 8.61732814974493e-05
-            T_ejected = 10**6.5*k_boltz
-
-            # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
-            G = 1.81805235e-27
-            factor = np.log(1+x)/x
-            T_bound = factor * self.alpha_T * 2 * G * M_use * self.prefac_T / (3 * a * R_M)
-
-            # Put them together
-            prof = (rho_bound*T_bound+rho_ejected*T_ejected)*self.prefac_rho
-
-        if np.ndim(r) == 0:
-            prof = np.squeeze(prof, axis=-1)
-        if np.ndim(M) == 0:
-            prof = np.squeeze(prof, axis=0)
-        return prof
-
-
-
-
-class HaloProfileDensityHydrostaticEquilibrium(_HaloProfileHydrostaticEquilibrium):
-
-    def __init__(self, *, mass_def, concentration,
-                 beta=0.6,
-                 gamma=1.17,
-                 A_star=0.03,
-                 sigma_star=1.2,
-                 eta_b=0.5,
-                 alpha_T=1.0,
-                 kind="rho_gas",
-                 kind_T="T_total"):
-        super().__init__(mass_def=mass_def, concentration=concentration,
-                         beta=beta,
-                         gamma=gamma,
-                         A_star=A_star,
-                         sigma_star=sigma_star,
-                         eta_b=eta_b,
-                         alpha_T=alpha_T,
-                         kind=kind,
-                         kind_T=kind_T,
-                         quantity="density")
-
-
-class HaloProfilePressureHydrostaticEquilibrium(_HaloProfileHydrostaticEquilibrium):
-    def __init__(self, *, mass_def, concentration,
-                 beta=0.6,
-                 gamma=1.17,
-                 A_star=0.03,
-                 sigma_star=1.2,
-                 eta_b=0.5,
-                 alpha_T=1.0,
-                 kind="rho_gas",
-                 kind_T="T_total"):
-        super().__init__(mass_def=mass_def, concentration=concentration,
-                         beta=beta,
-                         gamma=gamma,
-                         A_star=A_star,
-                         sigma_star=sigma_star,
-                         eta_b=eta_b,
-                         alpha_T=alpha_T,
-                         kind=kind,
-                         kind_T=kind_T,
-                         quantity="pressure")
-
-
 class HaloProfilePressureBattaglia(ccl.halos.HaloProfile):
     """Gas pressure profile from Battaglia 2012.
 
     Profile is calculated in units of eV cm^-3. Allowed values
-    for `kind` are `'P_total'`, `'P_baryon'`, `'P_H'`, and
-    `'P_elecron'`.
+    for `kind` are `'n_total'`, `'n_baryon'`, `'n_H'`, and
+    `'n_elecron'`.
 
     Default values of all parameters correspond to the values
     found in Battaglia et al. 2016.
     """
-
     def __init__(self, *, mass_def,
                  alpha=1,
                  gamma=-0.3,
@@ -545,11 +322,10 @@ class HaloProfilePressureBattaglia(ccl.halos.HaloProfile):
                  beta_aM=0.0393,
                  beta_az=0.415,
                  beta_interp_spacing=0.3,
-                 kind="P_total",
+                 kind="n_total",
                  qrange=(1e-3, 1e3),
                  nq=128,
                  x_out=np.inf):
-
         self.alpha = alpha
         self.gamma = gamma
         self.P0_A = P0_A
@@ -561,8 +337,8 @@ class HaloProfilePressureBattaglia(ccl.halos.HaloProfile):
         self.beta_A = beta_A
         self.beta_aM = beta_aM
         self.beta_az = beta_az
-        self.P_kind = kind
-        self.prefac_P = get_prefac_P(self.P_kind)
+        self.kind = kind
+        self.prefac_P = get_prefac_P(self.kind)
 
         self.beta_interp_spacing = beta_interp_spacing
         self.qrange = qrange
@@ -746,46 +522,289 @@ class HaloProfilePressureBattaglia(ccl.halos.HaloProfile):
         return cprof
 
 
-class HaloProfileTemperatureSpectroscopicLike(ccl.halos.HaloProfile):
-    """Gas temperature profile from Lee et al. 2020.
+class _HaloProfileHE(ccl.halos.HaloProfile):
+    """Gas density profile given by the sum of the density profile for
+    the bound and the ejected gas, each modelled separetely for a halo
+    in hydrostatic equilibrium.
 
-    Profile is calculated in units of eV, following eq (18).
+    The density and mass fraction of the bound gas as well as the mass
+    fraction of the ejected gas taken from Mead 2020, and the density
+    of the ejected gas taken from Schneider & Teyssier 2016.
 
-    Default values of all parameters correspond to the mean
-    values found in Lee et al. 2020 for a Spectroscopic-like
-    temperature, T_{sl}.
+    Profile is calculated in units of M_sun Mpc^-3 if
+    requesting mass density (`kind == 'rho_gas'`), or in cm^-3
+    if requesting a number density. Allowed values for `kind`
+    in the latter case are `'n_total'`, `'n_baryon'`, `'n_H'`,
+    `'n_electron'`.
+
+    Default values of all parameters correspond to the values
+    found in Mead et al. 2020.
     """
+    def __init__(self, *, mass_def, concentration,
+                 beta=0.6,
+                 gamma=1.17,
+                 A_star=0.03,
+                 sigma_star=1.2,
+                 eta_b=0.5,
+                 alpha_T=1.0,
+                 kind="rho_gas",
+                 kind_T="T_total",
+                 quantity="density"):
+        self.beta = beta
+        self.gamma = gamma
+        self.A_star = A_star
+        self.eta_b = eta_b
+        self.alpha_T = alpha_T
+        self.sigma_star = sigma_star
+        self.kind = kind
+        self.quantity = quantity
+        self.prefac_rho = get_prefac_rho(self.kind)
+        self.prefac_T = get_prefac_T(kind_T)
 
-    def __init__(self, *, mass_def,
-                 par_A=4.295, 
-                 par_B=0.514, 
-                 par_C=-0.039, 
-                 m_fid=3e14):
-    
-        self.par_A = par_A
-        self.par_B = par_B
-        self.par_C = par_C
-        self.m_fid = m_fid
-        super().__init__(mass_def=mass_def)
+        super().__init__(mass_def=mass_def, concentration=concentration)
+
+    def update_parameters(self,
+                          beta=None,
+                          gamma=None,
+                          A_star=None,
+                          sigma_star=None,
+                          alpha_T=None,
+                          eta_b=None):
+        if beta is not None:
+            self.beta = beta
+        if gamma is not None:
+            self.gamma = gamma
+        if A_star is not None:
+            self.A_star = A_star
+        if eta_b is not None:
+            self.eta_b = eta_b
+        if sigma_star is not None:
+            self.sigma_star = sigma_star
+        if alpha_T is not None:
+            self.alpha_T = alpha_T
+
+    def _fb_bound(self, cosmo, M):
+        part1 = get_fb(cosmo)
+        part2 = (cosmo["h"] * M * 1e-14) ** self.beta
+        part3 = part2 / (1 + part2)
+        return part1 * part3
+
+    def _fb_ejected(self, cosmo, M):
+        part1 = get_fb(cosmo)
+        part2 = self._fb_bound(cosmo, M)
+        part3 = self.A_star * np.exp(
+            -(
+                (np.log10(cosmo["h"] * M * 10 ** (-12.5)) ** 2)
+                / (2 * self.sigma_star**2)
+            )
+        )
+        return part1 - part2 - part3
+
+    def _rho_bound(self, x):
+        return (np.log(1 + x) / x) ** (1 / (self.gamma - 1))
+
+    def _rho_ejected(self, x, cosmo, M, a):
+        # Eq. (2.13) of Schneider & Teyssier 2016
+        r200 = self.mass_def.get_radius(cosmo, M, a) / a
+        delta200 = self.mass_def.get_Delta(cosmo, a)
+        r_esc = 0.5 * np.sqrt(delta200) * r200
+        eta_a = 0.75 * self.eta_b
+        Re2 = ((eta_a * r_esc)**2)[:, None]
+        return M[:, None] / (2 * np.pi * Re2)**(3 / 2) * np.exp(-(x**2 / (2 * Re2)))
+
+    def _get_rho0(self, cosmo, M, r, c_M):
+        # This integral can be precomputed if it's too slow
+        integral = np.array(
+            [quad(lambda x: self._rho_bound(x) * x**2, 0, c)[0] for c in c_M]
+        )
+        fb = self._fb_bound(cosmo, M)
+        rho0 = M * fb / (4 * np.pi * r**3 * integral)
+        return rho0
 
     def _real(self, cosmo, r, M, a):
         # Real-space profile.
-        # Output in units of eV
+        # Output in units of eV/cm^3
+        r_use = np.atleast_1d(r)
         M_use = np.atleast_1d(M)
 
-        m_ratio = M_use / self.m_fid
-        exponent = self.par_B + self.par_C * np.log10(m_ratio)
-        cosmo_model = ccl.h_over_h0(cosmo, a) ** (2 / 3)
+        # Comoving virial radius
+        R_M = self.mass_def.get_radius(cosmo, M_use, a) / a
+        c_M = self.concentration(cosmo, M_use, a)
+        R_s = R_M / c_M
 
-        prof = cosmo_model * self.par_A * m_ratio ** exponent
-        prof *= 1e3
+        x = r_use[None, :] / R_s[:, None]
+        rho0 = self._get_rho0(cosmo, M_use, R_s, c_M)
+        rho_bound = self._rho_bound(x) * rho0[:, None]
+        rho_ejected = self._rho_ejected(
+            r_use[None, :], cosmo, M_use, a) * self._fb_ejected(cosmo, M_use)[:, None]
+
+        if self.quantity == 'density':
+            prof = (rho_bound + rho_ejected) * self.prefac_rho
+        elif self.quantity == 'pressure':
+            # Boltmann constant which, when multiplied by T in Kelvin gives you eV
+            k_boltz = 8.61732814974493e-05
+            T_ejected = 10**6.5*k_boltz
+
+            # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
+            G = 1.81805235e-27
+            factor = np.log(1+x)/x
+            T_bound = factor * self.alpha_T * 2 * G * M_use[:, None] * self.prefac_T / (3 * a * R_M[:, None])
+
+            # Put them together
+            prof = (rho_bound*T_bound+rho_ejected*T_ejected)*self.prefac_rho
 
         if np.ndim(r) == 0:
             prof = np.squeeze(prof, axis=-1)
         if np.ndim(M) == 0:
             prof = np.squeeze(prof, axis=0)
-        prof = np.repeat(prof,len(r))
         return prof
+
+
+class HaloProfileDensityHE(_HaloProfileHE):
+    def __init__(self, *, mass_def, concentration,
+                 beta=0.6,
+                 gamma=1.17,
+                 A_star=0.03,
+                 sigma_star=1.2,
+                 eta_b=0.5,
+                 alpha_T=1.0,
+                 kind="rho_gas",
+                 kind_T="T_total"):
+        super().__init__(mass_def=mass_def, concentration=concentration,
+                         beta=beta,
+                         gamma=gamma,
+                         A_star=A_star,
+                         sigma_star=sigma_star,
+                         eta_b=eta_b,
+                         alpha_T=alpha_T,
+                         kind=kind,
+                         kind_T=kind_T,
+                         quantity="density")
+
+
+class HaloProfilePressureHE(_HaloProfileHE):
+    def __init__(self, *, mass_def, concentration,
+                 beta=0.6,
+                 gamma=1.17,
+                 A_star=0.03,
+                 sigma_star=1.2,
+                 eta_b=0.5,
+                 alpha_T=1.0,
+                 kind="rho_gas",
+                 kind_T="T_total"):
+        super().__init__(mass_def=mass_def, concentration=concentration,
+                         beta=beta,
+                         gamma=gamma,
+                         A_star=A_star,
+                         sigma_star=sigma_star,
+                         eta_b=eta_b,
+                         alpha_T=alpha_T,
+                         kind=kind,
+                         kind_T=kind_T,
+                         quantity="pressure")
+
+
+class _HaloProfileNFW(ccl.halos.HaloProfile):
+    """Simple gas density profile assuming NFW (times cosmic
+    baryon fraction).
+    """
+    def __init__(self, *, mass_def, concentration,
+                 truncated=True,
+                 par_A=4.295, 
+                 par_B=0.514, 
+                 par_C=-0.039, 
+                 m_fid=3e14,
+                 kind="rho_gas",
+                 quantity="density"):
+        self.nfw = ccl.halos.HaloProfileNFW(
+            mass_def=mass_def,
+            concentration=concentration,
+            fourier_analytic=True,
+            projected_analytic=False,
+            cumul2d_analytic=False,
+            truncated=truncated)
+        self.kind = kind
+        self.prefac_rho = get_prefac_rho(self.kind)
+        self.par_A = par_A
+        self.par_B = par_B
+        self.par_C = par_C
+        self.m_fid = m_fid
+        self.quantity = quantity
+        super().__init__(mass_def=mass_def, concentration=concentration)
+
+    def _norm(self, cosmo):
+        return get_fb(cosmo) * self.prefac_rho
+
+    def _get_T(self, cosmo, M, a):
+        m_ratio = M / self.m_fid
+        exponent = self.par_B + self.par_C * np.log10(m_ratio)
+        cosmo_model = ccl.h_over_h0(cosmo, a) ** (2 / 3)
+
+        return 1E3*cosmo_model * self.par_A * m_ratio ** exponent
+        
+    def _real(self, cosmo, r, M, a):
+        r_use = np.atleast_1d(r)
+        M_use = np.atleast_1d(M)
+
+        norm = self._norm(cosmo)
+        prof = norm * self.nfw._real(cosmo, r_use, M_use, a)
+
+        if self.quantity == 'pressure':
+            T = self._get_T(cosmo, M_use, a)
+            prof *= T[:, None]
+
+        if np.ndim(r) == 0:
+            prof = np.squeeze(prof, axis=-1)
+        if np.ndim(M) == 0:
+            prof = np.squeeze(prof, axis=0)
+        return prof
+        
+    def _fourier(self, cosmo, k, M, a):
+        k_use = np.atleast_1d(k)
+        M_use = np.atleast_1d(M)
+
+        norm = self._norm(cosmo)
+        prof = norm * self.nfw._fourier(cosmo, k_use, M_use, a)
+
+        if self.quantity == 'pressure':
+            T = self._get_T(cosmo, M_use, a)
+            prof *= T[:, None]
+
+        if np.ndim(k) == 0:
+            prof = np.squeeze(prof, axis=-1)
+        if np.ndim(M) == 0:
+            prof = np.squeeze(prof, axis=0)
+        return prof
+
+
+
+
+class HaloProfileDensityNFW(_HaloProfileNFW):
+    def __init__(self, *, mass_def, concentration,
+                 truncated=True,
+                 par_A=4.295, 
+                 par_B=0.514, 
+                 par_C=-0.039, 
+                 m_fid=3e14,
+                 kind="rho_gas"):
+        super().__init__(mass_def=mass_def, concentration=concentration,
+                         truncated=truncated,
+                         par_A=par_A, par_B=par_B, par_C=par_C,
+                         m_fid=m_fid, kind=kind, quantity='density')
+
+
+class HaloProfilePressureNFW(_HaloProfileNFW):
+    def __init__(self, *, mass_def, concentration,
+                 truncated=True,
+                 par_A=4.295, 
+                 par_B=0.514, 
+                 par_C=-0.039, 
+                 m_fid=3e14,
+                 kind="rho_gas"):
+        super().__init__(mass_def=mass_def, concentration=concentration,
+                         truncated=truncated,
+                         par_A=par_A, par_B=par_B, par_C=par_C,
+                         m_fid=m_fid, kind=kind, quantity='pressure')
 
 
 class HaloProfileXray(ccl.halos.HaloProfile):
@@ -830,7 +849,6 @@ class HaloProfileXray(ccl.halos.HaloProfile):
                  Jinterp,
                  dens,
                  pres=None,
-                 temp=None,
                  lMmin_fit=11,
                  lMmax_fit=15.5,
                  nlM_fit=16,
@@ -838,27 +856,19 @@ class HaloProfileXray(ccl.halos.HaloProfile):
                  nz_fit=8,
                  with_clumping=False,
                  fourier_approx=True,
+                 plaw_fourier=-2.0,
                  truncated=False):
 
         self.dens = dens
         self.pres = pres
-        self.temp = temp
-        if self.pres is None and self.temp is None:
-            raise ValueError(
-                "You must provide either a pressure "
-                "or a temperature profile."
-            )
         self.truncated = truncated
         # Check the density and pressure are for the
         # same quantity (otherwise recovered temperature
         # won't make sense).
         if self.pres is not None:
-            if self.dens.rho_kind.split("_")[-1] != \
-                    self.pres.P_kind.split("_")[-1]:
-                raise ValueError(
-                    "Density and pressure profiles must "
-                    "correspond to the same species."
-                )
+            if self.dens.kind != self.pres.kind:
+                raise ValueError("Density and pressure profiles must "
+                                 "correspond to the same species.")
         self.Jinterp = Jinterp
         self.lkT_max = Jinterp.grid[0][-1]
         self.lkT_min = Jinterp.grid[0][0]
@@ -878,11 +888,15 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         if fourier_approx:
             self._fourier = self._fourier_approx
         # Transforms to n_H * n_e
-        pref_dens = get_prefac_rho(self.dens.rho_kind)
+        pref_dens = get_prefac_rho(self.dens.kind)
         pref_H = get_prefac_rho("n_H")
         pref_e = get_prefac_rho("n_electron")
         self.pref_nHne = pref_H * pref_e / pref_dens**2
         super().__init__(mass_def=mass_def)
+        self.update_precision_fftlog(padding_hi_fftlog=1E2,
+                                     padding_lo_fftlog=1E-2,
+                                     n_per_decade=1000,
+                                     plaw_fourier=plaw_fourier)
 
     def _get_fourier_params(self, cosmo):
         xmax = 100.0
@@ -1030,17 +1044,14 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         rDelta = self.mass_def.get_radius(cosmo, M_use, a) / a
         # Number density in cm^-3
         ndens = self.dens.real(cosmo, r_use, M_use, a).flatten()
-        # Pressure in eV * cm^-
-        ndens = self.dens.real(cosmo, r_use, M_use, a).flatten()
-        if self.pres is not None:
-            # Pressure in eV * cm^-3
-            P = self.pres.real(cosmo, r_use, M_use, a).flatten()
-            # log-Temperature in keV
-            lkT = np.log(1e-3 * P / ndens)
-        if self.temp is not None:
-            T = self.temp.real(cosmo, r_use, M_use, a).flatten()
-            # log-Temperature in keV
-            lkT = np.log(1e-3 * T)
+        # Pressure in eV * cm^-3
+        P = self.pres.real(cosmo, r_use, M_use, a).flatten()
+        # log-Temperature in keV
+        lkT = np.zeros(nM*nr)
+        good = ndens > 0
+        lkT[good] = np.log(1e-3 * P[good] / ndens[good])
+        if not np.all(good):  # Set temperature to a tiny number where n=0
+            lkT[~good] = -30.0
         # Integrated spectrum in cm^-5 s^-1
         z = 1.0 / a - 1
         ev = np.array([lkT, np.full_like(lkT, z)]).T
