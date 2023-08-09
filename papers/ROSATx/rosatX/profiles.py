@@ -868,7 +868,8 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         if self.pres is not None:
             if self.dens.kind != self.pres.kind:
                 raise ValueError("Density and pressure profiles must "
-                                 "correspond to the same species.")
+                                 "correspond to the same species "
+                                 f"{self.dens.kind} != {self.pres.kind}")
         self.Jinterp = Jinterp
         self.lkT_max = Jinterp.grid[0][-1]
         self.lkT_min = Jinterp.grid[0][0]
