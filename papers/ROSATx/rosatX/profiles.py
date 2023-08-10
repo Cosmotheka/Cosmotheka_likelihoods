@@ -411,10 +411,8 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         delta200 = self.mass_def.get_Delta(cosmo, a)
         r_esc = 0.5 * np.sqrt(delta200) * r200
         eta_a = 0.75 * self.eta_b
-        Re2 = (eta_a * r_esc)**2
-        Re2 = Re2[:, None]
-        M = M[:, None]
-        return M / (2 * np.pi * Re2)**(3 / 2) * np.exp(-(x**2 / (2 * Re2)))
+        Re2 = ((eta_a * r_esc)[:, None])**2
+        return M[:, None] / (2 * np.pi * Re2)**(3 / 2) * np.exp(-(x**2 / (2 * Re2)))
 
     def _get_rho0(self, cosmo, M, r, c_M):
         # This integral can be precomputed if it's too slow
@@ -459,8 +457,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
             T_ejected = 10**6.5*k_boltz
 
             # Physical radius in Mpc
-            R_phys = a * R_M
-            R_phys = R_phys[:, None]
+            R_phys = (a * R_M)[:, None]
 
             # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
             G = 1.81805235e-27
@@ -1076,7 +1073,10 @@ class HaloProfileXray(ccl.halos.HaloProfile):
             beta = (0.185 * (1e-14 * M_c2r) ** 0.547)[:, None]
             gamma = (1.16e6 * (1e-14 * M_c2r) ** (-4.86))[:, None]
             xxc = r_use[None, :] / (xc * rDelta)[:, None]
-            c2r = 1 + xxc**beta * (1 + xxc) ** (gamma - beta)
+            part1 = xxc**beta
+            part2 = (1 + xxc) ** (gamma - beta)
+            c2r = 1 + part1 * part2
+            #c2r = 1 + xxc**beta * (1 + xxc) ** (gamma - beta)
         else:
             c2r = 1
         # Final profile in cm^-1
