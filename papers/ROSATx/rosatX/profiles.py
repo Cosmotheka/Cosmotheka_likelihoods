@@ -541,6 +541,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
     found in Mead et al. 2020.
     """
     def __init__(self, *, mass_def, concentration,
+                 lMc=14.0,
                  beta=0.6,
                  gamma=1.17,
                  A_star=0.03,
@@ -550,6 +551,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
                  kind="rho_gas",
                  kind_T="T_total",
                  quantity="density"):
+        self.lMc = lMc
         self.beta = beta
         self.gamma = gamma
         self.A_star = A_star
@@ -564,12 +566,15 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         super().__init__(mass_def=mass_def, concentration=concentration)
 
     def update_parameters(self,
+                          lMc=None,
                           beta=None,
                           gamma=None,
                           A_star=None,
                           sigma_star=None,
                           alpha_T=None,
                           eta_b=None):
+        if lMc is not None:
+            self.lMc = lMc
         if beta is not None:
             self.beta = beta
         if gamma is not None:
@@ -585,7 +590,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
 
     def _fb_bound(self, cosmo, M):
         part1 = get_fb(cosmo)
-        part2 = (cosmo["h"] * M * 1e-14) ** self.beta
+        part2 = (cosmo["h"] * M * 10**(-self.lMc)) ** self.beta
         part3 = part2 / (1 + part2)
         return part1 * part3
 
@@ -664,6 +669,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
 
 class HaloProfileDensityHE(_HaloProfileHE):
     def __init__(self, *, mass_def, concentration,
+                 lMc=14.0,
                  beta=0.6,
                  gamma=1.17,
                  A_star=0.03,
@@ -673,6 +679,7 @@ class HaloProfileDensityHE(_HaloProfileHE):
                  kind="rho_gas",
                  kind_T="T_total"):
         super().__init__(mass_def=mass_def, concentration=concentration,
+                         lMc=lMc,
                          beta=beta,
                          gamma=gamma,
                          A_star=A_star,
@@ -686,6 +693,7 @@ class HaloProfileDensityHE(_HaloProfileHE):
 
 class HaloProfilePressureHE(_HaloProfileHE):
     def __init__(self, *, mass_def, concentration,
+                 lMc=14.0,
                  beta=0.6,
                  gamma=1.17,
                  A_star=0.03,
@@ -695,6 +703,7 @@ class HaloProfilePressureHE(_HaloProfileHE):
                  kind="rho_gas",
                  kind_T="T_total"):
         super().__init__(mass_def=mass_def, concentration=concentration,
+                         lMc=lMc,
                          beta=beta,
                          gamma=gamma,
                          A_star=A_star,
@@ -865,11 +874,10 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         # Check the density and pressure are for the
         # same quantity (otherwise recovered temperature
         # won't make sense).
-        if self.pres is not None:
-            if self.dens.kind != self.pres.kind:
-                raise ValueError("Density and pressure profiles must "
-                                 "correspond to the same species "
-                                 f"{self.dens.kind} != {self.pres.kind}")
+        if self.dens.kind != self.pres.kind:
+            raise ValueError("Density and pressure profiles must "
+                             "correspond to the same species "
+                             f"{self.dens.kind} != {self.pres.kind}")
         self.Jinterp = Jinterp
         self.lkT_max = Jinterp.grid[0][-1]
         self.lkT_min = Jinterp.grid[0][0]
