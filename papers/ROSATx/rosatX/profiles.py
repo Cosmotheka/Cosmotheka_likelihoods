@@ -548,15 +548,25 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
                  sigma_star=1.2,
                  eta_b=0.5,
                  alpha_T=1.0,
+                 logTw0=6.5,
+                 Tw1=0.0,
+                 logTAGN=None,
                  kind="rho_gas",
                  kind_T="T_total",
                  quantity="density"):
+        self._Bi = None
+        if logTAGN is not None:
+            self._build_BAHAMAS_interp()
+            lMc, gamma, alpha_T, logTw0, Tw1 = self.from_logTAGN(logTAGN)
+        self.logTAGN = logTAGN
         self.lMc = lMc
         self.beta = beta
         self.gamma = gamma
         self.A_star = A_star
         self.eta_b = eta_b
         self.alpha_T = alpha_T
+        self.logTw0 = logTw0
+        self.Tw1 = Tw1
         self.sigma_star = sigma_star
         self.kind = kind
         self.quantity = quantity
@@ -572,9 +582,21 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
                           A_star=None,
                           sigma_star=None,
                           alpha_T=None,
-                          eta_b=None):
+                          logTw0=None,
+                          Tw1=None,
+                          eta_b=None,
+                          logTw=None,
+                          logTAGN=None):
+        if logTAGN is not None:
+            self._build_BAHAMAS_interp()
+            lMc, gamma, alpha_T, logTw0, Tw1 = self.from_logTAGN(logTAGN)
+            self.logTAGN = logTAGN
         if lMc is not None:
             self.lMc = lMc
+        if logTw0 is not None:
+            self.logTw0 = logTw0
+        if Tw1 is not None:
+            self.Tw1 = Tw1
         if beta is not None:
             self.beta = beta
         if gamma is not None:
@@ -587,6 +609,38 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
             self.sigma_star = sigma_star
         if alpha_T is not None:
             self.alpha_T = alpha_T
+
+    def _build_BAHAMAS_interp(self):
+        if self._Bi is not None:
+            return
+        kwargs = {'kind': 'linear',
+                  'bounds_error': False,
+                  'fill_value': 'extrapolate'}
+        logTAGNs = np.array([7.6, 7.8, 8.0])
+        self._Bi = {}
+        lMci = interp1d(logTAGNs, np.array([13.1949, 13.5937, 14.2480]),
+                        **kwargs)
+        gammai = interp1d(logTAGNs, np.array([1.1647, 1.1770, 1.1966]),
+                          **kwargs)
+        alpha_Ti = interp1d(logTAGNs, np.array([0.7642, 0.8471, 1.0314]),
+                            **kwargs)
+        logTw0i = interp1d(logTAGNs, np.array([6.6762, 6.6545, 6.6615]),
+                           **kwargs)
+        Tw1i = interp1d(logTAGNs, np.array([-0.5566, -0.3652, -0.0617]),
+                        **kwargs)
+        self._Bi['lMc'] = lMci
+        self._Bi['gamma'] = gammai
+        self._Bi['alpha_T'] = alpha_Ti
+        self._Bi['logTw0'] = logTw0i
+        self._Bi['Tw1'] = Tw1i
+
+    def from_logTAGN(self, logTAGN):
+        lMc = self._Bi['lMc'](logTAGN)
+        gamma = self._Bi['gamma'](logTAGN)
+        alpha_T = self._Bi['alpha_T'](logTAGN)
+        logTw0 = self._Bi['logTw0'](logTAGN)
+        Tw1 = self._Bi['Tw1'](logTAGN)
+        return lMc, gamma, alpha_T, logTw0, Tw1
 
     def _fb_bound(self, cosmo, M):
         part1 = get_fb(cosmo)
@@ -649,7 +703,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
             # Boltmann constant which, when multiplied by T in Kelvin
             # gives you eV
             k_boltz = 8.61732814974493e-05
-            T_ejected = 10**6.5*k_boltz
+            T_ejected = k_boltz * 10**self.logTw0 * np.exp(self.Tw1*(1/a-1))
 
             # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
             G = 1.81805235e-27
