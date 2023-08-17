@@ -1132,7 +1132,7 @@ class HaloProfileXray(ccl.halos.HaloProfile):
                 rD = rDelta[im]
                 # Only use fitting function up to 3 times virial radius
                 # Constant afterwards
-                x = np.minimum(r_use/rDelta[im], 3.0)
+                x = np.minimum(r_use/rDelta[im], 5.0)
                 xxc = x / xc[im]
                 c2r[im, :] = 1 + xxc**beta[im] * (1+xxc)**(gamma[im]-beta[im])
         # Final profile in cm^-1

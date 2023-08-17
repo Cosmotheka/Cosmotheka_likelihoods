@@ -4,7 +4,8 @@ from astropy.io import fits
 
 
 class ROSATResponse(object):
-    def __init__(self, fname_rsp):
+    def __init__(self, fname_rsp, Zmetal=0.3):
+        self.Zmetal = Zmetal
         self.rsp_h = fits.open(fname_rsp)[1].data
         self.chans_h = fits.open(fname_rsp)[2].data
 
@@ -42,6 +43,10 @@ class ROSATResponse(object):
         self.energ_chans[-1] = self.chans_h['E_MAX'][-1]
 
         self.sess = padb.spectrum.CIESession()
+        # Set metallicity
+        Zs = np.ones(31)
+        Zs[3:] = self.Zmetal
+        self.sess.set_abund(np.arange(31, dtype=int), Zs)
 
     def get_energ_in_bins(self):
         return self.energ_bins
