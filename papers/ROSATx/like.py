@@ -16,7 +16,8 @@ rc('text', usetex=True)
 class ROSATxLike(object):
     def __init__(self, year=3,
                  params_vary=['lMc', 'alpha_T'],
-                 priors={'lMc': [13.0, 15.0], 'alpha_T': [0.1, 2.0]},
+                 priors={'lMc': [13.0, 15.0], 'alpha_T': [0.1, 2.0],
+                         'eta_b': [0.1, 2.0]},
                  bins=[0, 1, 2, 3], Zmetal=0.3, lines=True, lmin=30,
                  lmax=2048, mbias=[-0.0063, -0.0198, -0.0241, -0.0369],
                  zbias=[0.0, 0.0, 0.0, 0.0], with_clumping=True):
@@ -142,7 +143,7 @@ class ROSATxLike(object):
         return pdict
 
     def update_params(self, pdict):
-        kwargs = {k: pdict.get(k, None) for k in ['lMc', 'alpha_T', 'logTAGN']}
+        kwargs = {k: pdict.get(k, None) for k in ['lMc', 'alpha_T', 'logTAGN', 'eta_b']}
         self.prof_dens.update_parameters(**kwargs)
         self.prof_pres.update_parameters(**kwargs)
 
@@ -190,14 +191,16 @@ class ROSATxLike(object):
         return self.get_logp(per_bin=per_bin, **pdict)
 
 whichbins = sys.argv[1]
-fname_out = sys.argv[2]
+params_vary = sys.argv[2].split(',')
+fname_out = sys.argv[3]
 if whichbins == 'all':
     bins = [0, 1, 2, 3]
 else:
     bins = [int(whichbins)]
 
-l = ROSATxLike(bins=bins)
-pBF = np.array([14.0, 0.9])
+pars_BF = {'lMc': 14.0, 'alpha_T': 0.9, 'eta_b': 0.5}
+l = ROSATxLike(bins=bins, params_vary=params_vary)
+pBF = np.array([pars_BF[k] for k in params_vary])
 chi2 = -2*l.logp(pBF)
 print(chi2, l.ndata)
 
