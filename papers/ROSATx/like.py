@@ -187,8 +187,11 @@ class ROSATxLike(object):
         return -0.5*chi2
 
     def logp(self, pvec, per_bin=False):
-        pdict = self.params_to_dict(pvec)
-        return self.get_logp(per_bin=per_bin, **pdict)
+        try:
+            pdict = self.params_to_dict(pvec)
+            return self.get_logp(per_bin=per_bin, **pdict)
+        except:
+            return -np.inf
 
 whichbins = sys.argv[1]
 params_vary = sys.argv[2].split(',')
