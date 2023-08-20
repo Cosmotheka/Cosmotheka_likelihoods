@@ -66,7 +66,6 @@ class ROSATResponse(object):
         """ Returns incoming emissivity in ph cm^3 s^-1 bin^-1"""
         energ_o_bins = self.energ_bins
         energ_i_bins = energ_o_bins*(1+z)
-        # TODO: check z is being taken into acocunt correctly here
         self.sess.set_response(energ_i_bins, raw=True)
         # This returns epsilon = ph cm^3 s^-1 bin^-1
         # (bin is range of E_in, hence we correct by (1+z))
