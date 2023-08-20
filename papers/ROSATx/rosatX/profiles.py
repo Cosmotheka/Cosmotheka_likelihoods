@@ -769,15 +769,18 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         self.quantity = quantity
         self.prefac_rho = get_prefac_rho(self.kind)
         self.prefac_T = get_prefac_T(kind_T)
-        self._build_bound_norm_interp()
+        self.norm_interp = self.get_dens_norm_interp()
 
         super().__init__(mass_def=mass_def, concentration=concentration)
 
-    def _build_bound_norm_interp(self):
-        cs = np.linspace(0.5, 15, 64)
-        ints = np.array([quad(lambda x: x**2*self._F_bound(x), 0, c)[0]
-                         for c in cs])
-        self._bound_norm_interp = interp1d(cs, 1/ints)
+    def get_dens_norm_interp(self):
+        cs = np.geomspace(1E-2, 100, 64)
+        gs = np.geomspace(0.1, 10, 64)
+        norms = np.array([[quad(lambda x: x**2*self._F_bound(x, g), 0, c)[0]
+                           for c in cs]
+                          for g in gs])
+        ip = RegularGridInterpolator((np.log(gs), np.log(cs)), np.log(norms))
+        return ip
 
     def update_parameters(self,
                           lMc=None,
@@ -805,7 +808,6 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
             self.beta = beta
         if gamma is not None:
             self.gamma = gamma
-            self._build_bound_norm_interp()
         if A_star is not None:
             self.A_star = A_star
         if eta_b is not None:
@@ -856,8 +858,8 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         f_ejected = fb-f_bound-f_star
         return f_bound, f_ejected, f_star
 
-    def _F_bound(self, x):
-        return (np.log(1 + x) / x) ** (1 / (self.gamma - 1))
+    def _F_bound(self, x, G):
+        return (np.log(1 + x) / x)**G
 
     def _real(self, cosmo, r, M, a):
         # Real-space profile.
@@ -877,8 +879,10 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         fb, fe, _ = self._get_fractions(cosmo, M)
 
         # Bound gas
-        norm = self._bound_norm_interp(cM)
-        rho_bound = (am3*M_use*fb*norm/(4*np.pi*rs**3))[:, None]*self._F_bound(x)
+        G = 1./(self.gamma-1)
+        xnorm = np.array([np.full_like(cM, G), cM]).T
+        norm = np.exp(self.norm_interp(np.log(xnorm)))
+        rho_bound = (am3*M_use*fb/(4*np.pi*rs**3*norm))[:, None]*self._F_bound(x, G)
 
         # Ejected gas
         # Eq. (2.13) of Schneider & Teyssier 2016
