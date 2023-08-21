@@ -8,3 +8,4 @@ from .profiles import (
     HaloProfilePressureHE,
     HaloProfileXray,
     XrayTracer)
+from .like import ROSATxLike

@@ -534,7 +534,6 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
                  quantity="density"):
         self._Bi = None
         if logTAGN is not None:
-            self._build_BAHAMAS_interp()
             lMc, gamma, alpha_T, logTw0, Tw1 = self.from_logTAGN(logTAGN)
         self.logTAGN = logTAGN
         self.lMc = lMc
@@ -575,7 +574,6 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
                           logTw=None,
                           logTAGN=None):
         if logTAGN is not None:
-            self._build_BAHAMAS_interp()
             lMc, gamma, alpha_T, logTw0, Tw1 = self.from_logTAGN(logTAGN)
             self.logTAGN = logTAGN
         if lMc is not None:
@@ -622,6 +620,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         self._Bi['Tw1'] = Tw1i
 
     def from_logTAGN(self, logTAGN):
+        self._build_BAHAMAS_interp()
         lMc = self._Bi['lMc'](logTAGN)
         gamma = self._Bi['gamma'](logTAGN)
         alpha_T = self._Bi['alpha_T'](logTAGN)
