@@ -143,8 +143,8 @@ class ROSATxLike(object):
         self.a_arr = np.linspace(0.3, 1, 8)
 
     def default_params(self):
-        return {'lMc': 14.0, 'alpha_T': 1.0, 'eta_b': 0.5,
-                'gamma': 1.17, 'logTAGN': None}
+        return {'lMc': 14.2, 'alpha_T': 1.0, 'eta_b': 0.5,
+                'gamma': 1.19, 'logTAGN': None}
 
     def params_to_dict(self, pvec):
         pdict = self.default_params()
