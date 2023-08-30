@@ -218,3 +218,63 @@ class EPTCalculator(object):
                         pk_arr=pk, is_logp=False)
         self.pk2d_computed[kind] = pk2d
         return pk2d
+
+    def get_pk_IA(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
+        # Clarification:
+        # We are expanding the intrinsic alignment as:
+        #   I = c1 s + c2 s^2 + cd * s*delta
+        # (see cell 10 in
+        # https://github.com/JoeMcEwen/FAST-PT/blob/master/examples/fastpt_examples.ipynb). # noqa
+        # The `ia_tt`, `ia_ta` and `ia_mix` arrays contain the following power
+        # spectra in order:
+        #  ia_tt:
+        #    <s^2,s^2>
+        #    <s^2,s^2_B>
+        #  ia_ta:
+        #    <s,ds> (first half)
+        #    <s,ds> (second half)
+        #    <ds,ds>
+        #    <ds,ds_B>
+        #  ia_mix:
+        #    <s,s^2> (first half)
+        #    <s,s^2> (second half)
+        #    <s^2,ds>
+        #    <s^2,ds_B>
+        # mm -> <s*s> (returns pnl)
+        # mc1 -> <s*s> (returns pnl)
+        # mc2 -> <s*s^2>
+        # mcd -> <s*ds>
+        # c1c1 -> <s*s> (returns pnl)
+        # c1c2 -> <s*s^2>
+        # c1cd -> <s*ds>
+        # c2c2 -> <s^2*s^2>
+        # c2cd -> <s^2*ds>
+        # cdcd -> <ds*ds>
+        # When not provided, this function just returns `alt`
+
+        kind = kind.replace('m', 'c1')
+
+        if kind in self.pk2d_computed:
+            return self.pk2d_computed[kind]
+
+        if kind == 'c1c1':
+            return pnl
+
+        if kind == 'c1c2':
+            p = self.ia_mix[0]+self.ia_mix[1]
+        elif kind == 'c1cd':
+            p = self.ia_ta[0]+self.ia_ta[1]
+        elif kind == 'c2c2':
+            p = self.ia_tt[0]
+        elif kind == 'c2cd':
+            p = self.ia_mix[2]
+        elif kind == 'cdcd':
+            p = self.ia_ta[2]
+        else:
+            return alt
+
+        pk = self.g4[:, None]*p[None, :]
+        pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
+                        pk_arr=pk, is_logp=False)
+        self.pk2d_computed[kind] = pk2d
+        return pk2d

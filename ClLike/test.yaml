@@ -15,7 +15,7 @@ params:
       max: 1.2
     ref:
       dist: norm
-      loc: 0.8
+      loc: 0.81
       scale: 0.01
     latex: \sigma_8
     proposal: 0.001
@@ -47,13 +47,15 @@ params:
   limber_sh4_dz: 0.0
   limber_sh5_dz: 0.0
 
-  bias_A_IA:
+  bias_c2: 0.0
+  bias_cd: 0.0
+  bias_c1:
     prior: 
       min: -5
       max: 5
     ref:
       dist: norm
-      loc: 0.0
+      loc: 1.0
       scale: 0.1
     latex: A_{IA}
     proposal: 0.1
@@ -64,7 +66,7 @@ params:
       max: 5
     ref:
       dist: norm
-      loc: 0.0
+      loc: 0.3
       scale: 0.1
     latex: \eta_{IA}
     proposal: 0.1
@@ -77,9 +79,9 @@ theory:
     baryons_pk: nobaryons
   cl_like.Pk:
     bias_model: "Linear"
+    ia_model: "TATT"
   cl_like.Limber:
     nz_model: "NzShift"
-    ia_model: "IADESY1"
     input_params_prefix: "limber"
   cl_like.ClFinal:
     input_params_prefix: "bias"

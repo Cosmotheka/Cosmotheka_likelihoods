@@ -181,23 +181,31 @@ class ClFinal(Theory):
 
             elif quantity == 'galaxy_shear':
                 bd['eps'] = True
-                if ia_model == 'IAPerBin':
-                    pn = '_'.join([self.input_params_prefix, name, 'A_IA'])
-                elif ia_model == 'IADESY1':
-                    pn = '_'.join([self.input_params_prefix, 'A_IA'])
-                elif ia_model == 'IADESY1_PerSurvey':
-                    # This assumes that name = survey__zbin
-                    survey = name.split('__')[0]
-                    pn = '_'.join([self.input_params_prefix, survey, 'A_IA'])
+                if ia_model == 'TATT':
+                    inds = []
+                    for bn in ['c1', 'c2', 'cd']:
+                        bias_names.append(self.input_params_prefix + '_' + bn)
+                        inds.append(ind_bias)
+                        ind_bias += 1
+                    bd['bias_ind'] = inds
                 else:
-                    continue
+                    if ia_model == 'IAPerBin':
+                        pn = '_'.join([self.input_params_prefix, name, 'A_IA'])
+                    elif ia_model == 'IADESY1':
+                        pn = '_'.join([self.input_params_prefix, 'A_IA'])
+                    elif ia_model == 'IADESY1_PerSurvey':
+                        # This assumes that name = survey__zbin
+                        survey = name.split('__')[0]
+                        pn = '_'.join([self.input_params_prefix, survey, 'A_IA'])
+                    else:
+                        continue
 
-                if pn in bias_names:
-                    bd['bias_ind'] = [bias_names.index(pn)]
-                else:
-                    bias_names.append(pn)
-                    bd['bias_ind'] = [ind_bias]
-                    ind_bias += 1
+                    if pn in bias_names:
+                        bd['bias_ind'] = [bias_names.index(pn)]
+                    else:
+                        bias_names.append(pn)
+                        bd['bias_ind'] = [ind_bias]
+                        ind_bias += 1
             elif quantity == 'cmb_convergence':
                 bd['eps'] = True
 

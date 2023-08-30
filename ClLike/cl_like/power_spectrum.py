@@ -37,6 +37,10 @@ class Pk(Theory):
     """Computes the power spectrum"""
     # b(z) model name
     bias_model: str = "BzNone"
+    # IA model name. Currently all of these are
+    # just flags, but we could turn them into
+    # homogeneous systematic classes.
+    ia_model: str = "IANone"
     # k shot noise suppression scale
     k_SN_suppress: float = 0.01
     # min k 3D power spectra
@@ -59,7 +63,7 @@ class Pk(Theory):
 
     def initialize(self):
         # Bias model
-        self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT', 'BaccoPT']
+        self.is_PT_bias = (self.bias_model in ['LagrangianPT', 'EulerianPT', 'BaccoPT']) or (self.ia_model == 'TATT')
         # Pk sampling
         self.a_s_pks = 1./(1+np.linspace(0., self.zmax_pks, self.nz_pks)[::-1])
         self.nk_pks = int((self.l10k_max_pks - self.l10k_min_pks) *
@@ -102,6 +106,8 @@ class Pk(Theory):
         #         self.hmcorr = HalomodCorrection()
         #     else:
         #         self.hmcorr = None
+        if self.ia_model == 'TATT' and not HAVE_EPT:
+            raise EPT_exception
         if self.bias_model == 'LagrangianPT' and not HAVE_LPT:
             raise LPT_exception
         elif self.bias_model == 'EulerianPT' and not HAVE_EPT:
@@ -177,7 +183,7 @@ class Pk(Theory):
             pkd['pk_d1w'] = pkd['pk_wd1'] = pkwm
             pkd['pk_mw'] = pkd['pk_wm'] = pkwm
             pkd['pk_ww'] = pkww
-        elif self.is_PT_bias:
+        if self.is_PT_bias:
             if ('delta_matter:Weyl' in cosmo._pk_nl) or \
                     ('Weyl:Weyl' in cosmo._pk_nl):
                 raise RuntimeError('Pk involving the Weyl potential not '
@@ -186,11 +192,13 @@ class Pk(Theory):
                 k_filter = self.k_SN_suppress
             else:
                 k_filter = None
-            if self.bias_model == 'EulerianPT':
+            if (self.bias_model == 'EulerianPT') or (self.ia_model == 'TATT'):
                 from .ept import EPTCalculator
                 cosmo.compute_nonlin_power()
+                wNC = self.bias_model == 'EulerianPT'
+                wIA = self.ia_model == 'TATT'
                 pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-                ptc = EPTCalculator(with_NC=True, with_IA=False,
+                ptc = EPTCalculator(with_NC=wNC, with_IA=wIA,
                                     log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
                                     nk_per_decade=self.nk_per_dex_pks,
@@ -211,29 +219,49 @@ class Pk(Theory):
                 raise NotImplementedError("Not yet: " + self.bias_model)
             ptc.update_pk(cosmo, bcmpar=bcmpar)
             pkd = {}
-            operators = ['m', 'w', 'd1', 'd2', 's2', 'k2']
-            for i1, op1 in enumerate(operators):
-                for op2 in operators[i1:]:
-                    comb_12 = op1+op2
-                    # Since PT models are not meant to work with Weyl and we
-                    # have already checked if Weyl is in cosmo._pk_nl, let's
-                    # fill pkd weyl pk's with matter ones.
-                    kind = comb_12.replace('w', 'm')
-                    pkd[f'pk_{comb_12}'] = ptc.get_pk(kind, pnl=pkmm,
-                                                      cosmo=cosmo)
-                    # Symmetric terms for convenience
-                    if op1 != op2:
-                        comb_21 = op2+op1
-                        pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
-            if self.bias_model == 'BaccoPT':
-                pkd['pk_mm_sh_sh'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
+            if self.bias_model in ['EulerianPT', 'LagrangianPT', 'BaccoPT']:
+                operators = ['m', 'w', 'd1', 'd2', 's2', 'k2']
+                for i1, op1 in enumerate(operators):
+                    for op2 in operators[i1:]:
+                        comb_12 = op1+op2
+                        # Since PT models are not meant to work with Weyl and we
+                        # have already checked if Weyl is in cosmo._pk_nl, let's
+                        # fill pkd weyl pk's with matter ones.
+                        kind = comb_12.replace('w', 'm')
+                        pkd[f'pk_{comb_12}'] = ptc.get_pk(kind, pnl=pkmm,
+                                                          cosmo=cosmo)
+                        # Symmetric terms for convenience
+                        if op1 != op2:
+                            comb_21 = op2+op1
+                            pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
+                if self.bias_model == 'BaccoPT':
+                    pkd['pk_mm_sh_sh'] = ptc.get_pk('mm_sh_sh', pnl=pkmm,
+                                                    cosmo=cosmo)
+            if self.ia_model == 'TATT':
+                operators = ['m', 'w', 'c1', 'c2', 'cd']
+                for i1, op1 in enumerate(operators):
+                    for op2 in operators[i1:]:
+                        comb_12 = op1+op2
+                        # Since PT models are not meant to work with Weyl and we
+                        # have already checked if Weyl is in cosmo._pk_nl, let's
+                        # fill pkd weyl pk's with matter ones.
+                        kind = comb_12.replace('w', 'm')
+                        pkd[f'pk_{comb_12}'] = ptc.get_pk_IA(kind, pnl=pkmm,
+                                                             cosmo=cosmo)
+                        # Symmetric terms for convenience
+                        if op1 != op2:
+                            comb_21 = op2+op1
+                            pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
         return pkd
 
     def get_can_provide(self):
-        return ["is_PT_bias", "bias_model"]
+        return ["is_PT_bias", "bias_model", "ia_model"]
 
     def get_bias_model(self):
         return self.bias_model
+
+    def get_ia_model(self):
+        return self.ia_model
 
     def get_is_PT_bias(self):
         return self.is_PT_bias

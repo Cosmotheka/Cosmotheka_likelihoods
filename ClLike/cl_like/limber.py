@@ -17,10 +17,6 @@ class Limber(Theory):
     input_params_prefix: str = ""
     # N(z) model name
     nz_model: str = "NzNone"
-    # IA model name. Currently all of these are
-    # just flags, but we could turn them into
-    # homogeneous systematic classes.
-    ia_model: str = "IANone"
 
     # Sample type
     sample_type: str = "convolve"
@@ -33,6 +29,7 @@ class Limber(Theory):
         self.tracer_qs = None
         self.bin_properties = None
         self.is_PT_bias = None
+        self.ia_model = None
         self.bias_model = None
         self.provider = None
 
@@ -44,10 +41,11 @@ class Limber(Theory):
         self.l_sample = self._get_ell_sampling()
         self._add_pixbeam_to_cl_meta()
         self.is_PT_bias = self.provider.get_is_PT_bias()
+        self.ia_model = self.provider.get_ia_model()
         self.bias_model = self.provider.get_bias_model()
 
     def get_requirements(self):
-        return {'bias_model': None, 'is_PT_bias': None}
+        return {'ia_model': None, 'bias_model': None, 'is_PT_bias': None}
 
     def must_provide(self, **requirements):
         if "Limber" not in requirements:
@@ -130,10 +128,15 @@ class Limber(Theory):
                     t1n = [None]
                 else:
                     ia_bias = self._get_ia_bias(cosmo, name, **pars)
-                    t1 = [ccl.WeakLensingTracer(cosmo, dndz=dndz,
-                                                has_shear=False,
-                                                ia_bias=ia_bias)]
-                    t1n = ['w']
+                    tr = ccl.WeakLensingTracer(cosmo, dndz=dndz,
+                                               has_shear=False,
+                                               ia_bias=ia_bias)
+                    if self.ia_model == 'TATT':
+                        t1n = ['c1', 'c2', 'cd']
+                        t1 = [tr for dn in t1n]
+                    else:
+                        t1 = [tr]
+                        t1n = ['w']
             elif q == 'cmb_convergence':
                 # B.H. TODO: pass z_source as parameter to the YAML file
                 t0 = ccl.CMBLensingTracer(cosmo, z_source=1100)
@@ -174,8 +177,7 @@ class Limber(Theory):
             t0_2 = trs0[n2]
             t1_1 = trs1[n1]
             t1_2 = trs1[n2]
-            # The unbiased tracers have only one element in the list "m" or
-            # "w".
+            # The unbiased tracers have only one element in the list "m" or "w".
             t0dn_1 = trs0_dnames[n1][0]
             t0dn_2 = trs0_dnames[n2][0]
             t1dn_1 = trs1_dnames[n1]
@@ -342,7 +344,7 @@ class Limber(Theory):
         z = self.bin_properties[name]['z_fid']
         if self.ia_model == 'IAPerBin':
             A_IA = np.ones_like(z)
-        elif self.ia_model == 'IADESY1':
+        elif self.ia_model in ['IADESY1', 'TATT']:
             A0 = 1
             eta = pars[self.input_params_prefix + '_eta_IA']
             A_IA = A0 * ((1+z)/1.62)**eta
@@ -401,9 +403,3 @@ class Limber(Theory):
             l_sample = l_sample
 
         return l_sample
-
-    def get_can_provide(self):
-        return ["ia_model"]
-
-    def get_ia_model(self):
-        return self.ia_model
