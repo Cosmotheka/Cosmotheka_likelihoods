@@ -222,7 +222,7 @@ class EPTCalculator(object):
     def get_pk_IA(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
         # Clarification:
         # We are expanding the intrinsic alignment as:
-        #   I = c1 s + c2 s^2 + cd * s*delta
+        #   I = a1 s + a2 s^2 + ad * s*delta
         # (see cell 10 in
         # https://github.com/JoeMcEwen/FAST-PT/blob/master/examples/fastpt_examples.ipynb). # noqa
         # The `ia_tt`, `ia_ta` and `ia_mix` arrays contain the following power
@@ -241,34 +241,34 @@ class EPTCalculator(object):
         #    <s^2,ds>
         #    <s^2,ds_B>
         # mm -> <s*s> (returns pnl)
-        # mc1 -> <s*s> (returns pnl)
-        # mc2 -> <s*s^2>
-        # mcd -> <s*ds>
-        # c1c1 -> <s*s> (returns pnl)
-        # c1c2 -> <s*s^2>
-        # c1cd -> <s*ds>
-        # c2c2 -> <s^2*s^2>
-        # c2cd -> <s^2*ds>
-        # cdcd -> <ds*ds>
+        # ma1 -> <s*s> (returns pnl)
+        # ma2 -> <s*s^2>
+        # mad -> <s*ds>
+        # a1a1 -> <s*s> (returns pnl)
+        # a1a2 -> <s*s^2>
+        # a1ad -> <s*ds>
+        # a2a2 -> <s^2*s^2>
+        # a2ad -> <s^2*ds>
+        # adad -> <ds*ds>
         # When not provided, this function just returns `alt`
 
-        kind = kind.replace('m', 'c1')
+        kind = kind.replace('m', 'a1')
 
         if kind in self.pk2d_computed:
             return self.pk2d_computed[kind]
 
-        if kind == 'c1c1':
+        if kind == 'a1a1':
             return pnl
 
-        if kind == 'c1c2':
+        if kind == 'a1a2':
             p = self.ia_mix[0]+self.ia_mix[1]
-        elif kind == 'c1cd':
+        elif kind == 'a1ad':
             p = self.ia_ta[0]+self.ia_ta[1]
-        elif kind == 'c2c2':
+        elif kind == 'a2a2':
             p = self.ia_tt[0]
-        elif kind == 'c2cd':
+        elif kind == 'a2ad':
             p = self.ia_mix[2]
-        elif kind == 'cdcd':
+        elif kind == 'adad':
             p = self.ia_ta[2]
         else:
             return alt

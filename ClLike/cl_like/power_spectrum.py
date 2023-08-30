@@ -238,7 +238,7 @@ class Pk(Theory):
                     pkd['pk_mm_sh_sh'] = ptc.get_pk('mm_sh_sh', pnl=pkmm,
                                                     cosmo=cosmo)
             if self.ia_model == 'TATT':
-                operators = ['m', 'w', 'c1', 'c2', 'cd']
+                operators = ['m', 'w', 'a1', 'a2', 'ad']
                 for i1, op1 in enumerate(operators):
                     for op2 in operators[i1:]:
                         comb_12 = op1+op2

@@ -132,8 +132,16 @@ class Limber(Theory):
                                                has_shear=False,
                                                ia_bias=ia_bias)
                     if self.ia_model == 'TATT':
-                        t1n = ['c1', 'c2', 'cd']
-                        t1 = [tr for dn in t1n]
+                        z, a_ia = ia_bias
+                        gz = cosmo.growth_factor(1/(1+z))
+                        # The usual normalisation for A_2 is slightly
+                        # different than that of A_1 and A_delta
+                        # (see https://github.com/LSSTDESC/CCL/blob/29d46978445678d86a4bee485cb29d30246ff64a/pyccl/nl_pt/tracers.py#L56).
+                        tr2 = ccl.WeakLensingTracer(cosmo, dndz=dndz,
+                                                    has_shear=False,
+                                                    ia_bias=(z, -5*a_ia/gz))
+                        t1n = ['a1', 'a2', 'ad']
+                        t1 = [tr, tr2, tr]
                     else:
                         t1 = [tr]
                         t1n = ['w']

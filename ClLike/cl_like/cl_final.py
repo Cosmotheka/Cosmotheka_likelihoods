@@ -183,7 +183,7 @@ class ClFinal(Theory):
                 bd['eps'] = True
                 if ia_model == 'TATT':
                     inds = []
-                    for bn in ['c1', 'c2', 'cd']:
+                    for bn in ['a1', 'a2', 'ad']:
                         bias_names.append(self.input_params_prefix + '_' + bn)
                         inds.append(ind_bias)
                         ind_bias += 1
