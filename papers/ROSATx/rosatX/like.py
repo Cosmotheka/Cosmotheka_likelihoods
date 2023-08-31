@@ -21,12 +21,15 @@ class ROSATxLike(object):
                          'logTAGN': [7.5, 8.2]},
                  bins=[0, 1, 2, 3], Zmetal=0.3, lines=True, lmin=30,
                  lmax=2048, mbias=[-0.0063, -0.0198, -0.0241, -0.0369],
-                 zbias=[0.0, 0.0, 0.0, 0.0], with_clumping=True):
+                 zbias=[0.0, 0.0, 0.0, 0.0], with_clumping=True,
+                 spec_pyatomdb=True):
         self.params_vary = params_vary
         self.priors = priors
         self.Zmetal = Zmetal
         self.lines = lines
         self.wclump = with_clumping
+        self.spec_pyatomdb = spec_pyatomdb
+
         # Load data
         s = sacc.Sacc.load_fits(f'data/cls_cov_Y{year}iv_marg_dz_m.fits')
         # Scale cuts
@@ -89,17 +92,35 @@ class ROSATxLike(object):
         else:
             fname += 'cont'
         fname += '_Z%.2lf' % self.Zmetal
+        if self.spec_pyatomdb:
+            fname += '_padb'
         fname += '.pck'
         print(fname)
         if os.path.isfile(fname):
             with open(fname, "rb") as f:
                 J = pickle.load(f)
         else:
-            rs = ROSATResponse('data/pspcc_gain1_256.rsp', Zmetal=self.Zmetal)
-            J = rs.get_integrated_spectrum_interp(kTmin, kTmax, nkT,
-                                                  zmax, nz, emin, emax,
-                                                  dolines=self.lines,
-                                                  dopseudo=self.lines)
+            if self.spec_pyatomdb:
+                import pyatomdb
+                from astropy.io import fits
+                rmf = fits.open('data/pspcb_gain2_256.rmf')
+                arf = fits.open('data/pspcb_gain2_256.arf')
+                rosat_spectrum = pyatomdb.spectrum.CIESession()
+                rosat_spectrum.set_response(rmf, arf)
+                # Set metallicity
+                Zs = np.ones(31)
+                Zs[3:] = self.Zmetal
+                rosat_spectrum.set_abund(np.arange(31, dtype=int), Zs)
+                J = rosat_spectrum.return_integrated_spectrum_interp(kTmin, kTmax, nkT,
+                                                                     zmax, nz, emin, emax,
+                                                                     dolines=self.lines,
+                                                                     dopseudo=self.lines)
+            else:
+                rs = ROSATResponse('data/pspcc_gain1_256.rsp', Zmetal=self.Zmetal)
+                J = rs.get_integrated_spectrum_interp(kTmin, kTmax, nkT,
+                                                      zmax, nz, emin, emax,
+                                                      dolines=self.lines,
+                                                      dopseudo=self.lines)
             with open(fname, "wb") as f:
                 pickle.dump(J, f)
         self.J = J
