@@ -95,7 +95,7 @@ class ROSATxLike(object):
         if self.spec_pyatomdb:
             fname += '_padb'
         fname += '.pck'
-        print(fname)
+        #print(fname)
         if os.path.isfile(fname):
             with open(fname, "rb") as f:
                 J = pickle.load(f)

@@ -7,5 +7,6 @@ from .profiles import (
     HaloProfileDensityHE,
     HaloProfilePressureHE,
     HaloProfileXray,
+    HaloProfileNFWBaryon,
     XrayTracer)
 from .like import ROSATxLike
