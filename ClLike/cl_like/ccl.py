@@ -105,13 +105,23 @@ class CCL(Theory):
 
         return value
 
-    def _get_Onuh2(self, m_nu, T_CMB, T_ncdm):
+    def _get_Onu(self):
         # Onu = np.sum(self.provider.get_param('m_nu')) / 93.14 / self.provider.get_param('h')**2 # check consistency with ccl
+        m_nu = self.provider.get_param('m_nu')
+
+        if m_nu == 0:
+            return 0
+
+        h = self.provider.get_param('h')
+        T_CMB = self._get_ccl_param_or_arg('T_CMB',
+                                           ccl.physical_constants.T_CMB)
         if version.parse(ccl.__version__) < version.parse("2.8.0"):
             Onu = ccl.neutrinos.Omeganuh2(1, m_nu, T_CMB=T_CMB)
         else:
-            raise NotImplementedError("_get_Onuh2 needs testing for "
+            raise NotImplementedError("_get_Onu needs testing for "
                                       "pyccl>2.8.0")
+            T_ncdm = self._get_ccl_param_or_arg('T_ncdm',
+                                                ccl.DefaultParams.T_ncdm)
             # Copied from ccl/cosmology.py
             import pyccl.physical_constants as const
             c = const
@@ -125,7 +135,7 @@ class CCL(Theory):
             nu_mass = mnu_list[mnu_list > massless_limit]
             Onu = pyccl.cosmology.Cosmology._OmNuh2(m_nu, len(m_nu), T_CMB, T_ncdm)
 
-        return Onu
+        return Onu / h**2
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
@@ -133,21 +143,11 @@ class CCL(Theory):
         # Copy input_params. We will be removing elements that we extract from
         # it to pass to ccl.Cosmology all the remaining parameters.
         input_params = list(self.input_params)
-
         #
-        h = self.provider.get_param('h')
-        input_params.remove('h')
         Ob = self.provider.get_param('Omega_b')
         input_params.remove('Omega_b')
-        m_nu = self.provider.get_param('m_nu')
-        input_params.remove('m_nu')
-        T_CMB = self._get_ccl_param_or_arg('T_CMB',
-                                           ccl.physical_constants.T_CMB)
-        if 'T_CMB' in input_params:
-            input_params.remove('T_CMB')
-        T_ncdm = self._get_ccl_param_or_arg('T_ncdm', 0.71611)
 
-        Onu = self._get_Onuh2(m_nu, T_CMB, T_ncdm) / h**2 if m_nu != 0 else 0
+        Onu = self._get_Onu()
         if 'Omega_c' in self.input_params:
             Oc = self.provider.get_param('Omega_c')
             input_params.remove('Omega_c')
@@ -159,10 +159,7 @@ class CCL(Theory):
 
         # Parameters accepted by CCL
         params = {'Omega_c': Oc,
-                  'Omega_b': Ob,
-                  'h': h,
-                  'n_s': self.provider.get_param('n_s'),
-                  'm_nu': m_nu}
+                  'Omega_b': Ob}
 
         if 'A_sE9' in self.input_params:
             params.update({'A_s': self.provider.get_param('A_sE9')*1E-9})
@@ -179,8 +176,6 @@ class CCL(Theory):
             params[p] = self.provider.get_param(p)
 
         cosmo = ccl.Cosmology(**params,
-                              T_CMB=T_CMB,
-                              # T_ncdm=T_ncdm, v2.8.0
                               transfer_function=self.transfer_function,
                               matter_power_spectrum=self.matter_pk,
                               baryons_power_spectrum=self.baryons_pk,
