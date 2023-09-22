@@ -238,6 +238,7 @@ for i1, i2, ix, _ in get_pairs():
     if i2 in [2, 3, 4]:
         cl *= (1+m_sh[i2-2])
     sls[i1, i2, :] = cl
+    sls[i2, i1, :] = cl
 nls = np.zeros([n_tracers, n_tracers, nbpw])
 
 # 4 gal per arcmin^2

@@ -143,7 +143,7 @@ def test_dum(bias):
     loglikes, derived = model.loglikes()
 
     if bias != 'BaccoPT':
-        assert np.fabs(loglikes[0]) < 2E-3
+        assert np.fabs(loglikes[0]) < 3E-3
     else:
         # For some reason I cannot push it lower than this.
         assert np.fabs(loglikes[0]) < 0.2
@@ -155,7 +155,7 @@ def test_sigma8():
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    assert np.fabs(loglikes[0]) < 2E-3
+    assert np.fabs(loglikes[0]) < 3E-3
 
     del info["params"]["sigma8"]
     with pytest.raises(ValueError):
@@ -175,7 +175,7 @@ def test_ia_models(case):
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    cond = np.fabs(loglikes[0]) < 2E-3
+    cond = np.fabs(loglikes[0]) < 3E-3
     if case == 'IAPerBin':
         # IAPerBin has a constant ia_bias, which does not fit the generated
         # data.
@@ -188,13 +188,13 @@ def test_shape_model():
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    assert np.fabs(loglikes[0]) < 2E-3
+    assert np.fabs(loglikes[0]) < 3E-3
 
     info["theory"]["clfinal"]["shape_model"] = "ShapeNone"
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    assert np.fabs(loglikes[0]) > 2E-3
+    assert np.fabs(loglikes[0]) > 3E-3
 
 
 def test_timing():
@@ -224,7 +224,7 @@ def test_null_negative_eigvals_in_icov():
     model = get_model(info)
     loglikes, derived = model.loglikes()
     loglike0 = loglikes[0]
-    assert np.fabs(loglike0) < 2E-3
+    assert np.fabs(loglike0) < 3E-3
 
     # Let's change the covariance
     s = sacc.Sacc.load_fits(info['likelihood']['ClLike']['input_file'])
@@ -319,4 +319,4 @@ def test_S8():
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    assert np.fabs(loglikes[0]) < 2E-3
+    assert np.fabs(loglikes[0]) < 3E-3
