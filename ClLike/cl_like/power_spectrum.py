@@ -53,6 +53,7 @@ class Pk(Theory):
     nonlinear_emu_path = None
     nonlinear_emu_details = None
     use_baryon_boost : bool = False
+    baryon_model: str = ''
     ignore_lbias : bool = False
     allow_bcm_emu_extrapolation_for_shear : bool = True
     allow_halofit_extrapolation_for_shear : bool = False
@@ -109,15 +110,28 @@ class Pk(Theory):
         elif self.bias_model == 'BaccoPT' and not HAVE_BACCO:
             raise BACCO_exception
 
+        if self.baryon_model not in ['', 'Bacco', 'CCL_BCM']:
+            raise ValueError("baryon_model must be one of '', 'Bacco' or "
+                             "'CCL_BCM'")
+
         if self.bias_model == 'BaccoPT':
+            if self.use_baryon_boost and self.baryon_model == '':
+                    self.baryon_model = 'Bacco'
+
+            use_baryon_boost = self.use_baryon_boost and \
+                               self.baryon_model == 'Bacco'
             self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks,
                                               nonlinear_emu_path=self.nonlinear_emu_path,
                                               nonlinear_emu_details=self.nonlinear_emu_details,
-                                              use_baryon_boost=self.use_baryon_boost,
+                                              use_baryon_boost=use_baryon_boost,
                                               ignore_lbias=self.ignore_lbias,
                                               allow_bcm_emu_extrapolation_for_shear=self.allow_bcm_emu_extrapolation_for_shear,
                                               allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear
                                              )
+        else:
+            if self.baryon_model == 'Bacco':
+                raise ValueError("baryon_model 'Bacco' can only be used with "
+                                 "bias_model 'BaccoPT' at the moment.")
 
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
@@ -131,7 +145,7 @@ class Pk(Theory):
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
         bcmpar = None
-        if self.use_baryon_boost:
+        if self.use_baryon_boost and self.baryon_model == 'Bacco':
             M_c = self.provider.get_param('M_c')
             eta = self.provider.get_param('eta')
             beta = self.provider.get_param('beta')
@@ -225,12 +239,31 @@ class Pk(Theory):
                     if op1 != op2:
                         comb_21 = op2+op1
                         pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
-            if (self.bias_model == 'BaccoPT') and \
-                (self.use_baryon_boost or self.ignore_lbias):
-                # TODO: This assumes LCDM, but as above. BACCOemu is trained
-                # only in LCDM, anyway. What to do with the cross pk's? At the
-                # moment they don't have the correction.
+            if (self.bias_model == 'BaccoPT') and self.ignore_lbias:
+                # TODO: Move this to bacco.py
+                # In case we don't request the bias expansion, use the pk from
+                # the matter pk emulator
                 pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
+
+            # Add baryon correction
+            if self.use_baryon_boost:
+                if (self.bias_model == 'BaccoPT') and \
+                    (self.baryon_model == 'Bacco'):
+                    # TODO: This assumes LCDM, but as above. BACCOemu is
+                    # trained only in LCDM, anyway. What to do with the cross
+                    # pk's? At the moment they don't have the correction.
+                    pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
+                elif self.baryon_model == 'CCL_BCM':
+                    # The correction happens in place
+                    # If bias is Linear, then the pk already has the baryon
+                    # boost applied.
+                    apk2d, logkpk2d, pkpk2d = pkd['pk_ww'].get_spline_arrays()
+                    np.savez_compressed('pkww_ccl.npz', a=apk2d,
+                                        k=np.exp(logkpk2d), pk=pkpk2d)
+                    ccl.bcm.bcm_correct_pk2d(cosmo, pkd['pk_ww'])
+                    apk2d, logkpk2d, pkpk2d = pkd['pk_ww'].get_spline_arrays()
+                    np.savez_compressed('pkww_ccl_bcm.npz', a=apk2d,
+                                        k=np.exp(logkpk2d), pk=pkpk2d)
         return pkd
 
     def get_can_provide(self):

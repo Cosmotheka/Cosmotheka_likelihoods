@@ -19,16 +19,19 @@ def run_clean_tmp():
 
 def get_info(bias, A_sE9=True):
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
-    data += "cl_like/tests/data/sh_bcm_baryons.fits.gz"
 
     if bias == 'Linear':
+        data += "cl_like/tests/data/sh_bcm_baryons.fits.gz"
         pk_dict = {"external": Pk,
                    "bias_model": "Linear"}
     elif bias == 'BaccoPT':
+        data += "cl_like/tests/data/sh_PkmmBacco_bcm.fits.gz"
         pk_dict = {"external": Pk,
                    "bias_model": "BaccoPT",
                    "zmax_pks": 1.5,  # For baccoemu with baryons
-                   "use_baryon_boost" : False}
+                   "use_baryon_boost" : True,
+                   "ignore_lbias": True,
+                   "baryon_model": 'CCL_BCM'}
     else:
         raise ValueError(f'bias {bias} not implemented')
 
@@ -100,7 +103,7 @@ def get_info(bias, A_sE9=True):
     return info
 
 
-@pytest.mark.parametrize('bias', ['Linear']) # , 'BaccoPT'])
+@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
 def test_dum(bias):
     info = get_info(bias)
     model = get_model(info)
@@ -127,6 +130,14 @@ def test_dum(bias):
     # plt.show()
 
 
-    # TODO: Ideally, I should be able to recover exactly the data vector.
-    # However, I cannot push chi2 < 0.033. Not sure where the missmatch is.
-    assert np.fabs(loglikes[0]) < 0.035
+    if bias == 'Linear':
+        # TODO: Ideally, I should be able to recover exactly the data vector.
+        # However, I cannot push chi2 < 0.033. Not sure where the missmatch is.
+        assert np.fabs(loglikes[0]) < 0.035
+    elif bias == 'BaccoPT':
+        # TODO: Ideally, I should be able to recover exactly the data vector.
+        # However, I cannot push chi2 < 6.6, not sure why. With no neutrinos,
+        # it goes down to 0.13. The errors at the smaller scales are super
+        # tiny, and, even though the rel. dev. of the Cells is <1e-3, the
+        # contribution to the chi2 is order 1.
+        assert np.fabs(loglikes[0]) < 7
