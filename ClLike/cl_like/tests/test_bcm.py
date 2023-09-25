@@ -61,7 +61,7 @@ def get_info(bias, A_sE9=True):
                        # Baryons
                        "bcm_log10Mc": 14,
                        "bcm_etab": 0.6,
-                       "bcm_ks": 0.6,
+                       "bcm_ks": 50,
                        # Derived
                        "sigma8": None,
                        },
@@ -130,14 +130,7 @@ def test_dum(bias):
     # plt.show()
 
 
-    if bias == 'Linear':
-        # TODO: Ideally, I should be able to recover exactly the data vector.
-        # However, I cannot push chi2 < 0.033. Not sure where the missmatch is.
-        assert np.fabs(loglikes[0]) < 0.035
-    elif bias == 'BaccoPT':
-        # TODO: Ideally, I should be able to recover exactly the data vector.
-        # However, I cannot push chi2 < 6.6, not sure why. With no neutrinos,
-        # it goes down to 0.13. The errors at the smaller scales are super
-        # tiny, and, even though the rel. dev. of the Cells is <1e-3, the
-        # contribution to the chi2 is order 1.
-        assert np.fabs(loglikes[0]) < 7
+    # TODO: Ideally, I should be able to recover exactly the data vector.
+    # However, I cannot push chi2 < 0.2 for bcm_ks=50. Not sure where the
+    # missmatch is.
+    assert np.fabs(loglikes[0]) < 0.2

@@ -82,7 +82,7 @@ cosmobcm = ccl.Cosmology(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_bary
                          matter_power_spectrum="halofit",
                          bcm_log10Mc=14,
                          bcm_etab=0.6,
-                         bcm_ks=0.6)
+                         bcm_ks=50)
 
 ccl.bcm.bcm_correct_pk2d(cosmobcm, cosmo.get_nonlin_power())
 

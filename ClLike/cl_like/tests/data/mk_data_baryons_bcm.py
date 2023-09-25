@@ -14,7 +14,7 @@ cosmo = ccl.Cosmology(Omega_c=0.26,
                       baryons_power_spectrum='bcm',
                       bcm_log10Mc=14,
                       bcm_etab=0.6,
-                      bcm_ks=0.6,
+                      bcm_ks=50,
                       matter_power_spectrum='halofit')
 
 
