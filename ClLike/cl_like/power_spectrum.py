@@ -257,13 +257,8 @@ class Pk(Theory):
                     # The correction happens in place
                     # If bias is Linear, then the pk already has the baryon
                     # boost applied.
-                    apk2d, logkpk2d, pkpk2d = pkd['pk_ww'].get_spline_arrays()
-                    np.savez_compressed('pkww_ccl.npz', a=apk2d,
-                                        k=np.exp(logkpk2d), pk=pkpk2d)
                     ccl.bcm.bcm_correct_pk2d(cosmo, pkd['pk_ww'])
-                    apk2d, logkpk2d, pkpk2d = pkd['pk_ww'].get_spline_arrays()
-                    np.savez_compressed('pkww_ccl_bcm.npz', a=apk2d,
-                                        k=np.exp(logkpk2d), pk=pkpk2d)
+
         return pkd
 
     def get_can_provide(self):
