@@ -110,9 +110,9 @@ class Pk(Theory):
         elif self.bias_model == 'BaccoPT' and not HAVE_BACCO:
             raise BACCO_exception
 
-        if self.baryon_model not in ['', 'Bacco', 'CCL_BCM']:
+        if self.baryon_model not in ['', 'Bacco', 'CCL_BCM', 'Amon-Efstathiou']:
             raise ValueError("baryon_model must be one of '', 'Bacco' or "
-                             "'CCL_BCM'")
+                             "'CCL_BCM', 'Amon-Efstathiou'")
 
         if self.bias_model == 'BaccoPT':
             if self.use_baryon_boost and self.baryon_model == '':
@@ -140,28 +140,34 @@ class Pk(Theory):
         return {"CCL": None}
 
     def get_can_support_params(self):
-        return ["M_c", "eta", "beta", "M1_z0_cen", "theta_out", "theta_inn", "M_inn"]
+        # TODO: We should better use an input_params_prefix to avoid confusion
+        # with CCL params and maybe split the baryons stuff
+        return ["M_c", "eta", "beta", "M1_z0_cen", "theta_out", "theta_inn",
+                "M_inn", "A_AE"]
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
         bcmpar = None
-        if self.use_baryon_boost and self.baryon_model == 'Bacco':
-            M_c = self.provider.get_param('M_c')
-            eta = self.provider.get_param('eta')
-            beta = self.provider.get_param('beta')
-            M1_z0_cen = self.provider.get_param('M1_z0_cen')
-            theta_out = self.provider.get_param('theta_out')
-            theta_inn = self.provider.get_param('theta_inn')
-            M_inn = self.provider.get_param('M_inn')
-            bcmpar = {
-                'M_c'  : M_c,
-                'eta' : eta,
-                'beta' : beta,
-                'M1_z0_cen' : M1_z0_cen,
-                'theta_out' : theta_out,
-                'theta_inn' : theta_inn,
-                'M_inn' : M_inn
-            }
+        if self.use_baryon_boost:
+            if self.baryon_model == 'Bacco':
+                M_c = self.provider.get_param('M_c')
+                eta = self.provider.get_param('eta')
+                beta = self.provider.get_param('beta')
+                M1_z0_cen = self.provider.get_param('M1_z0_cen')
+                theta_out = self.provider.get_param('theta_out')
+                theta_inn = self.provider.get_param('theta_inn')
+                M_inn = self.provider.get_param('M_inn')
+                bcmpar = {
+                    'M_c'  : M_c,
+                    'eta' : eta,
+                    'beta' : beta,
+                    'M1_z0_cen' : M1_z0_cen,
+                    'theta_out' : theta_out,
+                    'theta_inn' : theta_inn,
+                    'M_inn' : M_inn
+                }
+            elif self.baryon_model == 'Amon-Efstathiou':
+                bcmpar = {'A_AE': self.provider.get_param('A_AE')}
 
         state['Pk'] = {'pk_data': self._get_pk_data(cosmo, bcmpar=bcmpar)}
 
@@ -245,19 +251,31 @@ class Pk(Theory):
                 # the matter pk emulator
                 pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
 
-            # Add baryon correction
-            if self.use_baryon_boost:
-                if (self.bias_model == 'BaccoPT') and \
-                    (self.baryon_model == 'Bacco'):
-                    # TODO: This assumes LCDM, but as above. BACCOemu is
-                    # trained only in LCDM, anyway. What to do with the cross
-                    # pk's? At the moment they don't have the correction.
-                    pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
-                elif self.baryon_model == 'CCL_BCM':
-                    # The correction happens in place
-                    # If bias is Linear, then the pk already has the baryon
-                    # boost applied.
-                    ccl.bcm.bcm_correct_pk2d(cosmo, pkd['pk_ww'])
+        # Add baryon correction
+        if self.use_baryon_boost:
+            if self.is_PT_bias and (self.bias_model == 'BaccoPT') and \
+                (self.baryon_model == 'Bacco'):
+                # TODO: This assumes LCDM, but as above. BACCOemu is
+                # trained only in LCDM, anyway. What to do with the cross
+                # pk's? At the moment they don't have the correction.
+                pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
+            elif self.is_PT_bias and (self.baryon_model == 'CCL_BCM'):
+                # The correction happens in place
+                # If bias is Linear, then the pk already has the baryon
+                # boost applied.
+                ccl.bcm.bcm_correct_pk2d(cosmo, pkd['pk_ww'])
+            elif self.baryon_model == 'Amon-Efstathiou':
+                pklin = cosmo.get_linear_power()
+                a, lnk, pklin = pklin.get_spline_arrays()
+                k = np.exp(lnk)
+                boost = np.zeros_like(pklin)
+                for i, ai in enumerate(a):
+                    boost[i] = pkd['pk_ww'].eval(k, ai) - pklin[i]
+
+                pkb = pklin + bcmpar['A_AE']*boost
+                pkd['pk_ww'] = ccl.Pk2D(a_arr=a, lk_arr=lnk,
+                                        pk_arr=np.log(pkb),
+                                        is_logp=True)
 
         return pkd
 
