@@ -270,7 +270,7 @@ class Pk(Theory):
                 k = np.exp(lnk)
                 boost = np.zeros_like(pklin)
                 for i, ai in enumerate(a):
-                    boost[i] = pkd['pk_ww'].eval(k, ai) - pklin[i]
+                    boost[i] = pkd['pk_ww'].eval(k, ai, cosmo) - pklin[i]
 
                 pkb = pklin + bcmpar['A_AE']*boost
                 pkd['pk_ww'] = ccl.Pk2D(a_arr=a, lk_arr=lnk,

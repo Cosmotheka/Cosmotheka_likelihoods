@@ -29,7 +29,7 @@ def get_info(bias, A_AE):
         pk_dict = {"external": Pk,
                    "bias_model": "BaccoPT",
                    "zmax_pks": 1.5,  # For baccoemu with baryons
-                   "ignore_lbias": True}
+                   "ignore_lbias": False}
     else:
         raise ValueError(f'bias {bias} not implemented')
 
@@ -99,7 +99,7 @@ def get_info(bias, A_AE):
     return info
 
 
-@pytest.mark.parametrize('bias', ['Linear']) # , 'BaccoPT'])
+@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
 def test_dum(bias):
     info = get_info(bias, A_AE=1)
     model = get_model(info)

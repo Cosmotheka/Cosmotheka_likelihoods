@@ -134,6 +134,9 @@ class BaccoCalculator(object):
             pk (array_like): linear power spectrum sampled at the
                 internal `k` values used by this calculator.
         """
+        if not self.use_baryon_boost:
+            bcmpar = None
+
         h = cosmo['h']
         cospar = {
             'omega_cold': cosmo['Omega_c'] + cosmo['Omega_b'],
