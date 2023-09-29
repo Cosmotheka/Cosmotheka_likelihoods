@@ -183,8 +183,9 @@ class BaccoCalculator(object):
         if baryonic_boost:
             Sk = np.array([self.mpk.get_baryonic_boost(k=k_sh_sh_for_bacco, expfactor=a, **cospar_for_bcm)[1] for a in these_a_s])
         else:
-            Sk = 1
+            Sk = np.ones_like(pk)
         self.pk_temp_sh_sh = pk * Sk
+        self.Sk_temp = Sk
         self.pk2d_computed = {}
 
     def get_pk(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
@@ -247,7 +248,17 @@ class BaccoCalculator(object):
                 's2k2': 0.5,
                 'k2k2': 1.0}
 
-        if kind != 'mm_sh_sh':
+        if kind == 'Sk':
+            pk = np.log(self.Sk_temp)
+            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
+                            pk_arr=pk, is_logp=True)
+            self.pk2d_computed[kind] = pk2d
+        elif kind == 'mm_sh_sh':
+            pk = np.log(self.pk_temp_sh_sh)
+            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
+                            pk_arr=pk, is_logp=True)
+            self.pk2d_computed[kind] = pk2d
+        else:
             if not self.ignore_lbias:
                 pk = pfac[kind]*self.pk_temp[:, inds[kind], :]
                 if kind in ['mm']:
@@ -257,9 +268,5 @@ class BaccoCalculator(object):
                 self.pk2d_computed[kind] = pk2d
             else:
                 pk2d = None
-        else:
-            pk = np.log(self.pk_temp_sh_sh)
-            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
-                            pk_arr=pk, is_logp=True)
-            self.pk2d_computed[kind] = pk2d
+
         return pk2d

@@ -2,12 +2,14 @@ import cl_like as cll
 from cl_like.limber import Limber
 from cl_like.power_spectrum import Pk
 from cl_like.cl_final import ClFinal
+from cl_like.bacco import BaccoCalculator
 import numpy as np
 from cobaya.model import get_model
 import pytest
 import os
 import shutil
 import sacc
+import pyccl as ccl
 
 
 # Cleaning the tmp dir before running and after running the tests
@@ -142,3 +144,37 @@ def test_A_s_sigma8():
     assert np.fabs(loglikes_A_s[0]) < 0.2
 
     assert np.fabs(loglikes_sigma8[0] / loglikes_A_s[0] - 1) < 2e-3
+
+
+def test_baryons_Sk():
+    # min k 3D power spectra
+    l10k_min_pks: float = -4.0
+    # max k 3D power spectra
+    l10k_max_pks: float = 2.0
+    # #k for 3D power spectra
+    nk_per_dex_pks: int = 25
+
+    nk_pks = int((l10k_max_pks - l10k_min_pks) * nk_per_dex_pks)
+    ptc = BaccoCalculator(use_baryon_boost=True,
+                          ignore_lbias=True,
+                          allow_bcm_emu_extrapolation_for_shear=True,
+                          allow_halofit_extrapolation_for_shear=True)
+
+    cosmo = ccl.CosmologyVanillaLCDM()
+
+    bcmpar = {
+               "M_c" :  14,
+               "eta" : -0.3,
+               "beta" : -0.22,
+               "M1_z0_cen" : 10.5,
+               "theta_out" : 0.25,
+               "theta_inn" : -0.86,
+               "M_inn" : 13.4,
+    }
+
+    ptc.update_pk(cosmo, bcmpar=None)
+    pk = ptc.get_pk('mm_sh_sh').get_spline_arrays()[-1]
+    ptc.update_pk(cosmo, bcmpar=bcmpar)
+    pkb = ptc.get_pk('mm_sh_sh').get_spline_arrays()[-1]
+    Sk = ptc.get_pk('Sk').get_spline_arrays()[-1]
+    assert Sk == pytest.approx(pkb/pk, rel=1e-5)
