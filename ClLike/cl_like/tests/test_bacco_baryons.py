@@ -18,6 +18,22 @@ def run_clean_tmp():
     if os.path.isdir("dum"):
         shutil.rmtree("dum")
 
+@pytest.fixture()
+def ptc():
+    # min k 3D power spectra
+    l10k_min_pks: float = -4.0
+    # max k 3D power spectra
+    l10k_max_pks: float = 2.0
+    # #k for 3D power spectra
+    nk_per_dex_pks: int = 25
+
+    nk_pks = int((l10k_max_pks - l10k_min_pks) * nk_per_dex_pks)
+    ptc = BaccoCalculator(use_baryon_boost=True,
+                          ignore_lbias=True,
+                          allow_bcm_emu_extrapolation_for_shear=True,
+                          allow_halofit_extrapolation_for_shear=True)
+    return ptc
+
 
 def get_info(A_sE9=True):
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
@@ -146,19 +162,7 @@ def test_A_s_sigma8():
     assert np.fabs(loglikes_sigma8[0] / loglikes_A_s[0] - 1) < 2e-3
 
 
-def test_baryons_Sk():
-    # min k 3D power spectra
-    l10k_min_pks: float = -4.0
-    # max k 3D power spectra
-    l10k_max_pks: float = 2.0
-    # #k for 3D power spectra
-    nk_per_dex_pks: int = 25
-
-    nk_pks = int((l10k_max_pks - l10k_min_pks) * nk_per_dex_pks)
-    ptc = BaccoCalculator(use_baryon_boost=True,
-                          ignore_lbias=True,
-                          allow_bcm_emu_extrapolation_for_shear=True,
-                          allow_halofit_extrapolation_for_shear=True)
+def test_baryons_Sk(ptc):
 
     cosmo = ccl.CosmologyVanillaLCDM()
 
@@ -178,3 +182,25 @@ def test_baryons_Sk():
     pkb = ptc.get_pk('mm_sh_sh').get_spline_arrays()[-1]
     Sk = ptc.get_pk('Sk').get_spline_arrays()[-1]
     assert Sk == pytest.approx(pkb/pk, rel=1e-5)
+
+
+def test_get_pars_and_a_for_bacco(ptc):
+    bcmpar = {
+               "M_c" :  14,
+               "eta" : -0.3,
+               "beta" : -0.22,
+               "M1_z0_cen" : 10.5,
+               "theta_out" : 0.25,
+               "theta_inn" : -0.86,
+               "M_inn" : 13.4,
+    }
+
+    a_arr = [0.8, 0.9, 1]
+
+    combined_pars = ptc._get_pars_and_a_for_bacco(bcmpar, a_arr)
+
+    assert combined_pars['expfactor'] == a_arr
+
+    for pn, pv in bcmpar.items():
+        assert np.all(combined_pars[pn] == np.array([pv] * len(a_arr)))
+

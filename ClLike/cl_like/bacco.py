@@ -177,16 +177,28 @@ class BaccoCalculator(object):
         else:
             # TODO: This is going to be called even if no baryons are
             # requested. Shouldn't it have a flag?
-            pk = np.array([self.mpk.get_nonlinear_pk(baryonic_boost=False, cold=False,
-                                                     k=k_sh_sh_for_bacco, expfactor=a,
-                                                     **cospar)[1]/h**3 for a in self.a_s])
+            cospar = self._get_pars_and_a_for_bacco(cospar, self.a_s)
+            pk = np.array(self.mpk.get_nonlinear_pk(baryonic_boost=False,
+                                                    cold=False,
+                                                    k=k_sh_sh_for_bacco,
+                                                     **cospar)[1]/h**3)
         if baryonic_boost:
-            Sk = np.array([self.mpk.get_baryonic_boost(k=k_sh_sh_for_bacco, expfactor=a, **cospar_for_bcm)[1] for a in these_a_s])
+            cospar_for_bcm = self._get_pars_and_a_for_bacco(cospar_for_bcm,
+                                                            these_a_s)
+            Sk = np.array(self.mpk.get_baryonic_boost(k=k_sh_sh_for_bacco, **cospar_for_bcm)[1])
         else:
             Sk = np.ones_like(pk)
         self.pk_temp_sh_sh = pk * Sk
         self.Sk_temp = Sk
         self.pk2d_computed = {}
+
+    def _get_pars_and_a_for_bacco(self, pars, a):
+        combined_pars = {}
+        for key in pars.keys():
+            combined_pars[key] = np.full((len(a)), pars[key])
+        combined_pars['expfactor'] = a
+
+        return combined_pars
 
     def get_pk(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
         # Clarification:
