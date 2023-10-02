@@ -47,6 +47,8 @@ jobs:
           pip install -U wheel
           # Installing numpy first to avoid CCL error
           pip install numpy
+          # Installing packaging for CAMB to compile
+          pip install packaging
           # Install the likelihood
           pip install -e ClLike
           # baccoemu depends on sklearn which is deprecated and the
