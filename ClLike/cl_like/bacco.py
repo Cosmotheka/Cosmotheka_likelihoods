@@ -62,7 +62,9 @@ class BaccoCalculator(object):
         """
         cosmopars = copy.deepcopy(cosmopars_in)
 
-        within_bounds = self._check_within_bounds(cosmopars)
+        # Return cosmopars to get the sigma8_cold equivalent to the input As
+        within_bounds, cosmopars = self._check_within_bounds(cosmopars,
+                                                             return_cosmopars=True)
         if (not self.allow_bcm_emu_extrapolation_for_shear) or \
             within_bounds['baryon']:
             return copy.deepcopy(cosmopars), copy.deepcopy(self.a_s)
@@ -100,12 +102,12 @@ class BaccoCalculator(object):
 
         return cosmopars_out, a_s_out
 
-    def _check_within_bounds(self, cosmopars):
+    def _check_within_bounds(self, cosmopars, return_cosmopars=False):
         """
         Check if cosmological parameters are within bounds
 
-        Return: dict with keys 'nonlinear' and 'baryon'
-
+        Return: dict with keys 'nonlinear' and 'baryon'. If return_cosmopars is
+        True, returns the cosmopars with sigma8_cold instead of A_s.
         """
         cosmopars = copy.deepcopy(cosmopars)
         if 'A_s' in cosmopars:
@@ -121,8 +123,12 @@ class BaccoCalculator(object):
             within_bounds.append(np.all(val >= self.mpk.emulator['baryon']['bounds'][i][0]) & np.all(val <= self.mpk.emulator['baryon']['bounds'][i][1]))
             within_bounds_mpk.append(np.all(val >= self.mpk.emulator['nonlinear']['bounds'][i][0]) & np.all(val <= self.mpk.emulator['nonlinear']['bounds'][i][1]))
 
-        return {'nonlinear': np.all(within_bounds_mpk),
+        output = {'nonlinear': np.all(within_bounds_mpk),
                 'baryon': np.all(within_bounds)}
+        if return_cosmopars:
+            return output, cosmopars
+
+        return output
 
     def _sigma8tot_2_sigma8cold(self, emupars, sigma8tot):
         """Use baccoemu to convert sigma8 total matter to sigma8 cdm+baryons
