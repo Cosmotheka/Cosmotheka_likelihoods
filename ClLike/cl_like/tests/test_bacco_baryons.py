@@ -163,8 +163,15 @@ def test_A_s_sigma8():
 
 
 def test_baryons_Sk(ptc):
+    info = get_info()
+    pars = info['params']
 
-    cosmo = ccl.CosmologyVanillaLCDM()
+    cosmo = ccl.Cosmology(Omega_c=pars['Omega_c'],
+                          Omega_b=pars['Omega_b'],
+                          h=pars['h'],
+                          n_s=pars['n_s'],
+                          A_s=pars['A_sE9']*1e-9,
+                          m_nu=pars['m_nu'])
 
     bcmpar = {
                "M_c" :  14,
@@ -182,6 +189,14 @@ def test_baryons_Sk(ptc):
     pkb = ptc.get_pk('mm_sh_sh').get_spline_arrays()[-1]
     Sk = ptc.get_pk('Sk').get_spline_arrays()[-1]
     assert Sk == pytest.approx(pkb/pk, rel=1e-5)
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    lkl = model.likelihood['ClLike']
+    a_arr, lnk, Sk2 = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()
+    k = np.exp(lnk)
+    for i, ai in enumerate(a_arr):
+        assert ptc.get_pk('Sk').eval(k, ai) == pytest.approx(Sk2[i], rel=1e-3)
 
 
 def test_get_pars_and_a_for_bacco(ptc):

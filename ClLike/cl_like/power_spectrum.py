@@ -252,18 +252,29 @@ class Pk(Theory):
                 pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
 
         # Add baryon correction
-        if self.use_baryon_boost:
+        baryons_in_cosmo = cosmo._config_init_kwargs['baryons_power_spectrum']
+        if self.use_baryon_boost or (baryons_in_cosmo != 'nobaryons'):
             if self.is_PT_bias and (self.bias_model == 'BaccoPT') and \
                 (self.baryon_model == 'Bacco'):
                 # TODO: This assumes LCDM, but as above. BACCOemu is
                 # trained only in LCDM, anyway. What to do with the cross
                 # pk's? At the moment they don't have the correction.
                 pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
-            elif self.is_PT_bias and (self.baryon_model == 'CCL_BCM'):
-                # The correction happens in place
-                # If bias is Linear, then the pk already has the baryon
-                # boost applied.
-                ccl.bcm.bcm_correct_pk2d(cosmo, pkd['pk_ww'])
+                pkd['Sk'] = ptc.get_pk('Sk')
+            elif (self.baryon_model == 'CCL_BCM') or \
+                (baryons_in_cosmo == 'bcm'):
+                if self.is_PT_bias:
+                    # The correction happens in place
+                    # If bias is Linear, then the pk already has the baryon
+                    # boost applied.
+                    ccl.bcm.bcm_correct_pk2d(cosmo, pkd['pk_ww'])
+                a_arr, lnk, pkww = pkd['pk_ww'].get_spline_arrays()
+                k = np.exp(lnk)
+                Sk = np.zeros_like(pkww)
+                for i, ai in enumerate(a_arr):
+                    Sk[i] = ccl.bcm.bcm_model_fka(cosmo, k, ai)
+                pkd['Sk'] = ccl.Pk2D(a_arr=a_arr, lk_arr=lnk,
+                                     pk_arr=np.log(Sk), is_logp=True)
             elif self.baryon_model == 'Amon-Efstathiou':
                 pklin = cosmo.get_linear_power()
                 a, lnk, pklin = pklin.get_spline_arrays()
@@ -272,10 +283,17 @@ class Pk(Theory):
                 for i, ai in enumerate(a):
                     boost[i] = pkd['pk_ww'].eval(k, ai, cosmo) - pklin[i]
 
-                pkb = pklin + bcmpar['A_AE']*boost
+                Sk = bcmpar['A_AE']*boost
+                pkb = pklin + Sk
                 pkd['pk_ww'] = ccl.Pk2D(a_arr=a, lk_arr=lnk,
                                         pk_arr=np.log(pkb),
                                         is_logp=True)
+                # No log(Sk) in case A=0
+                pkd['Sk'] = ccl.Pk2D(a_arr=a, lk_arr=lnk, pk_arr=Sk,
+                                     is_logp=False)
+            else:
+                # TODO: Bacco returns a pk2d of 1's, maybe homogenize this
+                pkd['Sk'] = None
 
         return pkd
 

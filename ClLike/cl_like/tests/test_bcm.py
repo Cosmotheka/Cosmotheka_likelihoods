@@ -8,6 +8,7 @@ import pytest
 import os
 import shutil
 import sacc
+import pyccl as ccl
 
 
 # Cleaning the tmp dir before running and after running the tests
@@ -134,3 +135,33 @@ def test_dum(bias):
     # However, I cannot push chi2 < 0.2 for bcm_ks=50. Not sure where the
     # missmatch is.
     assert np.fabs(loglikes[0]) < 0.2
+
+
+@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
+def test_Sk(bias):
+    info = get_info(bias)
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+
+    pars = info['params']
+
+    # cosmo = ccl.CosmologyVanillaLCDM()
+    cosmo = ccl.Cosmology(Omega_c=pars['Omega_c'],
+                          Omega_b=pars['Omega_b'],
+                          h=pars['h'],
+                          n_s=pars['n_s'],
+                          A_s=pars['A_sE9']*1e-9,
+                          m_nu=pars['m_nu'],
+                          bcm_log10Mc=pars['bcm_log10Mc'],
+                          bcm_etab=pars['bcm_etab'],
+                          bcm_ks=pars['bcm_ks'],
+                          baryons_power_spectrum='bcm'
+                          )
+
+    lkl = model.likelihood['ClLike']
+    a_arr, lnk, Sk = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()
+    k = np.exp(lnk)
+
+    for i, ai in enumerate(a_arr):
+        assert Sk[i] == pytest.approx(ccl.bcm.bcm_model_fka(cosmo, k, ai),
+                                      rel=1e-3)
