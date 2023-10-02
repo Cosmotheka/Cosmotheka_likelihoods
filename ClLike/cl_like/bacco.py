@@ -61,20 +61,10 @@ class BaccoCalculator(object):
         while modifying Ob and Oc to keep the baryon fraction fixed
         """
         cosmopars = copy.deepcopy(cosmopars_in)
-        if 'A_s' in cosmopars:
-            cosmopars['sigma8_cold'] = self.mpk.get_sigma8(**cosmopars_in, cold=True)
-            del cosmopars['A_s']
-        within_bounds = []
-        within_bounds_mpk = []
-        for i, parname in enumerate(self.mpk.emulator['nonlinear']['keys']):
-            if parname != 'expfactor':
-                val = cosmopars[parname]
-            else:
-                val = copy.deepcopy(self.a_s)
-            within_bounds.append(np.all(val >= self.mpk.emulator['baryon']['bounds'][i][0]) & np.all(val <= self.mpk.emulator['baryon']['bounds'][i][1]))
-            within_bounds_mpk.append(np.all(val >= self.mpk.emulator['nonlinear']['bounds'][i][0]) & np.all(val <= self.mpk.emulator['nonlinear']['bounds'][i][1]))
-        self.within_bounds_mpk = np.all(within_bounds_mpk)
-        if (not self.allow_bcm_emu_extrapolation_for_shear) | (np.all(within_bounds)):
+
+        within_bounds = self._check_within_bounds(cosmopars)
+        if (not self.allow_bcm_emu_extrapolation_for_shear) or \
+            within_bounds['baryon']:
             return copy.deepcopy(cosmopars), copy.deepcopy(self.a_s)
 
         cosmopars_out = copy.deepcopy(cosmopars)
@@ -110,6 +100,29 @@ class BaccoCalculator(object):
 
         return cosmopars_out, a_s_out
 
+    def _check_within_bounds(self, cosmopars):
+        """
+        Check if cosmological parameters are within bounds
+
+        Return: dict with keys 'nonlinear' and 'baryon'
+
+        """
+        cosmopars = copy.deepcopy(cosmopars)
+        if 'A_s' in cosmopars:
+            cosmopars['sigma8_cold'] = self.mpk.get_sigma8(**cosmopars, cold=True)
+            del cosmopars['A_s']
+        within_bounds = []
+        within_bounds_mpk = []
+        for i, parname in enumerate(self.mpk.emulator['nonlinear']['keys']):
+            if parname != 'expfactor':
+                val = cosmopars[parname]
+            else:
+                val = copy.deepcopy(self.a_s)
+            within_bounds.append(np.all(val >= self.mpk.emulator['baryon']['bounds'][i][0]) & np.all(val <= self.mpk.emulator['baryon']['bounds'][i][1]))
+            within_bounds_mpk.append(np.all(val >= self.mpk.emulator['nonlinear']['bounds'][i][0]) & np.all(val <= self.mpk.emulator['nonlinear']['bounds'][i][1]))
+
+        return {'nonlinear': np.all(within_bounds_mpk),
+                'baryon': np.all(within_bounds)}
 
     def _sigma8tot_2_sigma8cold(self, emupars, sigma8tot):
         """Use baccoemu to convert sigma8 total matter to sigma8 cdm+baryons
@@ -134,23 +147,11 @@ class BaccoCalculator(object):
             pk (array_like): linear power spectrum sampled at the
                 internal `k` values used by this calculator.
         """
-        if not self.use_baryon_boost:
-            bcmpar = None
+        cospar = self._get_bacco_pars_from_cosmo(cosmo)
+        h = cospar['hubble']
+        cospar_and_a = self._get_pars_and_a_for_bacco(cospar, self.a_s)
 
-        h = cosmo['h']
-        cospar = {
-            'omega_cold': cosmo['Omega_c'] + cosmo['Omega_b'],
-            'omega_baryon': cosmo['Omega_b'],
-            'ns': cosmo['n_s'],
-            'hubble': h,
-            'neutrino_mass': np.sum(cosmo['m_nu']),
-            'w0': cosmo['w0'],
-            'wa': cosmo['wa']}
-        if np.isnan(cosmo['A_s']):
-            cospar['sigma8_cold'] = self._sigma8tot_2_sigma8cold(cospar, cosmo.sigma8())
-        else:
-            cospar['A_s'] = cosmo['A_s']
-
+        # HEFT
         k_for_bacco = self.ks/h
         # TODO: Use lbias.emulator['nonlinear']['k'].max() instead of 0.75?
         self.mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= 0.75))
@@ -158,36 +159,37 @@ class BaccoCalculator(object):
         if self.ignore_lbias:
             self.pk_temp = None
         else:
-            self.pk_temp = np.array([self.lbias.get_nonlinear_pnn(k=k_for_bacco,
-                                                                  expfactor=a,
-                                                                  **cospar)[1]/h**3 for a in self.a_s])
-        baryonic_boost = bcmpar is not None
-        these_a_s = self.a_s
-        cospar_for_bcm, these_a_s = self._check_baccoemu_baryon_pars_for_extrapolation(cospar)
-        if baryonic_boost:
-            cospar_for_bcm.update(bcmpar)
+            self.pk_temp = self.lbias.get_nonlinear_pnn(k=k_for_bacco,
+                                                        **cospar_and_a)[1]/h**3
+            print(self.pk_temp.shape)
+            print(self.a_s.shape)
+            print(k_for_bacco.shape)
+
+        # Shear - Shear (and baryons)
+        baryonic_boost = self.use_baryon_boost and (bcmpar is not None)
+
         k_sh_sh_for_bacco = self.ks_sh_sh/h
         emu_type_for_setting_kmax = 'baryon' if baryonic_boost else 'nonlinear'
         self.mask_ks_sh_sh_for_bacco = np.squeeze(np.where(k_sh_sh_for_bacco <= self.mpk.emulator[emu_type_for_setting_kmax]['k'].max()))
         k_sh_sh_for_bacco = k_sh_sh_for_bacco[self.mask_ks_sh_sh_for_bacco]
-        if (not self.within_bounds_mpk) & self.allow_halofit_extrapolation_for_shear:
+
+        within_bounds_mpk = self._check_within_bounds(cospar)['nonlinear']
+
+        if (not within_bounds_mpk) & self.allow_halofit_extrapolation_for_shear:
             cosmo.compute_nonlin_power()
             pknl = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
             pk = np.array([pknl.eval(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco], a, cosmo) for a in self.a_s])
         else:
             # TODO: This is going to be called even if no baryons are
             # requested. Shouldn't it have a flag?
-            cospar = self._get_pars_and_a_for_bacco(cospar, self.a_s)
-            pk = np.array(self.mpk.get_nonlinear_pk(baryonic_boost=False,
-                                                    cold=False,
-                                                    k=k_sh_sh_for_bacco,
-                                                     **cospar)[1]/h**3)
+            pk = self.mpk.get_nonlinear_pk(baryonic_boost=False, cold=False,
+                                           k=k_sh_sh_for_bacco,
+                                           **cospar_and_a)[1]/h**3
         if baryonic_boost:
-            cospar_for_bcm = self._get_pars_and_a_for_bacco(cospar_for_bcm,
-                                                            these_a_s)
-            Sk = np.array(self.mpk.get_baryonic_boost(k=k_sh_sh_for_bacco, **cospar_for_bcm)[1])
+            Sk = self.get_baryonic_boost(cosmo, bcmpar, k_sh_sh_for_bacco)
         else:
             Sk = np.ones_like(pk)
+
         self.pk_temp_sh_sh = pk * Sk
         self.Sk_temp = Sk
         self.pk2d_computed = {}
@@ -199,6 +201,31 @@ class BaccoCalculator(object):
         combined_pars['expfactor'] = a
 
         return combined_pars
+
+    def _get_bacco_pars_from_cosmo(self, cosmo):
+        cospar = {
+            'omega_cold': cosmo['Omega_c'] + cosmo['Omega_b'],
+            'omega_baryon': cosmo['Omega_b'],
+            'ns': cosmo['n_s'],
+            'hubble': cosmo['h'],
+            'neutrino_mass': np.sum(cosmo['m_nu']),
+            'w0': cosmo['w0'],
+            'wa': cosmo['wa']}
+        if np.isnan(cosmo['A_s']):
+            cospar['sigma8_cold'] = self._sigma8tot_2_sigma8cold(cospar, cosmo.sigma8())
+        else:
+            cospar['A_s'] = cosmo['A_s']
+
+        return cospar
+
+    def get_baryonic_boost(self, cosmo, bcmpar, k_arr):
+        cospar = self._get_bacco_pars_from_cosmo(cosmo)
+        cospar_for_bcm, these_a_s = self._check_baccoemu_baryon_pars_for_extrapolation(cospar)
+        cospar_for_bcm.update(bcmpar)
+        cospar_for_bcm = self._get_pars_and_a_for_bacco(cospar_for_bcm,
+                                                        these_a_s)
+        Sk = self.mpk.get_baryonic_boost(k=k_arr, **cospar_for_bcm)[1]
+        return Sk
 
     def get_pk(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
         # Clarification:
@@ -272,7 +299,7 @@ class BaccoCalculator(object):
             self.pk2d_computed[kind] = pk2d
         else:
             if not self.ignore_lbias:
-                pk = pfac[kind]*self.pk_temp[:, inds[kind], :]
+                pk = pfac[kind]*self.pk_temp[inds[kind], :, :]
                 if kind in ['mm']:
                     pk = np.log(pk)
                 pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks[self.mask_ks_for_bacco]),
