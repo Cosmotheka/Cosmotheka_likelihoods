@@ -224,9 +224,7 @@ class CCL(Theory):
 
         if self.sigma8_to_As and ('sigma8' in params):
             # E.g. needed to use HMCode with CAMB
-            print(params)
             params['A_s'] = self._get_As_from_sigma8(params)
-            print(params['A_s'])
             del params['sigma8']
 
         cosmo = ccl.Cosmology(**params,
@@ -251,9 +249,7 @@ class CCL(Theory):
             state['derived']['S8'] = sigma8*np.sqrt(Om/0.3)
 
         if ('A_s' not in self.input_params) and ('A_s' in params):
-            print(params['A_s'])
             state['derived']['A_s'] = params['A_s']
-            print(state['derived']['A_s'])
 
         state['derived'].update({'Omega_m': Om,
                                  'Omega_nu': Onu,
