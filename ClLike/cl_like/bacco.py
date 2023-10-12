@@ -167,9 +167,6 @@ class BaccoCalculator(object):
         else:
             self.pk_temp = self.lbias.get_nonlinear_pnn(k=k_for_bacco,
                                                         **cospar_and_a)[1]/h**3
-            print(self.pk_temp.shape)
-            print(self.a_s.shape)
-            print(k_for_bacco.shape)
 
         # Shear - Shear (and baryons)
         baryonic_boost = self.use_baryon_boost and (bcmpar is not None)
