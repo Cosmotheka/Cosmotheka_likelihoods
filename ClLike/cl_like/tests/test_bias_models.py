@@ -320,3 +320,54 @@ def test_S8():
     loglikes, derived = model.loglikes()
     print(loglikes)
     assert np.fabs(loglikes[0]) < 3E-3
+
+
+def test_sigma8_to_As():
+    info = get_info('Linear', False)
+    info['theory']['ccl']['sigma8_to_As'] = True
+    info['params']['A_s'] = None
+    cosmopars = {
+       "Omega_c": 0.26,
+       "Omega_b": 0.05,
+       "h": 0.67,
+       "n_s": 0.96,
+       "m_nu": 0.15,
+       "sigma8": 0.7824601264149301,
+    }
+
+    model = get_model(info)
+
+    As = model.theory['ccl']._get_As_from_sigma8(cosmopars)
+    assert np.abs(As*1E9 / 2.1265 -1) < 1e-3
+
+    loglikes, derived = model.loglikes()
+    assert np.abs(As / derived[0] - 1) < 1e-9
+
+    print(loglikes)
+    # The O(1e-3) difference between As makes chi2~0.37
+    assert np.fabs(loglikes[0]) < 0.4
+
+
+def test_camb_hmcode_dum():
+    info = get_info('Linear', False)
+    info['theory']['ccl']['sigma8_to_As'] = True
+
+    ccl_arguments = {'extra_parameters': {"camb": {"halofit_version":
+                                                   "mead2020_feedback",
+                                                   "HMCode_logT_AGN": 7.8}}}
+    info['theory']['ccl']['ccl_arguments'] = ccl_arguments
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+
+
+    info['params']['HMCode_logT_AGN'] = 7.8
+    ccl_arguments = {'extra_parameters': {"camb": {"halofit_version":
+                                                   "mead2020_feedback"}}}
+    info['theory']['ccl']['ccl_arguments'] = ccl_arguments
+
+    model = get_model(info)
+    loglikes2, derived = model.loglikes()
+
+
+    assert np.abs(loglikes[0] / loglikes2[0] - 1) < 1e-5

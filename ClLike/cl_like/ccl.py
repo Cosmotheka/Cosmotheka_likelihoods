@@ -40,6 +40,14 @@ import numpy as np
 from packaging import version
 from cobaya.theory import Theory
 
+try:
+    import baccoemu
+    HAVE_BACCO = True
+    BACCO_exception = None
+except ImportError as e:
+    BACCO_exception = e
+    HAVE_BACCO = False
+
 
 class CCL(Theory):
     """
@@ -51,10 +59,12 @@ class CCL(Theory):
     transfer_function: str = 'boltzmann_camb'
     matter_pk: str = 'halofit'
     baryons_pk: str = 'nobaryons'
+    sigma8_to_As: bool = False
     ccl_arguments: dict = {}
 
     def initialize(self):
         self._required_results = {}
+        self.baccompk = None
 
     def initialize_with_params(self):
         if ('A_sE9' not in self.input_params) and \
@@ -90,10 +100,6 @@ class CCL(Theory):
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
         return ['S8', 'sigma8', "Omega_m", "Omega_nu", "Omega_c"]
-
-    def get_can_support_params(self):
-        # return any nuisance parameters that CCL can support
-        return ["sigma8", "A_sE9", "Omega_m", "Omega_c", "S8"]
 
     def _get_ccl_param_or_arg(self, param_name, default):
         if param_name in self.ccl_arguments:
@@ -137,6 +143,37 @@ class CCL(Theory):
 
         return Onu / h**2
 
+    def _get_As_from_sigma8(self, pars):
+        pars = pars.copy()
+        sigma8 = pars.pop('sigma8')
+        A_s_fid = 2.1e-9
+
+        if HAVE_BACCO:
+            if self.baccompk is None:
+                self.baccompk = baccoemu.Matter_powerspectrum()
+
+            mpk = self.baccompk
+
+            params = {
+                'omega_cold': pars['Omega_c'] + pars['Omega_b'],
+                'omega_baryon': pars['Omega_b'],
+                # sigma8_cold = None,
+                'hubble': pars['h'],
+                'ns': pars['n_s'],
+                'neutrino_mass': pars['m_nu'],
+                'w0': -1,
+                'wa': 0,
+                'expfactor': 1
+            }
+            sigma8_fid = mpk.get_sigma8(cold=False, A_s=A_s_fid, **params)
+        else:
+            cosmo = ccl.Cosmology(**params, A_s=A_s_fid)
+            sigma8_fid = ccl.sigma8(cosmo)
+
+        A_s = (sigma8 / sigma8_fid)**2 * A_s_fid
+
+        return A_s
+
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
 
@@ -175,11 +212,27 @@ class CCL(Theory):
         for p in input_params:
             params[p] = self.provider.get_param(p)
 
+        if self.sigma8_to_As and ('sigma8' in params):
+            # E.g. needed to use HMCode with CAMB
+            params['Omega_nu'] = Onu
+            params['A_s'] = self._get_As_from_sigma8(params)
+            del params['sigma8']
+            del params['Omega_nu']
+
+        # Read HMCode CAMB params
+        ccl_arguments = self.ccl_arguments.copy()
+        hmcode_camb = ["HMCode_logT_AGN", "HMCode_A_baryon",
+                       "HMCode_eta_baryon"]
+        for p in hmcode_camb:
+            if p in params:
+                val = params.pop(p)
+                ccl_arguments['extra_parameters']['camb'][p] = val
+
         cosmo = ccl.Cosmology(**params,
                               transfer_function=self.transfer_function,
                               matter_power_spectrum=self.matter_pk,
                               baryons_power_spectrum=self.baryons_pk,
-                              **self.ccl_arguments)
+                              **ccl_arguments)
 
         state['CCL'] = {'cosmo': cosmo}
 
@@ -195,6 +248,9 @@ class CCL(Theory):
 
         if 'S8' not in self.input_params:
             state['derived']['S8'] = sigma8*np.sqrt(Om/0.3)
+
+        if ('A_s' not in self.input_params) and ('A_s' in params):
+            state['derived']['A_s'] = params['A_s']
 
         state['derived'].update({'Omega_m': Om,
                                  'Omega_nu': Onu,
