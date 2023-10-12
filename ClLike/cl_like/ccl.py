@@ -59,7 +59,7 @@ class CCL(Theory):
     transfer_function: str = 'boltzmann_camb'
     matter_pk: str = 'halofit'
     baryons_pk: str = 'nobaryons'
-    sigma8_to_As: bool = False
+    sigma8_to_As: str = ''
     ccl_arguments: dict = {}
 
     def initialize(self):
@@ -148,7 +148,7 @@ class CCL(Theory):
         sigma8 = pars.pop('sigma8')
         A_s_fid = 2.1e-9
 
-        if HAVE_BACCO:
+        if HAVE_BACCO and (self.sigma8_to_As == 'baccoemu'):
             if self.baccompk is None:
                 self.baccompk = baccoemu.Matter_powerspectrum()
 
@@ -167,7 +167,7 @@ class CCL(Theory):
             }
             sigma8_fid = mpk.get_sigma8(cold=False, A_s=A_s_fid, **params)
         else:
-            cosmo = ccl.Cosmology(**params, A_s=A_s_fid)
+            cosmo = ccl.Cosmology(**pars, A_s=A_s_fid)
             sigma8_fid = ccl.sigma8(cosmo)
 
         A_s = (sigma8 / sigma8_fid)**2 * A_s_fid
@@ -212,21 +212,22 @@ class CCL(Theory):
         for p in input_params:
             params[p] = self.provider.get_param(p)
 
-        if self.sigma8_to_As and ('sigma8' in params):
-            # E.g. needed to use HMCode with CAMB
-            params['Omega_nu'] = Onu
-            params['A_s'] = self._get_As_from_sigma8(params)
-            del params['sigma8']
-            del params['Omega_nu']
-
         # Read HMCode CAMB params
         ccl_arguments = self.ccl_arguments.copy()
         hmcode_camb = ["HMCode_logT_AGN", "HMCode_A_baryon",
                        "HMCode_eta_baryon"]
+
         for p in hmcode_camb:
             if p in params:
                 val = params.pop(p)
                 ccl_arguments['extra_parameters']['camb'][p] = val
+
+        if self.sigma8_to_As and ('sigma8' in params):
+            # E.g. needed to use HMCode with CAMB
+            print(params)
+            params['A_s'] = self._get_As_from_sigma8(params)
+            print(params['A_s'])
+            del params['sigma8']
 
         cosmo = ccl.Cosmology(**params,
                               transfer_function=self.transfer_function,
@@ -250,7 +251,9 @@ class CCL(Theory):
             state['derived']['S8'] = sigma8*np.sqrt(Om/0.3)
 
         if ('A_s' not in self.input_params) and ('A_s' in params):
+            print(params['A_s'])
             state['derived']['A_s'] = params['A_s']
+            print(state['derived']['A_s'])
 
         state['derived'].update({'Omega_m': Om,
                                  'Omega_nu': Onu,

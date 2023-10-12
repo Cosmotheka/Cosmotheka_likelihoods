@@ -322,9 +322,10 @@ def test_S8():
     assert np.fabs(loglikes[0]) < 3E-3
 
 
-def test_sigma8_to_As():
+@pytest.mark.parametrize('case', ['baccoemu', 'CCL'])
+def test_sigma8_to_As(case):
     info = get_info('Linear', False)
-    info['theory']['ccl']['sigma8_to_As'] = True
+    info['theory']['ccl']['sigma8_to_As'] = case
     info['params']['A_s'] = None
     cosmopars = {
        "Omega_c": 0.26,
@@ -333,24 +334,28 @@ def test_sigma8_to_As():
        "n_s": 0.96,
        "m_nu": 0.15,
        "sigma8": 0.7824601264149301,
+       "T_CMB": 2.7255
     }
 
     model = get_model(info)
-
-    As = model.theory['ccl']._get_As_from_sigma8(cosmopars)
-    assert np.abs(As*1E9 / 2.1265 -1) < 1e-3
-
     loglikes, derived = model.loglikes()
+    As = model.theory['ccl']._get_As_from_sigma8(cosmopars)
+
     assert np.abs(As / derived[0] - 1) < 1e-9
 
-    print(loglikes)
-    # The O(1e-3) difference between As makes chi2~0.37
-    assert np.fabs(loglikes[0]) < 0.4
+    if case == 'CCL':
+        assert np.abs(As*1E9 / 2.1265 -1) < 1e-5
+        assert np.fabs(loglikes[0]) < 3e-3
+    else:
+        # The O(1e-3) difference between As makes chi2~0.37 for baccoemu
+        assert np.abs(As*1E9 / 2.1265 -1) < 1e-3
+        assert np.fabs(loglikes[0]) < 0.4
 
 
-def test_camb_hmcode_dum():
+@pytest.mark.parametrize('case', ['baccoemu', 'CCL'])
+def test_camb_hmcode_dum(case):
     info = get_info('Linear', False)
-    info['theory']['ccl']['sigma8_to_As'] = True
+    info['theory']['ccl']['sigma8_to_As'] = case
 
     ccl_arguments = {'extra_parameters': {"camb": {"halofit_version":
                                                    "mead2020_feedback",
