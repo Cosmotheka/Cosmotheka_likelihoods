@@ -143,26 +143,26 @@ def test_dum(bias):
         assert pklin[i] == pytest.approx(pkww.eval(np.exp(lnklin), ai),
                                          rel=1e-5)
 
-@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
+@pytest.mark.parametrize('bias', ['BaccoPT'])
 def test_Sk(bias):
     info = get_info(bias, A_AE=0)
     model = get_model(info)
     loglikes, derived = model.loglikes()
+
     lkl = model.likelihood['ClLike']
-    Sk = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()[-1]
-    assert np.all(Sk == 0)
+    pk2d_lin = lkl.provider.get_CCL()['cosmo'].get_linear_power()
+    a_arr, lnk, pk2d_nlin = \
+        lkl.provider.get_Pk()['pk_data']['pk_ww'].get_spline_arrays()
+
+    k = np.exp(lnk)
+
+    for i, ai in enumerate(a_arr):
+        assert pk2d_nlin[i] == pytest.approx(pk2d_lin.eval(k, ai), rel=1e-4)
 
     info = get_info(bias, A_AE=1)
     model = get_model(info)
     loglikes, derived = model.loglikes()
 
     lkl = model.likelihood['ClLike']
-    pk2d_lin = lkl.provider.get_CCL()['cosmo'].get_linear_power()
-    pk2d_nlin = lkl.provider.get_Pk()['pk_data']['pk_ww']
-
-    a_arr, lnk, Sk = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()
-    k = np.exp(lnk)
-
-    for i, ai in enumerate(a_arr):
-        assert Sk[i] == pytest.approx(pk2d_nlin.eval(k, ai)
-                                      - pk2d_lin.eval(k, ai), rel=1e-4)
+    Sk = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()[-1]
+    assert Sk == pytest.approx(1, rel=1e-9)

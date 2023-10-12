@@ -280,17 +280,18 @@ class Pk(Theory):
                 a, lnk, pklin = pklin.get_spline_arrays()
                 k = np.exp(lnk)
                 boost = np.zeros_like(pklin)
+                pknonlin = np.zeros_like(pklin)
                 for i, ai in enumerate(a):
-                    boost[i] = pkd['pk_ww'].eval(k, ai, cosmo) - pklin[i]
+                    pknonlin[i] = pkd['pk_ww'].eval(k, ai, cosmo)
+                    boost[i] = pknonlin[i] - pklin[i]
 
-                Sk = bcmpar['A_AE']*boost
-                pkb = pklin + Sk
+                pkb = pklin + bcmpar['A_AE']*boost
                 pkd['pk_ww'] = ccl.Pk2D(a_arr=a, lk_arr=lnk,
                                         pk_arr=np.log(pkb),
                                         is_logp=True)
-                # No log(Sk) in case A=0
-                pkd['Sk'] = ccl.Pk2D(a_arr=a, lk_arr=lnk, pk_arr=Sk,
-                                     is_logp=False)
+                Sk = pkb / pknonlin
+                pkd['Sk'] = ccl.Pk2D(a_arr=a, lk_arr=lnk, pk_arr=np.log(Sk),
+                                     is_logp=True)
             else:
                 # TODO: Bacco returns a pk2d of 1's, maybe homogenize this
                 pkd['Sk'] = None
