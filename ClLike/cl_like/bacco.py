@@ -20,7 +20,7 @@ class BaccoCalculator(object):
                  log10k_sh_sh_min=np.log10(0.0001), log10k_sh_sh_max=np.log10(50), nk_sh_sh_per_decade=20,
                  a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None, use_baryon_boost=False,
                  ignore_lbias=False, allow_bcm_emu_extrapolation_for_shear=True,
-                 allow_halofit_extrapolation_for_shear=False):
+                 allow_halofit_extrapolation_for_shear=False, bias_convention='ccl'):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
         nk_sh_sh_total = int((log10k_sh_sh_max - log10k_sh_sh_min) * nk_sh_sh_per_decade)
         self.ks = np.logspace(log10k_min, log10k_max, nk_total)
@@ -29,6 +29,9 @@ class BaccoCalculator(object):
         self.ignore_lbias = ignore_lbias
         self.allow_bcm_emu_extrapolation_for_shear = allow_bcm_emu_extrapolation_for_shear
         self.allow_halofit_extrapolation_for_shear = allow_halofit_extrapolation_for_shear
+        self.bias_convention = bias_convention
+
+        assert self.bias_convention in ['bacco', 'ccl']
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=UserWarning)
@@ -155,9 +158,9 @@ class BaccoCalculator(object):
         if self.ignore_lbias:
             self.pk_temp = None
         else:
-            self.pk_temp = np.array([self.lbias.get_nonlinear_pnn(k=k_for_bacco,
-                                                                  expfactor=a,
-                                                                  **cospar)[1]/h**3 for a in self.a_s])
+            _pk_temp = (self.lbias.get_nonlinear_pnn(k=k_for_bacco,expfactor=self.a_s,
+                                                         **cospar)[1]/h**3)
+            self.pk_temp = np.swapaxes(_pk_temp, 0, 1)
         baryonic_boost = bcmpar is not None
         these_a_s = self.a_s
         cospar_for_bcm, these_a_s = self._check_baccoemu_baryon_pars_for_extrapolation(cospar)
@@ -174,11 +177,10 @@ class BaccoCalculator(object):
         else:
             # TODO: This is going to be called even if no baryons are
             # requested. Shouldn't it have a flag?
-            pk = np.array([self.mpk.get_nonlinear_pk(baryonic_boost=False, cold=False,
-                                                     k=k_sh_sh_for_bacco, expfactor=a,
-                                                     **cospar)[1]/h**3 for a in self.a_s])
+            pk = (self.mpk.get_nonlinear_pk(baryonic_boost=False, cold=False, k=k_sh_sh_for_bacco,
+                                            expfactor=self.a_s, **cospar)[1]/h**3)
         if baryonic_boost:
-            Sk = np.array([self.mpk.get_baryonic_boost(k=k_sh_sh_for_bacco, expfactor=a, **cospar_for_bcm)[1] for a in these_a_s])
+            Sk = self.mpk.get_baryonic_boost(k=k_sh_sh_for_bacco, expfactor=these_a_s, **cospar_for_bcm)[1]
         else:
             Sk = 1
         self.pk_temp_sh_sh = pk * Sk
@@ -228,21 +230,38 @@ class BaccoCalculator(object):
                 's2s2': 12,
                 's2k2': 13,
                 'k2k2': 14}
-        pfac = {'mm': 1.0,
-                'md1': 1.0,
-                'md2': 0.5,
-                'ms2': 0.5,
-                'mk2': 1.0,
-                'd1d1': 1.0,
-                'd1d2': 0.5,
-                'd1s2': 0.5,
-                'd1k2': 1.0,
-                'd2d2': 0.25,
-                'd2s2': 0.25,
-                'd2k2': 0.5,
-                's2s2': 0.25,
-                's2k2': 0.5,
-                'k2k2': 1.0}
+        if self.bias_convention == 'ccl':
+            pfac = {'mm': 1.0,
+                    'md1': 1.0,
+                    'md2': 0.5,
+                    'ms2': 0.5,
+                    'mk2': 1.0,
+                    'd1d1': 1.0,
+                    'd1d2': 0.5,
+                    'd1s2': 0.5,
+                    'd1k2': 1.0,
+                    'd2d2': 0.25,
+                    'd2s2': 0.25,
+                    'd2k2': 0.5,
+                    's2s2': 0.25,
+                    's2k2': 0.5,
+                    'k2k2': 1.0}
+        else:
+            pfac = {'mm': 1.0,
+                    'md1': 1.0,
+                    'md2': 1.0,
+                    'ms2': 1.0,
+                    'mk2': 1.0,
+                    'd1d1': 1.0,
+                    'd1d2': 1.0,
+                    'd1s2': 1.0,
+                    'd1k2': 1.0,
+                    'd2d2': 1.0,
+                    'd2s2': 1.0,
+                    'd2k2': 1.0,
+                    's2s2': 1.0,
+                    's2k2': 1.0,
+                    'k2k2': 1.0}
 
         if kind != 'mm_sh_sh':
             if not self.ignore_lbias:

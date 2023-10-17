@@ -56,6 +56,7 @@ class Pk(Theory):
     ignore_lbias : bool = False
     allow_bcm_emu_extrapolation_for_shear : bool = True
     allow_halofit_extrapolation_for_shear : bool = False
+    bias_convention : str = 'ccl'
 
     def initialize(self):
         # Bias model
@@ -116,7 +117,8 @@ class Pk(Theory):
                                               use_baryon_boost=self.use_baryon_boost,
                                               ignore_lbias=self.ignore_lbias,
                                               allow_bcm_emu_extrapolation_for_shear=self.allow_bcm_emu_extrapolation_for_shear,
-                                              allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear
+                                              allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear,
+                                              bias_convention=self.bias_convention
                                              )
 
     def must_provide(self, **requirements):
