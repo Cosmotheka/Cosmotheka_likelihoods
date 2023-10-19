@@ -93,7 +93,7 @@ class CCL(Theory):
 
     def get_can_support_params(self):
         # return any nuisance parameters that CCL can support
-        return ["sigma8", "A_sE9", "Omega_m", "Omega_c", "S8"]
+        return ["sigma8", "A_sE9", "Omega_m", "Omega_c", "S8", "omega_b"]
 
     def _get_ccl_param_or_arg(self, param_name, default):
         if param_name in self.ccl_arguments:
@@ -144,8 +144,12 @@ class CCL(Theory):
         # it to pass to ccl.Cosmology all the remaining parameters.
         input_params = list(self.input_params)
         #
-        Ob = self.provider.get_param('Omega_b')
-        input_params.remove('Omega_b')
+        if 'omega_b' in self.provider.input_params:
+            Ob = self.provider.get_param('omega_b') / self.provider.get_param('h')**2
+            input_params.remove('omega_b')
+        else:
+            Ob = self.provider.get_param('Omega_b')
+            input_params.remove('Omega_b')
 
         Onu = self._get_Onu()
         if 'Omega_c' in self.input_params:
