@@ -34,14 +34,13 @@ class LPTCalculator(object):
         else:
             self.wk_low = np.ones(nk_total)
 
-    def update_pk(self, cosmo, **kwargs):
+    def update_pk(self, pk, Dz):
         """ Update the internal PT arrays.
 
         Args:
-            cosmo
+            pk (array_like): linear power spectrum sampled at the
+                internal `k` values used by this calculator.
         """
-        pk = cosmo.linear_matter_power(self.ks, 1.)
-        Dz = cosmo.growth_factor(self.a_s)
         if pk.shape != self.ks.shape:
             raise ValueError("Input spectrum has wrong shape")
         if Dz.shape != self.a_s.shape:
@@ -54,19 +53,16 @@ class LPTCalculator(object):
             self.lpt_table.append(cleft.pktable)
         self.lpt_table = np.array(self.lpt_table)
         self.lpt_table /= self.h**3
-        self.pk2d_computed = {}
 
-    def get_pk(self, kind, pnl=None, cosmo=None, alt=None):
+    def get_pgg(self, Pnl, b11, b21, bs1, b12, b22, bs2):
         if self.lpt_table is None:
             raise ValueError("Please initialise CLEFT calculator")
         # Clarification:
         # CLEFT uses the followint expansion for the galaxy overdensity:
         #   d_g = b1 d + b2 d2^2/2 + bs s^2
         # (see Eq. 4.4 of https://arxiv.org/pdf/2005.00523.pdf).
-        # But we want to use
-        #   d_g = b1 d + b2 d2^2/2 + bs s^2/2 + bk k^2 d
-        # So, to add to the confusion, this is different from the prescription
-        # used by EPT (and which we want to use), where s^2 is divided by 2 :-|
+        # To add to the confusion, this is different from the prescription
+        # used by EPT, where s^2 is divided by 2 :-|
         #
         # The LPT table below contains the following power spectra
         # in order:
@@ -91,74 +87,143 @@ class LPTCalculator(object):
         # Importantly, we have corrected the spectra involving s2 to
         # make the definition of bs equivalent in the EPT and LPT
         # expansions.
-        # The power spectra provided below are (kind -> Pk):
-        # mm   -> <1*1> (returns pnl)
-        # md1  -> <1*d> (returns pnl)
-        # md2  -> <1*d^2/2>
-        # ms2  -> <1*s^2/2>
-        # mk2  -> k^2 <1*1> (with <1*1> as pnl)
-        # d1d1 -> <d*d> (returns pnl)
-        # d1d2 -> <d*d^2/2>
-        # d1s2 -> <d*s^2/2>
-        # d1k2 -> k^2 <1*d> (with <1*d> as pnl)
-        # d2d2 -> <d^2/2*d^2/2>
-        # d2s2 -> <d^2/2*s^2/2>
-        # d2k2 -> k^2 <1*d^2/2>, not provided
-        # s2s2 -> <s^2/2*s^2/2>
-        # s2k2 -> k^2 <1*s^2/2>, not provided
-        # k2k2 -> k^4 <1*1>, not provided
+        bL11 = b11-1
+        bL12 = b12-1
+        if Pnl is None:
+            Pdmdm = self.lpt_table[:, :, 1]
+            Pdmd1 = 0.5*self.lpt_table[:, :, 2]
+            Pd1d1 = self.lpt_table[:, :, 3]
+            pgg = (Pdmdm + (bL11+bL12)[:, None] * Pdmd1 +
+                   (bL11*bL12)[:, None] * Pd1d1)
+        else:
+            pgg = (b11*b12)[:, None]*Pnl
+        Pdmd2 = 0.5*self.lpt_table[:, :, 4]
+        Pd1d2 = 0.5*self.lpt_table[:, :, 5]
+        Pd2d2 = self.lpt_table[:, :, 6]*self.wk_low[None, :]
+        Pdms2 = 0.25*self.lpt_table[:, :, 7]
+        Pd1s2 = 0.25*self.lpt_table[:, :, 8]
+        Pd2s2 = 0.25*self.lpt_table[:, :, 9]*self.wk_low[None, :]
+        Ps2s2 = 0.25*self.lpt_table[:, :, 10]*self.wk_low[None, :]
 
-        if kind in self.pk2d_computed:
-            return self.pk2d_computed[kind]
+        pgg += ((b21 + b22)[:, None] * Pdmd2 +
+                (bs1 + bs2)[:, None] * Pdms2 +
+                (bL11*b22 + bL12*b21)[:, None] * Pd1d2 +
+                (bL11*bs2 + bL12*bs1)[:, None] * Pd1s2 +
+                (b21*b22)[:, None] * Pd2d2 +
+                (b21*bs2 + b22*bs1)[:, None] * Pd2s2 +
+                (bs1*bs2)[:, None] * Ps2s2)
+        return pgg
 
-        if kind in ['mm', 'md1', 'd1d1']:
-            return pnl
+    def get_pgm(self, Pnl, b1, b2, bs):
+        if self.lpt_table is None:
+            raise ValueError("Please initialise CLEFT calculator")
+        bL1 = b1-1
+        if Pnl is None:
+            Pdmdm = self.lpt_table[:, :, 1]
+            Pdmd1 = 0.5*self.lpt_table[:, :, 2]
+            pgm = Pdmdm + bL1[:, None] * Pdmd1
+        else:
+            pgm = b1[:, None]*Pnl
+        Pdmd2 = 0.5*self.lpt_table[:, :, 4]
+        Pdms2 = 0.25*self.lpt_table[:, :, 7]
 
-        if kind in ['mk2', 'd1k2']:
-            pk = np.array([pnl.eval(self.ks, a, cosmo)*self.ks**2
-                           for a in self.a_s])
-            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
-                            pk_arr=pk, is_logp=False)
-            self.pk2d_computed['mk2'] = pk2d
-            self.pk2d_computed['d1k2'] = pk2d
-            return pk2d
+        pgm += (b2[:, None] * Pdmd2 +
+                bs[:, None] * Pdms2)
+        return pgm
 
-        inds = {'mm': 1,
-                'md1': 2,
-                'md2': 4,
-                'ms2': 7,
-                'd1d1': 3,
-                'd1d2': 5,
-                'd1s2': 8,
-                'd2d2': 6,
-                'd2s2': 9,
-                's2s2': 10}
-        filt = {'mm': 1.,
-                'md1': 1.,
-                'md2': 1.,
-                'ms2': 1.,
-                'd1d1': 1.,
-                'd1d2': 1.,
-                'd1s2': 1.,
-                'd2d2': self.wk_low[None, :],
-                'd2s2': self.wk_low[None, :],
-                's2s2': self.wk_low[None, :]}
-        pfac = {'mm': 1.0,
-                'md1': 0.5, # x-corr
-                'md2': 0.5, # x-corr
-                'ms2': 0.25, # x-corr, s^2
-                'd1d1': 1.0,
-                'd1d2': 0.5, # x-corr
-                'd1s2': 0.25, # x-corr, s^2
-                'd2d2': 1.0,
-                'd2s2': 0.25, # x-corr, s^2
-                's2s2': 0.25} # s^2, s^2
 
-        if kind not in inds:
-            return alt
+def get_lpt_pk2d(cosmo, tracer1, tracer2=None, ptc=None,
+                 nonlin_pk_type='nonlinear',
+                 extrap_order_lok=1, extrap_order_hik=2):
+    """Returns a :class:`~pyccl.pk2d.Pk2D` object containing
+    the PT power spectrum for two quantities defined by
+    two :class:`~pyccl.nl_pt.tracers.PTTracer` objects.
 
-        pk = pfac[kind]*self.lpt_table[:, :, inds[kind]]*filt[kind]
-        pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
-                        pk_arr=pk, is_logp=False)
-        self.pk2d_computed[kind] = pk2d
-        return pk2d
+    .. note:: The full non-linear model for the cross-correlation
+              between number counts and intrinsic alignments is
+              still work in progress in FastPT. As a workaround
+              CCL assumes a non-linear treatment of IAs, but only
+              linearly biased number counts.
+
+    Args:
+        cosmo (:class:`~pyccl.core.Cosmology`): a Cosmology object.
+        tracer1 (:class:`~pyccl.nl_pt.tracers.PTTracer`): the first
+            tracer being correlated.
+        ptc (:class:`PTCalculator`): a perturbation theory
+            calculator.
+        tracer2 (:class:`~pyccl.nl_pt.tracers.PTTracer`): the second
+            tracer being correlated. If `None`, the auto-correlation
+            of the first tracer will be returned.
+        extrap_order_lok (int): extrapolation order to be used on
+            k-values below the minimum of the splines. See
+            :class:`~pyccl.pk2d.Pk2D`.
+        extrap_order_hik (int): extrapolation order to be used on
+            k-values above the maximum of the splines. See
+            :class:`~pyccl.pk2d.Pk2D`.
+
+    Returns:
+        :class:`~pyccl.pk2d.Pk2D`: PT power spectrum.
+        :class:`~pyccl.nl_pt.power.PTCalculator`: PT Calc [optional]
+    """
+
+    if tracer2 is None:
+        tracer2 = tracer1
+    if not isinstance(tracer1, ccl.nl_pt.PTTracer):
+        raise TypeError("tracer1 must be of type `ccl.nl_pt.PTTracer`")
+    if not isinstance(tracer2, ccl.nl_pt.PTTracer):
+        raise TypeError("tracer2 must be of type `ccl.nl_pt.PTTracer`")
+
+    if not isinstance(ptc, LPTCalculator):
+        raise TypeError("ptc should be of type `LPTCalculator`")
+    # z
+    z_arr = 1. / ptc.a_s - 1
+
+    if nonlin_pk_type == 'nonlinear':
+        Pnl = np.array([ccl.nonlin_matter_power(cosmo, ptc.ks, a)
+                        for a in ptc.a_s])
+    elif nonlin_pk_type == 'linear':
+        Pnl = np.array([ccl.linear_matter_power(cosmo, ptc.ks, a)
+                        for a in ptc.a_s])
+    elif nonlin_pk_type == 'spt':
+        Pnl = None
+    else:
+        raise NotImplementedError("Nonlinear option %s not implemented yet" %
+                                  (nonlin_pk_type))
+
+    if (tracer1.type == 'NC'):
+        b11 = tracer1.b1(z_arr)
+        b21 = tracer1.b2(z_arr)
+        bs1 = tracer1.bs(z_arr)
+        if (tracer2.type == 'NC'):
+            b12 = tracer2.b1(z_arr)
+            b22 = tracer2.b2(z_arr)
+            bs2 = tracer2.bs(z_arr)
+
+            p_pt = ptc.get_pgg(Pnl,
+                               b11, b21, bs1,
+                               b12, b22, bs2)
+        elif (tracer2.type == 'M'):
+            p_pt = ptc.get_pgm(Pnl, b11, b21, bs1)
+        else:
+            raise NotImplementedError("Combination %s-%s not implemented yet" %
+                                      (tracer1.type, tracer2.type))
+    elif (tracer1.type == 'M'):
+        if (tracer2.type == 'NC'):
+            b12 = tracer2.b1(z_arr)
+            b22 = tracer2.b2(z_arr)
+            bs2 = tracer2.bs(z_arr)
+            p_pt = ptc.get_pgm(Pnl, b12, b22, bs2)
+        elif (tracer2.type == 'M'):
+            raise NotImplementedError("Combination %s-%s not implemented yet" %
+                                      (tracer1.type, tracer2.type))
+    else:
+        raise NotImplementedError("Combination %s-%s not implemented yet" %
+                                  (tracer1.type, tracer2.type))
+
+    # Once you have created the 2-dimensional P(k) array,
+    # then generate a Pk2D object as described in pk2d.py.
+    pt_pk = ccl.Pk2D(a_arr=ptc.a_s,
+                     lk_arr=np.log(ptc.ks),
+                     pk_arr=p_pt,
+                     is_logp=False)
+    return pt_pk

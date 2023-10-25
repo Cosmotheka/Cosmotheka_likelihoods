@@ -1,16 +1,42 @@
 import numpy as np
+from scipy.interpolate import interp1d
 import pyccl as ccl
 import pyccl.nl_pt as pt
-import copy
+from .hm_extra import HalomodCorrection
+from .pixwin import beam_hpix
+from .lpt import LPTCalculator, get_lpt_pk2d
+from .ept import EPTCalculator, get_ept_pk2d
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 from scipy.optimize import minimize
-import sacc
 
 
 class ClLike(Likelihood):
+    # All parameters starting with this will be
+    # identified as belonging to this stage.
+    input_params_prefix: str = ""
     # Input sacc file
     input_file: str = ""
+    # IA model name. Currently all of these are
+    # just flags, but we could turn them into
+    # homogeneous systematic classes.
+    ia_model: str = "IANone"
+    # N(z) model name
+    nz_model: str = "NzNone"
+    # b(z) model name
+    bias_model: str = "BzNone"
+    # zmax for 3D power spectra
+    zmax_pks: float = 4.
+    # #z for 3D power spectra
+    nz_pks: int = 30
+    # #k for 3D power spectra
+    nk_per_dex_pks: int = 25
+    # min k 3D power spectra
+    l10k_min_pks: float = -4.0
+    # max k 3D power spectra
+    l10k_max_pks: float = 2.0
+    # k shot noise suppression scale
+    k_SN_suppress: float = 0.01
     # Angular resolution
     nside: int = -1
     # List of bin names
@@ -21,14 +47,41 @@ class ClLike(Likelihood):
     twopoints: list = []
     # Jeffreys prior for bias params?
     jeffrey_bias: bool = False
-    # Null negative covariance eigenvalues when computing inverse cov?
-    null_negative_cov_eigvals_in_icov: bool = False
 
     def initialize(self):
-        # Deep copy defaults to avoid modifying the input yaml
-        self.defaults = copy.deepcopy(self.defaults)
+        # Bias model
+        self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT']
         # Read SACC file
         self._read_data()
+        # Ell sampling for interpolation
+        self._get_ell_sampling()
+        # Other global parameters
+        self._init_globals()
+
+    def _init_globals(self):
+        # We will need this to map parameters into tracers
+        self.qabbr = {'galaxy_density': 'g',
+                      'galaxy_shear': 'm',
+                      'cmb_convergence': 'm'}
+
+        # Pk sampling
+        self.a_s_pks = 1./(1+np.linspace(0., self.zmax_pks, self.nz_pks)[::-1])
+        self.nk_pks = int((self.l10k_max_pks - self.l10k_min_pks) *
+                          self.nk_per_dex_pks)
+
+        # Pixel window function product for each power spectrum
+        nsides = {b['name']: b.get('nside', None)
+                  for b in self.bins}
+        for clm in self.cl_meta:
+            if self.sample_cen:
+                ls = clm['l_eff']
+            elif self.sample_bpw:
+                ls = self.l_sample
+            beam = np.ones(ls.size)
+            for n in [clm['bin_1'], clm['bin_2']]:
+                if nsides[n]:
+                    beam *= beam_hpix(ls, nsides[n])
+            clm['pixbeam'] = beam
 
     def _read_data(self):
         """
@@ -38,6 +91,7 @@ class ClLike(Likelihood):
         Reads tracer metadata (N(z))
         Reads covariance
         """
+        import sacc
 
         def get_cl_type(tr1, tr2):
             cltyp = 'cl_'
@@ -58,7 +112,7 @@ class ClLike(Likelihood):
             lmax = np.max([10., kmax * chi - 0.5])
             return lmax
 
-        self.sacc_file = s = sacc.Sacc.load_fits(self.input_file)
+        s = sacc.Sacc.load_fits(self.input_file)
 
         # 1. Iterate through tracers and collect properties
         self.bin_properties = {}
@@ -94,58 +148,67 @@ class ClLike(Likelihood):
                 lmax = get_lmax_from_kmax(cosmo_lcdm,
                                           kmax, zmid)
                 self.defaults[b['name']]['lmax'] = lmax
-
-                # Do we want magnification bias for this tracer?
-                self.bin_properties[b['name']]['mag_bias'] = \
-                    self.defaults[b['name']].get("mag_bias", False)
-
             else:
                 # Make sure everything else has an ell_max
                 if 'lmax' not in self.defaults[b['name']]:
                     self.defaults[b['name']]['lmax'] = self.defaults['lmax']
 
         # Additional information specific for this likelihood
-        # self._get_bin_info_extra(s)
+        self._get_bin_info_extra(s)
 
-        # 2. Iterate through two-point functions, apply scale cuts and collect
-        # information about them (tracer names, bandpower windows etc.), and
-        # put all C_ells in the right order
+        # 2. Iterate through two-point functions and apply scale cuts
         indices = []
-        self.cl_meta = []
-        id_sofar = 0
-        self.tracer_qs = {}
-        nsides = {b['name']: b.get('nside', None) for b in self.bins}
         for cl in self.twopoints:
-            # Get the suffix for both tracers
             tn1, tn2 = cl['bins']
-            cltyp = get_cl_type(s.tracers[tn1], s.tracers[tn2])
-            # Get data
-            l, c_ell, cov, ind = s.get_ell_cl(cltyp, tn1, tn2,
-                                              return_cov=True,
-                                              return_ind=True)
-            # Check it is not empty
-            if c_ell.size == 0:
-                continue
-
-            # Scale cuts
             lmin = np.max([self.defaults[tn1].get('lmin', 2),
                            self.defaults[tn2].get('lmin', 2)])
             lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
                            self.defaults[tn2].get('lmax', 1E30)])
-            sel = (l > lmin) * (l < lmax)
-            l = l[sel]
-            c_ell = c_ell[sel]
-            cov = cov[sel][:, sel]
-            ind = ind[sel]
+            # Get the suffix for both tracers
+            cltyp = get_cl_type(s.tracers[tn1], s.tracers[tn2])
+            ind = s.indices(cltyp, (tn1, tn2),
+                            ell__gt=lmin, ell__lt=lmax)
+            indices += list(ind)
+        s.keep_indices(np.array(indices))
 
-            if tn1 not in self.tracer_qs:
-                self.tracer_qs[tn1] = s.tracers[tn1].quantity
-            if tn2 not in self.tracer_qs:
-                self.tracer_qs[tn2] = s.tracers[tn2].quantity
+        # 3. Iterate through two-point functions, collect information about
+        # them (tracer names, bandpower windows etc.), and put all C_ells in
+        # the right order
+        indices = []
+        self.cl_meta = []
+        id_sofar = 0
+        self.tracer_qs = {}
+        self.l_min_sample = 1E30
+        self.l_max_sample = self.defaults.get('lmax_sample', -1E30)
+        self.sample_type = self.defaults.get('sample_type', 'convolve')
+        self.sample_cen = self.sample_type in ['center', 'best']
+        self.sample_bpw = self.sample_type == 'convolve'
+        lmax_sample_set = self.l_max_sample > 0
+        for cl in self.twopoints:
+            # Get the suffix for both tracers
+            tn1, tn2 = cl['bins']
+            cltyp = get_cl_type(s.tracers[tn1], s.tracers[tn2])
+            l, c_ell, cov, ind = s.get_ell_cl(cltyp, tn1, tn2,
+                                              return_cov=True,
+                                              return_ind=True)
+            if c_ell.size > 0:
+                if tn1 not in self.tracer_qs:
+                    self.tracer_qs[tn1] = s.tracers[tn1].quantity
+                if tn2 not in self.tracer_qs:
+                    self.tracer_qs[tn2] = s.tracers[tn2].quantity
 
             bpw = s.get_bandpower_windows(ind)
-            l_bpw = bpw.values
-            w_bpw = bpw.weight.T
+            if np.amin(bpw.values) < self.l_min_sample:
+                self.l_min_sample = np.amin(bpw.values)
+            if lmax_sample_set:
+                good = bpw.values <= self.l_max_sample
+                l_bpw = bpw.values[good]
+                w_bpw = bpw.weight[good].T
+            else:
+                if np.amax(bpw.values) > self.l_max_sample:
+                    self.l_max_sample = np.amax(bpw.values)
+                l_bpw = bpw.values
+                w_bpw = bpw.weight.T
 
             self.cl_meta.append({'bin_1': tn1,
                                  'bin_2': tn2,
@@ -156,9 +219,7 @@ class ClLike(Likelihood):
                                           np.arange(c_ell.size,
                                                     dtype=int)),
                                  'l_bpw': l_bpw,
-                                 'w_bpw': w_bpw,
-                                 'nside_1': nsides[tn1],
-                                 'nside_2': nsides[tn2]})
+                                 'w_bpw': w_bpw})
             indices += list(ind)
             id_sofar += c_ell.size
         indices = np.array(indices)
@@ -166,45 +227,397 @@ class ClLike(Likelihood):
         self.data_vec = s.mean[indices]
         self.cov = s.covariance.dense[indices][:, indices]
         # Invert covariance
-        self.inv_cov = self.get_inv_cov(self.cov)
+        self.inv_cov = np.linalg.inv(self.cov)
         self.ndata = len(self.data_vec)
-        # Keep indices in case we want so slice the original sacc file
-        self.indices = indices
 
-    def get_inv_cov(self, cov):
-        if self.null_negative_cov_eigvals_in_icov:
-            evals, evecs = np.linalg.eigh(cov)
-            inv_evals = 1/evals
-            sel = evals<0
-            print(f'Nulling {np.sum(sel)} negative eigenvalues:', evals[sel])
-            inv_evals[sel] = 0
-            inv_cov = evecs.dot(np.diag(inv_evals).dot(evecs.T))
+    def _get_bin_info_extra(self, s):
+        # Extract additional per-sample information from the sacc
+        # file needed for this likelihood.
+        ind_bias = 0
+        ind_IA = None
+        self.bias_names = []
+        for b in self.bins:
+            if b['name'] not in s.tracers:
+                raise LoggedError(self.log, "Unknown tracer %s" % b['name'])
+            t = s.tracers[b['name']]
+
+            self.bin_properties[b['name']]['bias_ind'] = None # No biases by default
+            if t.quantity == 'galaxy_density':
+                # Linear bias
+                inds = [ind_bias]
+                self.bias_names.append(self.input_params_prefix +
+                                       '_'+b['name']+'_b1')
+                ind_bias += 1
+                # Higher-order biases
+                if self.is_PT_bias:
+                    for bn in ['b2', 'bs', 'bk2']:
+                        self.bias_names.append(self.input_params_prefix +
+                                               '_'+b['name']+'_'+bn)
+                        inds.append(ind_bias)
+                        ind_bias += 1
+                self.bin_properties[b['name']]['bias_ind'] = inds
+                # No magnification bias yet
+                self.bin_properties[b['name']]['eps'] = False
+            if t.quantity == 'galaxy_shear':
+                if self.ia_model != 'IANone':
+                    if ind_IA is None:
+                        ind_IA = ind_bias
+                        self.bias_names.append(self.input_params_prefix + '_A_IA')
+                        ind_bias += 1
+                    self.bin_properties[b['name']]['bias_ind'] = [ind_IA]
+                self.bin_properties[b['name']]['eps'] = True
+       
+    def _get_ell_sampling(self, nl_per_decade=30):
+        # Selects ell sampling.
+        # Ell max/min are set by the bandpower window ells.
+        # It currently uses simple log-spacing.
+        # nl_per_decade is currently fixed at 30
+        if self.l_min_sample == 0:
+            l_min_sample_here = 2
         else:
-            inv_cov = np.linalg.inv(cov)
-        return inv_cov
+            l_min_sample_here = self.l_min_sample
+        nl_sample = int(np.log10(self.l_max_sample / l_min_sample_here) *
+                        nl_per_decade)
+        l_sample = np.unique(np.geomspace(l_min_sample_here,
+                                          self.l_max_sample+1,
+                                          nl_sample).astype(int)).astype(float)
 
-    def _get_jeffrey_bias_dchi2(self):
-        g = self.provider.get_cl_theory_deriv()
+        if self.l_min_sample == 0:
+            self.l_sample = np.concatenate((np.array([0.]), l_sample))
+        else:
+            self.l_sample = l_sample
+
+    def _eval_interp_cl(self, cl_in, l_bpw, w_bpw):
+        """ Interpolates C_ell, evaluates it at bandpower window
+        ell values and convolves with window."""
+        f = interp1d(np.log(1E-3+self.l_sample), cl_in)
+        cl_unbinned = f(np.log(1E-3+l_bpw))
+        cl_binned = np.dot(w_bpw, cl_unbinned)
+        return cl_binned
+                
+    def _get_tracers(self, cosmo):
+        """ Obtains CCL tracers (and perturbation theory tracers,
+        and halo profiles where needed) for all used tracers given the
+        current parameters."""
+        trs0 = {}
+        trs1 = {}
+        trs1_dnames = {}
+        for name, q in self.tracer_qs.items():
+            z = self.bin_properties[name]['z_fid']
+            nz = self.bin_properties[name]['nz_fid']
+            oz = np.ones_like(z)
+
+            if q == 'galaxy_density':
+                t0 = None
+                tr = ccl.NumberCountsTracer(cosmo, dndz=(z, nz),
+                                            bias=(z, oz), has_rsd=False)
+                t1 = [tr]
+                t1n = ['d1']
+                if self.is_PT_bias:
+                    for bn, dn in zip(['b2', 'bs', 'bk2'], ['d2', 's2', 'k2']):
+                        t1.append(tr)
+                        t1n.append(dn)
+            elif q == 'galaxy_shear':
+                t0 = ccl.WeakLensingTracer(cosmo, dndz=(z, nz))
+                if self.ia_model == 'IANone':
+                    t1 = None
+                else:
+                    t1 = [ccl.WeakLensingTracer(cosmo, dndz=(z, nz),
+                                                has_shear=False, ia_bias=(z, oz))]
+                    t1n = ['m']
+            elif q == 'cmb_convergence':
+                # B.H. TODO: pass z_source as parameter to the YAML file
+                t0 = ccl.CMBLensingTracer(cosmo, z_source=1100)
+                t1 = None
+                t1n = None
+
+            trs0[name] = t0
+            trs1[name] = t1
+            trs1_dnames[name] = t1n
+        return trs0, trs1, trs1_dnames
+
+    def _get_pk_data(self, cosmo):
+        cosmo.compute_nonlin_power()
+        pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+        if self.bias_model == 'Linear':
+            pkd = {}
+            pkd['pk_mm'] = pkmm
+            pkd['pk_md1'] = pkmm
+            pkd['pk_d1m'] = pkmm
+            pkd['pk_d1d1'] = pkmm
+        elif self.is_PT_bias:
+            if self.k_SN_suppress > 0:
+                k_filter = self.k_SN_suppress
+            else:
+                k_filter = None
+            if self.bias_model == 'EulerianPT':
+                ptc = EPTCalculator(with_NC=True, with_IA=False,
+                                    log10k_min=self.l10k_min_pks,
+                                    log10k_max=self.l10k_max_pks,
+                                    nk_per_decade=self.nk_per_dex_pks,
+                                    a_arr=self.a_s_pks, k_filter=k_filter)
+            else:
+                raise NotImplementedError("Not yet: " + self.bias_model)
+            pk_lin_z0 = ccl.linear_matter_power(cosmo, ptc.ks, 1.)
+            Dz = ccl.growth_factor(cosmo, ptc.a_s)
+            ptc.update_pk(pk_lin_z0, Dz)
+            pkd = {}
+            pkd['pk_mm'] = pkmm
+            pkd['pk_md1'] = pkmm
+            pkd['pk_md2'] = ptc.get_pk('d1d2')
+            pkd['pk_ms2'] = ptc.get_pk('d1s2')
+            pkd['pk_mk2'] = ptc.get_pk('d1k2', pgrad=pkmm, cosmo=cosmo)
+            pkd['pk_d1m'] = pkd['pk_md1']
+            pkd['pk_d1d1'] = pkmm
+            pkd['pk_d1d2'] = pkd['pk_md2']
+            pkd['pk_d1s2'] = pkd['pk_ms2']
+            pkd['pk_d1k2'] = pkd['pk_mk2']
+            pkd['pk_d2m'] = pkd['pk_md2']
+            pkd['pk_d2d1'] = pkd['pk_d1d2']
+            pkd['pk_d2d2'] = ptc.get_pk('d2d2')
+            pkd['pk_d2s2'] = ptc.get_pk('d2s2')
+            pkd['pk_d2k2'] = None
+            pkd['pk_s2m'] = pkd['pk_ms2']
+            pkd['pk_s2d1'] = pkd['pk_d1s2']
+            pkd['pk_s2d2'] = pkd['pk_d2s2']
+            pkd['pk_s2s2'] = ptc.get_pk('s2s2')
+            pkd['pk_s2k2'] = None
+            pkd['pk_k2m'] = pkd['pk_mk2']
+            pkd['pk_k2d1'] = pkd['pk_d1k2']
+            pkd['pk_k2d2'] = pkd['pk_d2k2']
+            pkd['pk_k2s2'] = pkd['pk_s2k2']
+            pkd['pk_k2k2'] = None
+        return pkd            
+
+    def _get_cl_data(self, cosmo):
+        """ Compute all C_ells."""
+        # Get P(k)s
+        pkd = self._get_pk_data(cosmo)
+
+        # Gather all tracers
+        trs0, trs1, dnames = self._get_tracers(cosmo)
+
+        # Correlate all needed pairs of tracers
+        cls_00 = []
+        cls_01 = []
+        cls_10 = []
+        cls_11 = []
+        for clm in self.cl_meta:
+            if self.sample_cen:
+                ls = clm['l_eff']
+            elif self.sample_bpw:
+                ls = self.l_sample
+
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            t0_1 = trs0[n1]
+            t0_2 = trs0[n2]
+            t1_1 = trs1[n1]
+            t1_2 = trs1[n2]
+            dn_1 = dnames[n1]
+            dn_2 = dnames[n2]
+            # 00: unbiased x unbiased
+            if t0_1 and t0_2:
+                pk = pkd['pk_mm']
+                cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
+                cls_00.append(cl00)
+            else:
+                cls_00.append(None)
+            # 01: unbiased x biased
+            if t0_1 and (t1_2 is not None):
+                cl01 = []
+                for t12, dn in zip(t1_2, dn_2):
+                    pk = pkd[f'pk_m{dn}']
+                    if pk is not None:
+                        cl = ccl.angular_cl(cosmo, t0_1, t12, ls, p_of_k_a=pk) * clm['pixbeam']
+                    else:
+                        cl = np.zeros_like(ls)
+                    cl01.append(cl)
+                cl01 = np.array(cl01)
+            else:
+                cl01 = None
+            cls_01.append(cl01)
+            # 10: biased x unbiased
+            if n1 == n2:
+                cls_10.append(cl01)
+            else:
+                if t0_2 and (t1_1 is not None):
+                    cl10 = []
+                    for t11, dn in zip(t1_1, dn_1):
+                        pk = pkd[f'pk_m{dn}']
+                        if pk is not None:
+                            cl = ccl.angular_cl(cosmo, t11, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
+                        else:
+                            cl = np.zeros_like(ls)
+                        cl10.append(cl)
+                    cl10 = np.array(cl10)
+                else:
+                    cl10 = None
+                cls_10.append(cl10)
+            # 11: biased x biased
+            if (t1_1 is not None) and (t1_2 is not None):
+                cl11 = np.zeros([len(t1_1), len(t1_2), len(ls)])
+                autocorr = n1 == n2
+                for i1, (t11, dn1) in enumerate(zip(t1_1, dn_1)):
+                    for i2, (t12, dn2) in enumerate(zip(t1_2, dn_2)):
+                        if autocorr and i2 < i1:
+                            cl11[i1, i2] = cl11[i2, i1]
+                        else:
+                            pk = pkd[f'pk_{dn1}{dn2}']
+                            if pk is not None:
+                                cl = ccl.angular_cl(cosmo, t11, t12, ls, p_of_k_a=pk) * clm['pixbeam']
+                            else:
+                                cl = np.zeros_like(ls)
+                            cl11[i1, i2, :] = cl
+            else:
+                cl11 = None
+            cls_11.append(cl11)
+
+        # Bandpower window convolution
+        if self.sample_cen:
+            clbs_00 = cls_00
+            clbs_01 = cls_01
+            clbs_10 = cls_10
+            clbs_11 = cls_11
+        elif self.sample_bpw:
+            clbs_00 = []
+            clbs_01 = []
+            clbs_10 = []
+            clbs_11 = []
+            # 00: unbiased x unbiased
+            for clm, cl00 in zip(self.cl_meta, cls_00):
+                if (cl00 is not None):
+                    clb00 = self._eval_interp_cl(cl00, clm['l_bpw'], clm['w_bpw'])
+                else: 
+                    clb00 = None
+                clbs_00.append(clb00)
+            for clm, cl01, cl10 in zip(self.cl_meta, cls_01, cls_10):
+                # 01: unbiased x biased
+                if (cl01 is not None):
+                    clb01 = []
+                    for cl in cl01:
+                        clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
+                        clb01.append(clb)
+                    clb01 = np.array(clb01)
+                else: 
+                    clb01 = None
+                clbs_01.append(clb01)
+                # 10: biased x unbiased
+                if clm['bin_1'] == clm['bin_2']:
+                    clbs_10.append(clb01)
+                else:
+                    if (cl10 is not None):
+                        clb10 = []
+                        for cl in cl10:
+                            clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
+                            clb10.append(clb)
+                        clb10 = np.array(clb10)
+                    else: 
+                        clb10 = None
+                    clbs_10.append(clb10)
+                # 11: biased x biased
+                for clm, cl11 in zip(self.cl_meta, cls_11):
+                    if (cl11 is not None):
+                        clb11 = np.zeros((cl11.shape[0], cl11.shape[1], len(clm['l_eff'])))
+                        autocorr = clm['bin_1'] == clm['bin_2']
+                        for i1 in range(np.shape(cl11)[0]):
+                            for i2 in range(np.shape(cl11)[1]):
+                                if autocorr and i2 < i1:
+                                    clb11[i1, i2] = clb11[i2, i1]
+                                else:
+                                    cl = cl11[i1,i2,:]
+                                    clb = self._eval_interp_cl(cl, clm['l_bpw'], clm['w_bpw'])
+                                    clb11[i1,i2,:] = clb 
+                    else: 
+                        clb11 = None
+                    clbs_11.append(clb11)
+                
+        return {'cl00': clbs_00, 'cl01': clbs_01, 'cl10': clbs_10, 'cl11': clbs_11}
+
+    def _model(self, cld, bias_vec):
+        cls = np.zeros(self.ndata)
+        for icl, clm in enumerate(self.cl_meta):
+            cl_this = np.zeros_like(clm['l_eff'])
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            e1 = self.bin_properties[n1]['eps']
+            e2 = self.bin_properties[n2]['eps']
+            ind1 = self.bin_properties[n1]['bias_ind']
+            ind2 = self.bin_properties[n2]['bias_ind']
+            b1 = bias_vec[ind1] if ind1 is not None else None
+            b2 = bias_vec[ind2] if ind2 is not None else None
+            inds = clm['inds']
+            if e1 and e2:
+                cl_this += cld['cl00'][icl]
+            if e1 and (b2 is not None):
+                cl_this += np.dot(b2, cld['cl01'][icl]) # (nbias) , (nbias, nell)
+            if e2 and (b1 is not None):
+                cl_this += np.dot(b1, cld['cl10'][icl]) # (nbias) , (nbias, nell)
+            if (b1 is not None) and (b2 is not None):
+                cl_this += np.dot(b1, np.dot(b2, cld['cl11'][icl])) # (nbias1) * ((nbias2), (nbias1,nbias2,nell))
+            cls[inds] = cl_this
+            
+        return cls
+
+    def _model_deriv(self, cld, bias_vec):
+        nbias = len(bias_vec)
+        cls_deriv = np.zeros((self.ndata, nbias))
+
+        for icl, clm in enumerate(self.cl_meta):
+            cls_grad = np.zeros([nbias, len(clm['l_eff'])])
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            e1 = self.bin_properties[n1]['eps']
+            e2 = self.bin_properties[n2]['eps']
+            ind1 = self.bin_properties[n1]['bias_ind']
+            ind2 = self.bin_properties[n2]['bias_ind']
+            b1 = bias_vec[ind1] if ind1 is not None else None
+            b2 = bias_vec[ind2] if ind2 is not None else None
+            inds = clm['inds']
+
+            if e1 and (b2 is not None):
+                cls_grad[ind2] += cld['cl01'][icl] # (nbias2, ndata) , (nbias2, ndata)
+            if e2 and (b1 is not None):
+                cls_grad[ind1] += cld['cl10'][icl] # (nbias1, ndata) , (nbias1, ndat)
+
+            if (b1 is not None) and (b2 is not None):
+                cl_b2 = np.dot(b2, cld['cl11'][icl]) # (nbias2) , (nbias1, nbias2, ndata) -> (nbias1, ndata)
+                cl_b1 = np.sum(b1[:, None, None] * cld['cl11'][icl], axis=0) # (nbias1) , (nbias1, nbias2, ndata) -> (nbias2, ndata)
+                cls_grad[ind1] += cl_b2
+                cls_grad[ind2] += cl_b1
+
+            cls_deriv[inds] = cls_grad.T
+        return cls_deriv # (ndata, nbias)
+
+    def _get_jeffrey_bias_dchi2(self, bias, cld):
+        g = self._model_deriv(cld, bias)
         ic_g = np.dot(self.inv_cov, g) # (ndata, ndata) , (ndata, nbias)
         F = np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
         return -np.log(np.linalg.det(F))
 
     def get_requirements(self):
-        return {"cl_theory": {"cl_meta": self.cl_meta,
-                              "tracer_qs": self.tracer_qs,
-                              "bin_properties": self.bin_properties,
-                             },
-                }
+        # By selecting `self._get_cl_data` as a `method` of CCL here,
+        # we make sure that this function is only run when the
+        # cosmological parameters vary.
+        return {'CCL': {'methods': {'cl_data': self._get_cl_data}}}
 
     def _get_chi2(self, **pars):
-        t = self.provider.get_cl_theory()
+        # First, gather all the necessary ingredients for the Cls without bias parameters
+        res = self.provider.get_CCL()
+        cld = res['cl_data']
+
+        # Construct bias vector
+        bias = np.array([pars[k] for k in self.bias_names])
+
+        # Theory model
+        t = self._model(cld, bias)
         r = t - self.data_vec
         chi2 = np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata)
 
         # Jeffreys prior for bias?
         dchi2_jeffrey = 0
         if self.jeffrey_bias:
-            dchi2_jeffrey = self._get_jeffrey_bias_dchi2()
+            dchi2_jeffrey = self._get_jeffrey_bias_dchi2(bias, cld)
         return chi2, dchi2_jeffrey
 
     def get_can_provide_params(self):
@@ -215,57 +628,6 @@ class ClLike(Likelihood):
         chi2, dchi2_jeffrey = self._get_chi2(**pars)
         state['logp'] = -0.5*(chi2+dchi2_jeffrey)
         state['derived'] = {'dchi2_jeffrey': dchi2_jeffrey}
-
-    def get_cl_theory_sacc(self):
-        # Create empty file
-        s = sacc.Sacc()
-
-        # Add tracers
-        for n, p in self.bin_properties.items():
-            if n not in self.tracer_qs:
-                continue
-            q = self.tracer_qs[n]
-            spin = 2 if q == 'galaxy_shear' else 0
-            if q in ['galaxy_density', 'galaxy_shear']:
-                # TODO: These would better be the shifted Nz
-                s.add_tracer('NZ', n, quantity=q, spin=spin,
-                             z=p['z_fid'], nz=p['nz_fid'])
-            else:
-                s.add_tracer('Map', n, quantity=q, spin=spin,
-                             ell=np.arange(10), beam=np.ones(10))
-
-        # Calculate power spectra
-        cl = self.provider.get_cl_theory()
-        for clm in self.cl_meta:
-            p1 = 'e' if self.tracer_qs[clm['bin_1']] == 'galaxy_shear' else '0'
-            p2 = 'e' if self.tracer_qs[clm['bin_2']] == 'galaxy_shear' else '0'
-            cltyp = f'cl_{p1}{p2}'
-            if cltyp == 'cl_e0':
-                cltyp = 'cl_0e'
-            bpw = sacc.BandpowerWindow(clm['l_bpw'], clm['w_bpw'].T)
-            s.add_ell_cl(cltyp, clm['bin_1'], clm['bin_2'],
-                         clm['l_eff'], cl[clm['inds']], window=bpw)
-
-        return s
-
-    def get_cl_data_sacc(self):
-        s = self.sacc_file.copy()
-        s.keep_indices(self.indices)
-
-        # Reorder
-        indices = []
-        for clm in self.cl_meta:
-            indices.extend(list(s.indices(tracers=(clm['bin_1'], clm['bin_2']))))
-        s.reorder(indices)
-
-        tracers = []
-        for trs in s.get_tracer_combinations():
-            tracers.extend(trs)
-
-        # Use list(set()) to remove duplicates
-        s.keep_tracers(list(set(tracers)))
-
-        return s
 
 
 class ClLikeFastBias(ClLike):
@@ -285,6 +647,7 @@ class ClLikeFastBias(ClLike):
         ind_IA = None
         self.bias0 = []
         self.bias_names = []
+        self.bias_bounds = []
         self.bias_pr_mean = []
         self.bias_pr_isigma2 = []
         for b in self.bins:
@@ -300,6 +663,10 @@ class ClLikeFastBias(ClLike):
                 else:
                     bnames = ['b1']
                 for bn in bnames:
+                    if bn == 'bs':  # Avoid bimodality in "b_s"
+                        self.bias_bounds.append((-1.5, 100))
+                    else:
+                        self.bias_bounds.append((-100, 100))
                     bname = self.input_params_prefix + '_' + b['name'] + '_' + bn
                     self.bias0.append(self.bias_params[bname]['value'])
                     self.bias_names.append(bname)
@@ -321,6 +688,7 @@ class ClLikeFastBias(ClLike):
                         ind_IA = ind_bias
                         pname = self.input_params_prefix + '_A_IA'
                         self.bias0.append(self.bias_params[pname]['value'])
+                        self.bias_bounds.append((-100, 100))
                         self.bias_names.append(pname)
                         pr = self.bias_params[pname].get('prior', None)
                         if pr is not None:
@@ -390,17 +758,30 @@ class ClLikeFastBias(ClLike):
 
         p = minimize(chi2, self.bias0, method='Newton-CG', jac=True,
                      hess=lambda b: self.hessian_chi2(b, cld))
+        #p = minimize(chi2, self.bias0, method='L-BFGS-B', jac=True,
+        #             bounds=self.bias_bounds)
         H = self.hessian_chi2(p.x, cld,
                               include_DF=self.bias_fisher_deriv2)
-
-        return p.fun, 0.5*H, p
+        ev = np.linalg.eigvals(0.5*H)
+        if np.any(ev <= 0): # Use positive-definite version if needed
+            H = self.hessian_chi2(p.x, cld,
+                                  include_DF=False)
+            ev = np.linalg.eigvals(0.5*H)
+        dchi2 = np.sum(np.log(ev))
+        if np.isnan(dchi2):
+            print(dchi2)
+            print(ev)
+            print(H)
+            exit(1)
+                              
+        return p.fun, dchi2, p
 
     def get_can_provide_params(self):
         return self.bias_names + ['nfev', 'dchi2_marg']
 
     def calculate(self, state, want_derived=True, **pars):
         # Calculate chi2
-        chi2, F, p = self._get_BF_chi2_and_F(**pars)
+        chi2, dchi2, p = self._get_BF_chi2_and_F(**pars)
 
         # Update starting point
         if self.bias_update_every or (not self.updated_bias0):
@@ -476,10 +857,9 @@ class ClLikeFastBias(ClLike):
 
         # Compute log_like
         if self.bias_fisher:
-            dchi2 = np.log(np.linalg.det(F))
+            state['logp'] = -0.5*(chi2 + dchi2)
         else:
-            dchi2 = 0.0
-        state['logp'] = -0.5*(chi2 + dchi2)
+            state['logp'] = -0.5*chi2
 
         # Add derived parameters
         # - Best-fit biases

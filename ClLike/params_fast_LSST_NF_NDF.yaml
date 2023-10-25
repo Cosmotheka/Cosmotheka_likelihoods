@@ -1,0 +1,448 @@
+theory:
+  cl_like.CCL:
+    baryons_pk: nobaryons
+    matter_pk: halofit
+    transfer_function: eisenstein_hu
+likelihood:
+  cl_like.ClLikeFastBias:
+    #input_file: /mnt/extraspace/damonge/FastBias/cls_LSST_linear.fits
+    input_file: /mnt/extraspace/damonge/FastBias/cls_LSST_linear_marg_derfrac0.01_dzwz.fits
+    bins:
+    - name: cl_0
+    - name: cl_1
+    - name: cl_2
+    - name: cl_3
+    - name: cl_4
+    - name: cl_5
+    - name: sh_0
+    - name: sh_1
+    - name: sh_2
+    - name: sh_3
+    - name: sh_4
+    twopoints:
+    - bins:
+      - cl_0
+      - cl_0
+    - bins:
+      - cl_0
+      - cl_1
+    - bins:
+      - cl_0
+      - cl_2
+    - bins:
+      - cl_0
+      - cl_3
+    - bins:
+      - cl_0
+      - cl_4
+    - bins:
+      - cl_0
+      - cl_5
+    - bins:
+      - cl_1
+      - cl_1
+    - bins:
+      - cl_1
+      - cl_2
+    - bins:
+      - cl_1
+      - cl_3
+    - bins:
+      - cl_1
+      - cl_4
+    - bins:
+      - cl_1
+      - cl_5
+    - bins:
+      - cl_2
+      - cl_2
+    - bins:
+      - cl_2
+      - cl_3
+    - bins:
+      - cl_2
+      - cl_4
+    - bins:
+      - cl_2
+      - cl_5
+    - bins:
+      - cl_3
+      - cl_3
+    - bins:
+      - cl_3
+      - cl_4
+    - bins:
+      - cl_3
+      - cl_5
+    - bins:
+      - cl_4
+      - cl_4
+    - bins:
+      - cl_4
+      - cl_5
+    - bins:
+      - cl_5
+      - cl_5
+    - bins:
+      - cl_0
+      - sh_0
+    - bins:
+      - cl_0
+      - sh_1
+    - bins:
+      - cl_0
+      - sh_2
+    - bins:
+      - cl_0
+      - sh_3
+    - bins:
+      - cl_0
+      - sh_4
+    - bins:
+      - cl_1
+      - sh_0
+    - bins:
+      - cl_1
+      - sh_1
+    - bins:
+      - cl_1
+      - sh_2
+    - bins:
+      - cl_1
+      - sh_3
+    - bins:
+      - cl_1
+      - sh_4
+    - bins:
+      - cl_2
+      - sh_0
+    - bins:
+      - cl_2
+      - sh_1
+    - bins:
+      - cl_2
+      - sh_2
+    - bins:
+      - cl_2
+      - sh_3
+    - bins:
+      - cl_2
+      - sh_4
+    - bins:
+      - cl_3
+      - sh_0
+    - bins:
+      - cl_3
+      - sh_1
+    - bins:
+      - cl_3
+      - sh_2
+    - bins:
+      - cl_3
+      - sh_3
+    - bins:
+      - cl_3
+      - sh_4
+    - bins:
+      - cl_4
+      - sh_0
+    - bins:
+      - cl_4
+      - sh_1
+    - bins:
+      - cl_4
+      - sh_2
+    - bins:
+      - cl_4
+      - sh_3
+    - bins:
+      - cl_4
+      - sh_4
+    - bins:
+      - cl_5
+      - sh_0
+    - bins:
+      - cl_5
+      - sh_1
+    - bins:
+      - cl_5
+      - sh_2
+    - bins:
+      - cl_5
+      - sh_3
+    - bins:
+      - cl_5
+      - sh_4
+    - bins:
+      - sh_0
+      - sh_0
+    - bins:
+      - sh_0
+      - sh_1
+    - bins:
+      - sh_0
+      - sh_2
+    - bins:
+      - sh_0
+      - sh_3
+    - bins:
+      - sh_0
+      - sh_4
+    - bins:
+      - sh_1
+      - sh_1
+    - bins:
+      - sh_1
+      - sh_2
+    - bins:
+      - sh_1
+      - sh_3
+    - bins:
+      - sh_1
+      - sh_4
+    - bins:
+      - sh_2
+      - sh_2
+    - bins:
+      - sh_2
+      - sh_3
+    - bins:
+      - sh_2
+      - sh_4
+    - bins:
+      - sh_3
+      - sh_3
+    - bins:
+      - sh_3
+      - sh_4
+    - bins:
+      - sh_4
+      - sh_4
+    defaults:
+      kmax: 0.3
+      lmax: 2000
+      lmin: 0
+      sample_type: center
+    input_params_prefix: clk
+    ia_model: IADESY1
+    nz_model: NzNone
+    bias_model: EulerianPT
+    bias_fisher: False
+    bias_fisher_deriv2: False
+    bias_update_every: False
+    bias_params:
+      clk_A_IA:
+        prior:
+          mean: 1.0
+          sigma: 100
+        value: 1.0
+      clk_cl_0_b1:
+        prior:
+          mean: 1.5
+          sigma: 100
+        value: 1.5
+      clk_cl_0_b2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_0_bk2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_0_bs:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_1_b1:
+        prior:
+          mean: 1.5
+          sigma: 100
+        value: 1.5
+      clk_cl_1_b2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_1_bk2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_1_bs:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_2_b1:
+        prior:
+          mean: 1.5
+          sigma: 100
+        value: 1.5
+      clk_cl_2_b2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_2_bk2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_2_bs:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_3_b1:
+        prior:
+          mean: 1.5
+          sigma: 100
+        value: 1.5
+      clk_cl_3_b2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_3_bk2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_3_bs:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_4_b1:
+        prior:
+          mean: 1.5
+          sigma: 100
+        value: 1.5
+      clk_cl_4_b2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_4_bk2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_4_bs:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_5_b1:
+        prior:
+          mean: 1.5
+          sigma: 100
+        value: 1.5
+      clk_cl_5_b2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_5_bk2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      clk_cl_5_bs:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+params:
+  sigma8:
+    prior:
+      min: 0.5
+      max: 1.1
+    ref:
+      dist: norm
+      loc: 0.8
+      scale: 0.002
+    latex: \sigma_8
+    proposal: 0.001
+  Omega_m:
+    prior:
+      min: 0.07
+      max: 0.8
+    ref:
+      dist: norm
+      loc: 0.3
+      scale: 0.002
+    latex: \Omega_m
+    proposal: 0.001
+  Omega_b:
+    prior:
+      min: 0.03
+      max: 0.07
+    ref:
+      dist: norm
+      loc: 0.05
+      scale: 0.001
+    latex: \Omega_b
+    proposal: 0.001
+  h:
+    prior:
+      min: 0.55
+      max: 0.91
+    ref:
+      dist: norm
+      loc: 0.67
+      scale: 0.01
+    latex: h
+    proposal: 0.01
+  n_s:
+    prior:
+      min: 0.87
+      max: 1.07
+    ref:
+      dist: norm
+      loc: 0.96
+      scale: 0.01
+    latex: n_s
+    proposal: 0.01
+  m_nu: 0.0
+  S8: 
+  nfev: 
+  dchi2_marg: 
+  clk_A_IA: 
+  clk_cl_0_b1: 
+  clk_cl_0_b2: 
+  clk_cl_0_bk2: 
+  clk_cl_0_bs: 
+  clk_cl_1_b1: 
+  clk_cl_1_b2: 
+  clk_cl_1_bk2: 
+  clk_cl_1_bs: 
+  clk_cl_2_b1: 
+  clk_cl_2_b2: 
+  clk_cl_2_bk2: 
+  clk_cl_2_bs: 
+  clk_cl_3_b1: 
+  clk_cl_3_b2: 
+  clk_cl_3_bk2: 
+  clk_cl_3_bs: 
+  clk_cl_4_b1: 
+  clk_cl_4_b2: 
+  clk_cl_4_bk2: 
+  clk_cl_4_bs: 
+  clk_cl_5_b1: 
+  clk_cl_5_b2: 
+  clk_cl_5_bk2: 
+  clk_cl_5_bs: 
+sampler:
+  #minimize: 
+  mcmc:
+    burn_in: 10
+    max_tries: 1000
+    learn_proposal: true
+    Rminus1_stop: 0.01
+    measure_speeds: true
+debug: false
+output: lsst_allX_wNz/Newton_CG/fast_LSST_nF_nDF/out

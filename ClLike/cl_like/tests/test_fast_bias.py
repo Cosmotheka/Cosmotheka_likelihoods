@@ -1,18 +1,13 @@
-import os
-import pytest
-if os.getenv("GITHUB_ACTIONS") == "true":
-    pytest.skip("The fast bias class need to be reimplemented first",
-                allow_module_level=True)
-
 from cobaya.model import get_model
 from cobaya.run import run
 import yaml
+import os
 
 import numpy as np
-import numpy.linalg as LA
+import numpy.linalg as LA 
 
 # Read in the yaml file
-config_fn = 'cl_like/tests/config_fast_bias.yaml'
+config_fn = 'tests/config_fast_bias.yaml'
 with open(config_fn, "r") as fin:
     info = yaml.load(fin, Loader=yaml.FullLoader)
 
