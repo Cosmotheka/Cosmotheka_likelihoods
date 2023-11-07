@@ -7,6 +7,7 @@ from .rosat import ROSATResponse
 from .profiles import (HaloProfileDensityHE,
                        HaloProfilePressureHE,
                        HaloProfileXray,
+                       HaloProfileNFWBaryon,
                        XrayTracer)
 
 
@@ -22,13 +23,16 @@ class ROSATxLike(object):
                  bins=[0, 1, 2, 3], Zmetal=0.3, lines=True, lmin=30,
                  lmax=2048, mbias=[-0.0063, -0.0198, -0.0241, -0.0369],
                  zbias=[0.0, 0.0, 0.0, 0.0], with_clumping=True,
-                 spec_pyatomdb=True):
+                 spec_pyatomdb=True, use_baryonic_matter=False,
+                 A_IA=None):
         self.params_vary = params_vary
         self.priors = priors
         self.Zmetal = Zmetal
         self.lines = lines
         self.wclump = with_clumping
         self.spec_pyatomdb = spec_pyatomdb
+        self.use_baryonic_matter = use_baryonic_matter
+        self.A_IA = A_IA
 
         # Load data
         s = sacc.Sacc.load_fits(f'data/cls_cov_Y{year}iv_marg_dz_m.fits')
@@ -146,8 +150,12 @@ class ROSATxLike(object):
         self.prof_pres = HaloProfilePressureHE(mass_def=mdef,
                                                concentration=cM,
                                                kind='n_total')
-        self.prof_matter = ccl.halos.HaloProfileNFW(
-            mass_def=mdef, concentration=cM)
+        if self.use_baryonic_matter:
+            self.prof_matter = HaloProfileNFWBaryon(
+                mass_def=mdef, concentration=cM)
+        else:
+            self.prof_matter = ccl.halos.HaloProfileNFW(
+                mass_def=mdef, concentration=cM)
         self.prof_xray = HaloProfileXray(
             mass_def=mdef, Jinterp=self.J,
             dens=self.prof_dens, pres=self.prof_pres,
@@ -155,7 +163,13 @@ class ROSATxLike(object):
             with_clumping=self.wclump)
         # Initialize tracers
         self.tx = XrayTracer(self.cosmo)
-        self.tgs = {k: ccl.WeakLensingTracer(self.cosmo, dndz=v)
+        if self.A_IA is not None:
+            ia = (np.linspace(0, 3, 1024),
+                  self.A_IA*np.ones(1024))
+        else:
+            ia = None
+        self.tgs = {k: ccl.WeakLensingTracer(self.cosmo, dndz=v,
+                                             ia_bias=ia)
                     for k, v in self.dndzs.items()}
 
         # Fixed k and a arrays
@@ -179,6 +193,12 @@ class ROSATxLike(object):
                             'gamma', 'logTAGN']}
         self.prof_dens.update_parameters(**kwargs)
         self.prof_pres.update_parameters(**kwargs)
+        if self.use_baryonic_matter:
+            kwargs = {k: pdict.get(k, None)
+                      for k in ['lMc', 'eta_b',
+                                'gamma', 'logTAGN']}
+            self.prof_matter.update_parameters(**kwargs)
+            
 
     def get_model(self, **kwargs):
         self.update_params(kwargs)

@@ -307,7 +307,7 @@ class HaloProfilePressureBattaglia(ccl.halos.HaloProfile):
                  beta_az=0.415,
                  beta_interp_spacing=0.3,
                  kind="n_total",
-                 qrange=(1e-3, 1e3),
+                 qrange=(1e-2, 1e3),
                  nq=128,
                  x_out=np.inf):
         self.alpha = alpha
@@ -419,13 +419,12 @@ class HaloProfilePressureBattaglia(ccl.halos.HaloProfile):
             ]
         )
         # Set to zero at high q, so extrapolation does the right thing.
-        f_arr[-1, :] = 1e-100
         Fqb = RegularGridInterpolator(
             [np.log(qs), betas],
             np.log(f_arr),
             fill_value=None,
             bounds_error=False,
-            method="cubic",
+            method="linear",
         )
         return Fqb
 
