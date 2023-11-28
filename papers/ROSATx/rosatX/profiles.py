@@ -960,9 +960,9 @@ class HaloProfileXray(ccl.halos.HaloProfile):
     def __init__(self, *,
                  mass_def,
                  J,
-                 dens,
-                 pres=None,
-                 temp=None,
+                 density,
+                 pressure=None,
+                 temperature=None,
                  lMmin_fit=11,
                  lMmax_fit=15.5,
                  nlM_fit=16,
@@ -972,10 +972,10 @@ class HaloProfileXray(ccl.halos.HaloProfile):
                  fourier_approx=True,
                  plaw_fourier=-2.0,
                  truncated=False):
-        self.dens = dens
-        self.pres = pres
-        self.temp = temp
-        if self.pres is None and self.temp is None:
+        self.density = density
+        self.pressure = pressure
+        self.temperature = temperature
+        if self.pressure is None and self.temperature is None:
             raise ValueError(
                 "You must provide either a pressure "
                 "or a temperature profile.")
@@ -983,11 +983,12 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         # Check the density and pressure are for the
         # same quantity (otherwise recovered temperature
         # won't make sense).
-        if self.pres is not None and self.dens.kind != self.pres.kind:
+        if self.pressure is not None and \
+           self.density.kind != self.pressure.kind:
             raise ValueError(
                 "Density and pressure profiles must "
                 "correspond to the same species "
-                f"{self.dens.kind} != {self.pres.kind}")
+                f"{self.density.kind} != {self.pressure.kind}")
         self.J = J
         self.lkT_max = J.grid[0][-1]
         self.lkT_min = J.grid[0][0]
@@ -1007,7 +1008,7 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         if fourier_approx:
             self._fourier = self._fourier_approx
         # Transforms to n_H * n_e
-        pref_dens = get_prefac_rho(self.dens.kind)
+        pref_dens = get_prefac_rho(self.density.kind)
         pref_H = get_prefac_rho("n_H")
         pref_e = get_prefac_rho("n_electron")
         self.pref_nHne = pref_H * pref_e / pref_dens**2
@@ -1137,18 +1138,18 @@ class HaloProfileXray(ccl.halos.HaloProfile):
 
         rDelta = self.mass_def.get_radius(cosmo, M_use, a) / a
         # Number density in cm^-3
-        ndens = self.dens.real(cosmo, r_use, M_use, a).flatten()
-        if self.pres is not None:
+        ndens = self.density.real(cosmo, r_use, M_use, a).flatten()
+        if self.pressure is not None:
             # Pressure in eV * cm^-3
-            P = self.pres.real(cosmo, r_use, M_use, a).flatten()
+            P = self.pressure.real(cosmo, r_use, M_use, a).flatten()
             # log-Temperature in keV
             lkT = np.zeros(nM * nr)
             good = ndens > 0
             lkT[good] = np.log(1e-3 * P[good] / ndens[good])
             if not np.all(good):  # Set temperature to a tiny number where n=0
                 lkT[~good] = -30.0
-        if self.temp is not None:
-            T = self.temp.real(cosmo, r_use, M_use, a).flatten()
+        if self.temperature is not None:
+            T = self.temperature.real(cosmo, r_use, M_use, a).flatten()
             # log-Temperature in keV
             lkT = np.log(1e-3 * T)
         # Integrated spectrum in cm^-5 s^-1
@@ -1449,3 +1450,22 @@ def XrayTracer(cosmo, z_min=0.0, z_max=2.0, n_chi=1024):
 
     tracer.add_tracer(cosmo, kernel=(chi_arr, a_arr**3 / (4 * np.pi)))
     return tracer
+
+
+def pixel_FWHM(nside):
+    """
+    Returns the FWHM of the HEALPix pixel with nside = nside
+    """
+    fwhm_hp_amin = 60 * 41.7 / nside
+    return np.radians(fwhm_hp_amin / 60) / 2.355
+
+
+def cl_smoothed(cl, ell, nside=1024):
+    """
+    Returns the smoothing factor for angular power spectrum
+    """
+    sigma_ROSAT = np.radians(1.8e0 / 60) / 2.355
+    sigma_HEALPix = pixel_FWHM(nside)
+    sigma_tot_2 = sigma_ROSAT**2 + 2 * sigma_HEALPix**2
+    smoothing_factor = np.exp(-0.5 * sigma_tot_2 * ell * (1 + ell))
+    return smoothing_factor * cl
