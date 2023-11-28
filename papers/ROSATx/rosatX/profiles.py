@@ -2,6 +2,7 @@ import numpy as np
 import pyccl as ccl
 from scipy.integrate import quad, simps
 from scipy.interpolate import RegularGridInterpolator, interp1d
+from scipy.special import sici
 
 
 def get_prefac_rho(kind, XH=0.76):
@@ -23,7 +24,8 @@ def get_prefac_rho(kind, XH=0.76):
         elif kind == "n_total":
             return MsunMpc2Mprotcm * (5 * XH + 3) / 4
         else:
-            raise NotImplementedError(f"Density type {kind} \
+            raise NotImplementedError(
+                f"Density type {kind} \
                                       not implemented")
 
 
@@ -65,14 +67,8 @@ def get_fb(cosmo):
     return cosmo["Omega_b"] / (cosmo["Omega_b"] + cosmo["Omega_c"])
 
 
-import numpy as np
-import pyccl as ccl
-from scipy.integrate import quad, simps
-from scipy.interpolate import RegularGridInterpolator
-
-
 class _HaloProfileBattaglia(ccl.halos.HaloProfile):
-    """Halo Profile for from Battaglia papers.
+    """Halo Profile from Battaglia papers.
 
     Default values of all parameters correspond to the values
     found in Battaglia et al. 2016.
@@ -227,16 +223,16 @@ class _HaloProfileBattaglia(ccl.halos.HaloProfile):
         # Note: this deviates from the arXiv version of the Battaglia
         # paper in the sign of the second instance of gamma. This was
         # a typo in the paper (Boris Bolliet - private comm.).
-        return x**self.gamma / (1 + x**alpha) ** ((beta + self.gamma) / alpha)
+        return x**self.gamma / (1+x**alpha) ** ((beta+self.gamma) / alpha)
 
     def _form_factor_pressure(self, x, beta):
-        return x**self.gamma / (1 + x**self.alpha) ** beta
+        return x**self.gamma / (1+x**self.alpha) ** beta
 
     def _integ_interp(self):
-        qs = np.geomspace(self.qrange[0], self.qrange[1], self.nq + 1)
+        qs = np.geomspace(self.qrange[0], self.qrange[1], self.nq+1)
 
         beta0 = self._beta(1e10, 1.0) - 1
-        beta1 = self._beta(1e15, 1 / (1 + 6.0)) + 1
+        beta1 = self._beta(1e15, 1 / (1+6.0))+1
         nbeta = int((beta1 - beta0) / self.beta_interp_spacing)
         betas = np.linspace(beta0, beta1, nbeta)
 
@@ -245,32 +241,19 @@ class _HaloProfileBattaglia(ccl.halos.HaloProfile):
             def integrand(x, alpha, beta):
                 return self._form_factor_density(x, alpha, beta) * x
 
-            alpha0 = self._alpha(1e15, 1.0) - \
-                self.alpha_interp_spacing
-            alpha1 = self._alpha(1e10, 1 / (1 + 6.0)) + \
-                self.alpha_interp_spacing
+            alpha0 = self._alpha(1e15, 1.0) - self.alpha_interp_spacing
+            alpha1 = self._alpha(1e10, 1 / (1+6.0))+self.alpha_interp_spacing
             nalpha = int((alpha1 - alpha0) / self.alpha_interp_spacing)
             alphas = np.linspace(alpha0, alpha1, nalpha)
-            f_arr = np.array(
-                [
-                    [
-                        [
-                            quad(
-                                integrand,
-                                args=(alpha, beta),
-                                a=1e-4,
-                                b=self.x_out,  # limits of integration
-                                weight="sin",  # fourier sine weight
-                                wvar=q,
-                            )[0]
-                            / q
-                            for alpha in alphas
-                        ]
-                        for beta in betas
-                    ]
-                    for q in qs
-                ]
-            )
+            f_arr = np.array([[[quad(integrand,
+                                     args=(alpha, beta),
+                                     a=1e-4,
+                                     b=self.x_out,  # limits of integration
+                                     weight="sin",  # fourier sine weight
+                                     wvar=q)[0] / q
+                                for alpha in alphas]
+                               for beta in betas]
+                              for q in qs])
             # Set to zero at high q, so extrapolation does the right thing.
             f_arr[-1, :, :] = 1e-100
             Fqb = RegularGridInterpolator(
@@ -278,8 +261,7 @@ class _HaloProfileBattaglia(ccl.halos.HaloProfile):
                 np.log(f_arr),
                 fill_value=None,
                 bounds_error=False,
-                method="cubic",
-            )
+                method="cubic")
 
         if self.quantity == "pressure":
 
@@ -287,22 +269,14 @@ class _HaloProfileBattaglia(ccl.halos.HaloProfile):
                 return self._form_factor_pressure(x, beta) * x
 
             f_arr = np.array(
-                [
-                    [
-                        quad(
-                            integrand,
-                            args=(beta),
-                            a=1e-4,
-                            b=self.x_out,  # limits of integration
-                            weight="sin",  # fourier sine weight
-                            wvar=q,
-                        )[0]
-                        / q
-                        for beta in betas
-                    ]
-                    for q in qs
-                ]
-            )
+                [[quad(integrand,
+                       args=(beta),
+                       a=1e-4,
+                       b=self.x_out,  # limits of integration
+                       weight="sin",  # fourier sine weight
+                       wvar=q)[0] / q
+                  for beta in betas]
+                 for q in qs])
             # Set to zero at high q, so extrapolation does the right thing.
             f_arr[-1, :, :] = 1e-100
             Fqb = RegularGridInterpolator(
@@ -310,13 +284,11 @@ class _HaloProfileBattaglia(ccl.halos.HaloProfile):
                 np.log(f_arr),
                 fill_value=None,
                 bounds_error=False,
-                method="cubic",
-            )
+                method="cubic")
         return Fqb
 
     def _norm(self, cosmo, M, a):
         # Density in Msun/Mpc^3
-
         if self.quantity == "density":
             # Note: this deviates from the arXiv version of the Battaglia
             # paper in the extra factor of f_b. This was
@@ -361,20 +333,14 @@ class _HaloProfileBattaglia(ccl.halos.HaloProfile):
         if self.quantity == "density":
             alphas = self._alpha(M_use, a)
             ev = np.array(
-                [
-                    np.log(qs).flatten(),
-                    (np.ones(nk)[None, :] * betas[:, None]).flatten(),
-                    (np.ones(nk)[None, :] * alphas[:, None]).flatten(),
-                ]
-            ).T
+                [np.log(qs).flatten(),
+                 (np.ones(nk)[None, :] * betas[:, None]).flatten(),
+                 (np.ones(nk)[None, :] * alphas[:, None]).flatten()]).T
 
         if self.quantity == "pressure":
             ev = np.array(
-                [
-                    np.log(qs).flatten(),
-                    (np.ones(nk)[None, :] * betas[:, None]).flatten(),
-                ]
-            ).T
+                [np.log(qs).flatten(),
+                 (np.ones(nk)[None, :] * betas[:, None]).flatten()]).T
 
         ff = self._fourier_interp(ev).reshape([-1, nk])
         ff = np.exp(ff)
@@ -402,14 +368,12 @@ class _HaloProfileBattaglia(ccl.halos.HaloProfile):
             alphas = self._alpha(M_use, a)
             prof = self._form_factor_density(
                 r_use[None, :] / xrDelta[:, None],
-                alphas[:, None], betas[:, None]
-            )
+                alphas[:, None], betas[:, None])
 
         if self.quantity == "pressure":
             prof = self._form_factor_pressure(
                 r_use[None, :] / xrDelta[:, None],
-                betas[:, None]
-            )
+                betas[:, None])
 
         prof *= nn[:, None]
 
@@ -536,6 +500,23 @@ class HaloProfilePressureBattaglia(_HaloProfileBattaglia):
 
 
 class _HaloProfileHE(ccl.halos.HaloProfile):
+    """Gas density profile given by the sum of the density profile for
+    the bound and the ejected gas, each modelled separetely for a halo
+    in hydrostatic equilibrium.
+
+    The density and mass fraction of the bound gas as well as the mass
+    fraction of the ejected gas taken from Mead 2020, and the density
+    of the ejected gas taken from Schneider & Teyssier 2016.
+
+    Profile is calculated in units of M_sun Mpc^-3 if
+    requesting mass density (`kind == 'rho_gas'`), or in cm^-3
+    if requesting a number density. Allowed values for `kind`
+    in the latter case are `'n_total'`, `'n_baryon'`, `'n_H'`,
+    `'n_electron'`.
+
+    Default values of all parameters correspond to the values
+    found in Mead et al. 2020.
+    """
 
     def __init__(self, *,
                  mass_def,
@@ -576,11 +557,8 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         cs = np.geomspace(1e-2, 100, 64)
         gs = np.geomspace(0.1, 10, 64)
         norms = np.array(
-            [
-                [quad(lambda x: x**2 * self._F_bound(x, g), 0, c)[0] for c in cs]
-                for g in gs
-            ]
-        )
+            [[quad(lambda x: x**2 * self._F_bound(x, g), 0, c)[0] for c in cs]
+                for g in gs])
         ip = RegularGridInterpolator((np.log(gs), np.log(cs)), np.log(norms))
         return ip
 
@@ -621,14 +599,21 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
     def _build_BAHAMAS_interp(self):
         if self._Bi is not None:
             return
-        kwargs = {"kind": "linear", "bounds_error": False, "fill_value": "extrapolate"}
+        kwargs = {"kind": "linear",
+                  "bounds_error": False,
+                  "fill_value": "extrapolate"}
         logTAGNs = np.array([7.6, 7.8, 8.0])
         self._Bi = {}
-        lMci = interp1d(logTAGNs, np.array([13.1949, 13.5937, 14.2480]), **kwargs)
-        gammai = interp1d(logTAGNs, np.array([1.1647, 1.1770, 1.1966]), **kwargs)
-        alpha_Ti = interp1d(logTAGNs, np.array([0.7642, 0.8471, 1.0314]), **kwargs)
-        logTw0i = interp1d(logTAGNs, np.array([6.6762, 6.6545, 6.6615]), **kwargs)
-        Tw1i = interp1d(logTAGNs, np.array([-0.5566, -0.3652, -0.0617]), **kwargs)
+        lMci = interp1d(logTAGNs, np.array([13.1949, 13.5937, 14.2480]),
+                        **kwargs)
+        gammai = interp1d(logTAGNs, np.array([1.1647, 1.1770, 1.1966]),
+                          **kwargs)
+        alpha_Ti = interp1d(logTAGNs, np.array([0.7642, 0.8471, 1.0314]),
+                            **kwargs)
+        logTw0i = interp1d(logTAGNs, np.array([6.6762, 6.6545, 6.6615]),
+                           **kwargs)
+        Tw1i = interp1d(logTAGNs, np.array([-0.5566, -0.3652, -0.0617]),
+                        **kwargs)
         self._Bi["lMc"] = lMci
         self._Bi["gamma"] = gammai
         self._Bi["alpha_T"] = alpha_Ti
@@ -647,15 +632,14 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
     def _get_fractions(self, cosmo, M):
         fb = get_fb(cosmo)
         Mbeta = (cosmo["h"] * M * 10 ** (-self.lMc)) ** self.beta
-        f_bound = fb * Mbeta / (1 + Mbeta)
+        f_bound = fb * Mbeta / (1+Mbeta)
         f_star = self.A_star * np.exp(
-            -0.5 * ((np.log10(cosmo["h"] * M) - 12.5) / self.sigma_star) ** 2
-        )
+            -0.5 * ((np.log10(cosmo["h"] * M) - 12.5) / self.sigma_star) ** 2)
         f_ejected = fb - f_bound - f_star
         return f_bound, f_ejected, f_star
 
     def _F_bound(self, x, G):
-        return (np.log(1 + x) / x) ** G
+        return (np.log(1+x) / x) ** G
 
     def _real(self, cosmo, r, M, a):
         # Real-space profile.
@@ -679,7 +663,8 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         xnorm = np.array([np.full_like(cM, G), cM]).T
         norm = np.exp(self.norm_interp(np.log(xnorm)))
         shape = self._F_bound(x, G)
-        rho_bound = (am3 * M_use * fb / (4 * np.pi * rs**3 * norm))[:, None] * shape
+        rho_bound = (am3 * M_use * fb
+                     / (4 * np.pi * rs**3 * norm))[:, None] * shape
 
         # Ejected gas
         # Eq. (2.13) of Schneider & Teyssier 2016
@@ -690,12 +675,13 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
             / (2 * np.pi * x_esc**2) ** 1.5)
 
         if self.quantity == "density":
-            prof = (rho_bound + rho_ejected) * self.prefac_rho
+            prof = (rho_bound+rho_ejected) * self.prefac_rho
         elif self.quantity == "pressure":
             # Boltmann constant which, when multiplied by T in Kelvin
             # gives you eV
             k_boltz = 8.61732814974493e-05
-            T_ejected = k_boltz * 10**self.logTw0 * np.exp(self.Tw1 * (1 / a - 1))
+            T_ejected = k_boltz * 10**self.logTw0 \
+                * np.exp(self.Tw1 * (1 / a - 1))
 
             # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
             mu_p = 0.61  # See footnote 8 in arXiv:2005.00009
@@ -703,13 +689,14 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
             # The quantity above is: G*(1 Msun)*(proton mass)/(1 Mpc)/(1 eV)
             # I.e. gravitational potential of a proton 1Mpc away from the sun
             # in eV.
-            T_bound_shape = np.log(1 + x) / x
+            T_bound_shape = np.log(1+x) / x
             T_bound_num = 2 * self.alpha_T * G_mp * mu_p * M_use
             T_bound_den = 3 * a * rDelta
             T_bound = (T_bound_num / T_bound_den)[:, None] * T_bound_shape
 
             # Put them together
-            prof = (rho_bound * T_bound + rho_ejected * T_ejected) * self.prefac_rho
+            prof = (rho_bound * T_bound + rho_ejected * T_ejected) \
+                * self.prefac_rho
 
         if np.ndim(r) == 0:
             prof = np.squeeze(prof, axis=-1)
@@ -856,15 +843,16 @@ class HaloProfileDensityNFW(_HaloProfileNFW):
                  par_C=-0.039,
                  m_fid=3e14,
                  kind="rho_gas"):
-        super().__init__(mass_def=mass_def,
-                         concentration=concentration,
-                         truncated=truncated,
-                         par_A=par_A,
-                         par_B=par_B,
-                         par_C=par_C,
-                         m_fid=m_fid,
-                         kind=kind,
-                         quantity="density")
+        super().__init__(
+            mass_def=mass_def,
+            concentration=concentration,
+            truncated=truncated,
+            par_A=par_A,
+            par_B=par_B,
+            par_C=par_C,
+            m_fid=m_fid,
+            kind=kind,
+            quantity="density")
 
 
 class HaloProfilePressureNFW(_HaloProfileNFW):
@@ -877,15 +865,16 @@ class HaloProfilePressureNFW(_HaloProfileNFW):
                  par_C=-0.039,
                  m_fid=3e14,
                  kind="rho_gas"):
-        super().__init__(mass_def=mass_def,
-                         concentration=concentration,
-                         truncated=truncated,
-                         par_A=par_A,
-                         par_B=par_B,
-                         par_C=par_C,
-                         m_fid=m_fid,
-                         kind=kind,
-                         quantity="pressure")
+        super().__init__(
+            mass_def=mass_def,
+            concentration=concentration,
+            truncated=truncated,
+            par_A=par_A,
+            par_B=par_B,
+            par_C=par_C,
+            m_fid=m_fid,
+            kind=kind,
+            quantity="pressure")
 
 
 class HaloProfileTemperatureSpectroscopicLike(ccl.halos.HaloProfile):
@@ -953,10 +942,10 @@ class HaloProfileXray(ccl.halos.HaloProfile):
     slow, but we have verified that the following empirical form
     works quite well:
 
-    X(k) = X_0 /(1+(k/k0)^gamma)^(alpha/gamma)
+    X(k) = X_0 /(1 + (k/k0)^gamma)^(alpha/gamma)
 
     where X_0 is given by the integral over volume of the real-
-    space profile, and alpha = 3+beta, where beta is the
+    space profile, and alpha = 3 + beta, where beta is the
     logarithmic tilt of the real-space spectrum on small scales.
     The pivot scale k_0 can be found by evaluating the Fourier
     transform numerically at very high k, and the intermediate
@@ -1044,82 +1033,64 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         q_piv = np.zeros([self.nz_fit, self.nlM_fit])
         sl_midk = np.zeros([self.nz_fit, self.nlM_fit])
         for iz, z in enumerate(zs):
-            a = 1.0 / (1 + z)
+            a = 1.0 / (1+z)
             rDelta = self.mass_def.get_radius(cosmo, Ms, a) / a
-            pr = np.array(
-                [self._real(cosmo, r0 * x, M, a) for r0, M in zip(rDelta, Ms)]
-            )
+            pr = np.array([self._real(cosmo, r0 * x, M, a)
+                           for r0, M in zip(rDelta, Ms)])
             f0 = simps(pr * x[None, :] ** 3, x=lx, axis=-1)
             tilt_lowr = np.log(pr[:, 1] / pr[:, 0]) / (lx[1] - lx[0])
             slope_hik = 3 + tilt_lowr
-            fint = [
-                interp1d(
+            fint = [interp1d(
                     lx,
                     np.log(p),
                     kind="linear",
                     fill_value="extrapolate",
-                    bounds_error=False,
-                )
-                for p in pr
-            ]
-            fhi = np.array(
-                [
-                    quad(
+                    bounds_error=False) for p in pr]
+            fhi = np.array([quad(
                         lambda y: np.exp(f(np.log(y))) * y,
                         a=1e-5,
                         b=xmax,
                         weight="sin",
-                        wvar=qhi,
-                    )[0]
-                    / qhi
-                    for f in fint
-                ]
-            )
+                        wvar=qhi)[0] / qhi
+                    for f in fint])
             q_pivot = qhi / (f0 / fhi - 1) ** (1 / slope_hik)
-            fmid = np.array(
-                [
-                    quad(
+            fmid = np.array([quad(
                         lambda y: np.exp(f(np.log(y))) * y,
                         a=1e-5,
                         b=xmax,
                         weight="sin",
-                        wvar=qp,
-                    )[0]
-                    / qp
-                    for f, qp in zip(fint, q_pivot)
-                ]
-            )
+                        wvar=qp)[0] / qp
+                    for f, qp in zip(fint, q_pivot)])
             slope_midk = slope_hik * np.log(2) / np.log(f0 / fmid)
             f0s[iz, :] = f0
             sl_hik[iz, :] = slope_hik
             q_piv[iz, :] = q_pivot
             sl_midk[iz, :] = slope_midk
         self.cosmo = cosmo
-        self.lf0 = RegularGridInterpolator(
-            [zs, l10Ms],
-            np.log(f0s),
-            fill_value=None,
-            bounds_error=False,
-            method="linear")
-        self.sl_hi = RegularGridInterpolator(
-            [zs, l10Ms], sl_hik, fill_value=None,
-            bounds_error=False, method="linear")
-        self.q_piv = RegularGridInterpolator(
-            [zs, l10Ms], q_piv, fill_value=None,
-            bounds_error=False, method="linear")
-        self.sl_mid = RegularGridInterpolator(
-            [zs, l10Ms], sl_midk, fill_value=None,
-            bounds_error=False, method="linear")
+        self.lf0 = RegularGridInterpolator([zs, l10Ms], np.log(f0s),
+                                           fill_value=None,
+                                           bounds_error=False,
+                                           method="linear")
+        self.sl_hi = RegularGridInterpolator([zs, l10Ms], sl_hik,
+                                             fill_value=None,
+                                             bounds_error=False,
+                                             method="linear")
+        self.q_piv = RegularGridInterpolator([zs, l10Ms], q_piv,
+                                             fill_value=None,
+                                             bounds_error=False,
+                                             method="linear")
+        self.sl_mid = RegularGridInterpolator([zs, l10Ms], sl_midk,
+                                              fill_value=None,
+                                              bounds_error=False,
+                                              method="linear")
 
     def _get_fourier_num(self, k, cosmo, M, a):
         r0 = self.mass_def.get_radius(cosmo, M, a) / a
         func = lambda x: self._real(cosmo, r0 * x, M, a) * x
         qs = r0 * k
-        fq = np.array(
-            [quad(func,
-                  a=1e-5, b=np.inf,
-                  weight="sin", wvar=q)[0] / q for q in qs]
-        )
+        fq = np.array([quad(func, a=1e-5, b=np.inf,
+                            weight="sin",
+                            wvar=q)[0] / q for q in qs])
         return fq * 4 * np.pi * r0**3
 
     def _should_recompute(self, cosmo):
@@ -1150,7 +1121,7 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         y = k_use[None, :] * (rDelta / q_piv)[:, None]
         part1 = 1 + y ** sl_mid[:, None]
         part2 = (sl_hi / sl_mid)[:, None]
-        prof = f0[:, None] / part1 ** part2
+        prof = f0[:, None] / part1**part2
 
         if np.ndim(k) == 0:
             prof = np.squeeze(prof, axis=-1)
@@ -1197,7 +1168,7 @@ class HaloProfileXray(ccl.halos.HaloProfile):
                 rD = rDelta[im]
                 # Only use fitting function up to 3 times virial radius
                 # Constant afterwards
-                x = np.minimum(r_use / rDelta[im], 3.0)
+                x = np.minimum(r_use / rDelta[im], 5.0)
                 xxc = x / xc[im]
                 part1 = xxc ** beta[im]
                 part2 = (1 + xxc) ** (gamma[im] - beta[im])
@@ -1217,12 +1188,248 @@ class HaloProfileXray(ccl.halos.HaloProfile):
         return prof
 
 
+class HaloProfileNFWBaryon(ccl.halos.HaloProfileMatter):
+    """Gas density profile given by the sum of the density profile for
+    the bound and the ejected gas, each modelled separetely for a halo
+    in hydrostatic equilibrium.
+
+    The density and mass fraction of the bound gas as well as the mass
+    fraction of the ejected gas taken from Mead 2020, and the density
+    of the ejected gas taken from Schneider & Teyssier 2016.
+
+    Profile is calculated in units of M_sun Mpc^-3 if
+    requesting mass density (`kind == 'rho_gas'`), or in cm^-3
+    if requesting a number density. Allowed values for `kind`
+    in the latter case are `'n_total'`, `'n_baryon'`, `'n_H'`,
+    `'n_electron'`.
+
+    Default values of all parameters correspond to the values
+    found in Mead et al. 2020.
+    """
+
+    def __init__(self, *,
+                 mass_def,
+                 concentration,
+                 lMc=14.0,
+                 beta=0.6,
+                 gamma=1.17,
+                 A_star=0.03,
+                 sigma_star=1.2,
+                 eta_b=0.5,
+                 logTAGN=None,
+                 quantity="density"):
+        self._Bi = None
+        if logTAGN is not None:
+            lMc, gamma, _, _, _ = self.from_logTAGN(logTAGN)
+        self.logTAGN = logTAGN
+        self.lMc = lMc
+        self.beta = beta
+        self.gamma = gamma
+        self.A_star = A_star
+        self.eta_b = eta_b
+        self.sigma_star = sigma_star
+        self.quantity = quantity
+        self.norm_interp = self.get_bound_norm_interp(self.gamma)
+        self.fourier_interp = self.get_bound_fourier_interp(self.gamma)
+        super().__init__(mass_def=mass_def, concentration=concentration)
+
+    def get_bound_fourier_interp(self, gamma, get_fq=False):
+        qs = np.geomspace(1e-3, 1e3, 128)
+        fq = np.array(
+            [quad(lambda x: x * self._F_bound(x, 1 / (gamma - 1)),
+                  1e-4,
+                  np.inf,
+                  weight="sin",
+                  wvar=q)[0] / q for q in qs])
+        # Divide by value at q -> 0
+        norm = quad(lambda x: x**2 *
+                    self._F_bound(x, 1 / (gamma-1)), 1e-4, np.inf)[0]
+        fq /= norm
+        ip = interp1d(np.log(qs),
+                      np.log(fq),
+                      fill_value="extrapolate",
+                      bounds_error=False)
+        return ip
+
+    def get_bound_norm_interp(self, gamma):
+        cs = np.geomspace(1e-2, 100, 64)
+        norms = np.array([quad(lambda x: x**2 *
+                          self._F_bound(x, 1 / (gamma-1)),
+                          0, c)[0] for c in cs])
+        ip = interp1d(np.log(cs),
+                      np.log(norms),
+                      fill_value="extrapolate",
+                      bounds_error=False)
+        return ip
+
+    def update_parameters(self,
+                          lMc=None,
+                          beta=None,
+                          gamma=None,
+                          A_star=None,
+                          sigma_star=None,
+                          eta_b=None,
+                          logTAGN=None):
+        if logTAGN is not None:
+            lMc, gamma, _, _, _ = self.from_logTAGN(logTAGN)
+            self.logTAGN = logTAGN
+        if lMc is not None:
+            self.lMc = lMc
+        if beta is not None:
+            self.beta = beta
+        if gamma is not None:
+            self.gamma = gamma
+            self.norm_interp = self.get_bound_norm_interp(self.gamma)
+            self.fourier_interp = self.get_bound_fourier_interp(self.gamma)
+        if A_star is not None:
+            self.A_star = A_star
+        if eta_b is not None:
+            self.eta_b = eta_b
+        if sigma_star is not None:
+            self.sigma_star = sigma_star
+
+    def _build_BAHAMAS_interp(self):
+        if self._Bi is not None:
+            return
+        kwargs = {"kind": "linear",
+                  "bounds_error": False,
+                  "fill_value": "extrapolate"}
+        logTAGNs = np.array([7.6, 7.8, 8.0])
+        self._Bi = {}
+        lMci = interp1d(logTAGNs, np.array([13.1949, 13.5937, 14.2480]),
+                        **kwargs)
+        gammai = interp1d(logTAGNs, np.array([1.1647, 1.1770, 1.1966]),
+                          **kwargs)
+        alpha_Ti = interp1d(logTAGNs, np.array([0.7642, 0.8471, 1.0314]),
+                            **kwargs)
+        logTw0i = interp1d(logTAGNs, np.array([6.6762, 6.6545, 6.6615]),
+                           **kwargs)
+        Tw1i = interp1d(logTAGNs, np.array([-0.5566, -0.3652, -0.0617]),
+                        **kwargs)
+        self._Bi["lMc"] = lMci
+        self._Bi["gamma"] = gammai
+        self._Bi["alpha_T"] = alpha_Ti
+        self._Bi["logTw0"] = logTw0i
+        self._Bi["Tw1"] = Tw1i
+
+    def from_logTAGN(self, logTAGN):
+        self._build_BAHAMAS_interp()
+        lMc = self._Bi["lMc"](logTAGN)
+        gamma = self._Bi["gamma"](logTAGN)
+        alpha_T = self._Bi["alpha_T"](logTAGN)
+        logTw0 = self._Bi["logTw0"](logTAGN)
+        Tw1 = self._Bi["Tw1"](logTAGN)
+        return lMc, gamma, alpha_T, logTw0, Tw1
+
+    def _get_fractions(self, cosmo, M):
+        fb = get_fb(cosmo)
+        f_cold = 1 - fb
+        Mbeta = (cosmo["h"] * M * 10 ** (-self.lMc)) ** self.beta
+        f_bound = fb * Mbeta / (1 + Mbeta)
+        f_star = self.A_star * np.exp(
+            -0.5 * ((np.log10(cosmo["h"] * M) - 12.5) / self.sigma_star) ** 2)
+        f_ejected = fb - f_bound - f_star
+        return f_cold, f_bound, f_ejected, f_star
+
+    def _F_bound(self, x, G):
+        return (np.log(1 + x) / x) ** G
+
+    def _real(self, cosmo, r, M, a):
+        # Real-space profile.
+        r_use = np.atleast_1d(r)
+        M_use = np.atleast_1d(M)
+
+        # Comoving virial radius
+        Delta = self.mass_def.get_Delta(cosmo, a)
+        rDelta = self.mass_def.get_radius(cosmo, M_use, a) / a
+        cM = self.concentration(cosmo, M_use, a)
+        rs = rDelta / cM
+        x = r_use[None, :] / rs[:, None]
+
+        # Mass fractions
+        fc, fb, fe, _ = self._get_fractions(cosmo, M)
+
+        # Cold dark matter
+        norm_cold = np.log(1 + cM) - cM / (1 + cM)
+        shape_cold = 1 / (x * (1 + x) ** 2)
+        rho_cold = (M_use * fc / (4 * np.pi * rs**3 * norm_cold))[
+            :, None] * shape_cold
+
+        # Bound gas
+        G = 1.0 / (self.gamma - 1)
+        norm_bound = np.exp(self.norm_interp(np.log(cM)))
+        shape_bound = self._F_bound(x, G)
+        rho_bound = (M_use * fb / (4 * np.pi * rs**3 * norm_bound))[
+            :, None] * shape_bound
+
+        # Ejected gas
+        # Eq. (2.13) of Schneider & Teyssier 2016
+        x_esc = (self.eta_b * 0.375 * np.sqrt(Delta) * cM)[:, None]
+        rho_ejected = ((M_use * fe / rs**3)[:, None]
+                       * np.exp(-0.5 * (x / x_esc) ** 2)
+                       / (2 * np.pi * x_esc**2) ** 1.5)
+
+        prof = rho_cold + rho_bound + rho_ejected
+
+        if np.ndim(r) == 0:
+            prof = np.squeeze(prof, axis=-1)
+        if np.ndim(M) == 0:
+            prof = np.squeeze(prof, axis=0)
+        return prof
+
+    def _fourier(self, cosmo, k, M, a):
+        # Real-space profile.
+        k_use = np.atleast_1d(k)
+        M_use = np.atleast_1d(M)
+
+        # Comoving virial radius
+        Delta = self.mass_def.get_Delta(cosmo, a)
+        rDelta = self.mass_def.get_radius(cosmo, M_use, a) / a
+        cM = self.concentration(cosmo, M_use, a)
+        rs = rDelta / cM
+        x = k_use[None, :] * rs[:, None]
+
+        # Mass fractions
+        fc, fb, fe, fs = self._get_fractions(cosmo, M)
+
+        # Cold dark matter
+        norm_cold = np.log(1 + cM) - cM / (1 + cM)
+        Si1, Ci1 = sici((1 + cM)[:, None] * x)
+        Si2, Ci2 = sici(x)
+        p1 = np.sin(x) * (Si1 - Si2) + np.cos(x) * (Ci1 - Ci2)
+        p2 = np.sin(cM[:, None] * x) / ((1 + cM[:, None]) * x)
+        shape_cold = p1 - p2
+        rho_cold = (M_use * fc / norm_cold)[:, None] * shape_cold
+
+        # Bound gas
+        # Already normalised!
+        norm_bound = 1.0
+        shape_bound = np.exp(self.fourier_interp(np.log(x)))
+        rho_bound = (M_use * fb / norm_bound)[:, None] * shape_bound
+
+        # Ejected gas
+        # Eq. (2.13) of Schneider & Teyssier 2016
+        x_esc = (self.eta_b * 0.375 * np.sqrt(Delta) * cM)[:, None]
+        rho_ejected = (M_use * fe)[:, None] * np.exp(-0.5 * (x * x_esc) ** 2)
+
+        # Stars
+        rho_stars = (M_use * fs)[:, None] * np.ones_like(k_use)[None, :]
+
+        prof = rho_cold + rho_bound + rho_ejected + rho_stars
+
+        if np.ndim(k) == 0:
+            prof = np.squeeze(prof, axis=-1)
+        if np.ndim(M) == 0:
+            prof = np.squeeze(prof, axis=0)
+        return prof
+
+
 def XrayTracer(cosmo, z_min=0.0, z_max=2.0, n_chi=1024):
     """Specific :class:`Tracer` associated with X-ray flux.
     The radial kernel for this tracer is simply
 
     .. math::
-       W(\\chi) = \\frac{1}{4\\pi(1+z)^3}.
+       W(\\chi) = \\frac{1}{4\\pi(1 + z)^3}.
 
     Args:
         cosmo (:class:`~pyccl.core.Cosmology`): Cosmology object.

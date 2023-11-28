@@ -1,10 +1,11 @@
-from .rosat import ROSATResponse
 from .like import ROSATxLike
-from .profiles import (HaloProfileDensityBattaglia,
-                       HaloProfilePressureBattaglia,
-                       HaloProfileDensityHE,
-                       HaloProfilePressureHE,
-                       HaloProfileDensityNFW,
-                       HaloProfileTemperatureSpectroscopicLike,
-                       HaloProfileXray,
-                       XrayTracer)
+from .profiles import (
+    HaloProfileDensityBattaglia,
+    HaloProfilePressureBattaglia,
+    HaloProfileDensityNFW,
+    HaloProfilePressureNFW,
+    HaloProfileDensityHE,
+    HaloProfilePressureHE,
+    HaloProfileXray,
+    HaloProfileNFWBaryon,
+    XrayTracer)
