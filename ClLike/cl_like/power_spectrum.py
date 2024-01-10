@@ -57,6 +57,7 @@ class Pk(Theory):
     ignore_lbias : bool = False
     allow_bcm_emu_extrapolation_for_shear : bool = True
     allow_halofit_extrapolation_for_shear : bool = False
+    allow_halofit_extrapolation_for_shear_on_k: bool = False
 
     def initialize(self):
         # Bias model
@@ -126,7 +127,8 @@ class Pk(Theory):
                                               use_baryon_boost=use_baryon_boost,
                                               ignore_lbias=self.ignore_lbias,
                                               allow_bcm_emu_extrapolation_for_shear=self.allow_bcm_emu_extrapolation_for_shear,
-                                              allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear
+                                              allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear,
+                                              allow_halofit_extrapolation_for_shear_on_k=self.allow_halofit_extrapolation_for_shear_on_k
                                              )
         else:
             if self.baryon_model == 'Bacco':

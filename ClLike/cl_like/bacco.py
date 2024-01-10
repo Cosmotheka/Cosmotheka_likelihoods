@@ -20,7 +20,8 @@ class BaccoCalculator(object):
                  log10k_sh_sh_min=np.log10(0.0001), log10k_sh_sh_max=np.log10(50), nk_sh_sh_per_decade=20,
                  a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None, use_baryon_boost=False,
                  ignore_lbias=False, allow_bcm_emu_extrapolation_for_shear=True,
-                 allow_halofit_extrapolation_for_shear=False):
+                 allow_halofit_extrapolation_for_shear=False,
+                 allow_halofit_extrapolation_for_shear_on_k=False):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
         nk_sh_sh_total = int((log10k_sh_sh_max - log10k_sh_sh_min) * nk_sh_sh_per_decade)
         self.ks = np.logspace(log10k_min, log10k_max, nk_total)
@@ -29,6 +30,7 @@ class BaccoCalculator(object):
         self.ignore_lbias = ignore_lbias
         self.allow_bcm_emu_extrapolation_for_shear = allow_bcm_emu_extrapolation_for_shear
         self.allow_halofit_extrapolation_for_shear = allow_halofit_extrapolation_for_shear
+        self.allow_halofit_extrapolation_for_shear_on_k = allow_halofit_extrapolation_for_shear_on_k
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=UserWarning)
@@ -188,10 +190,23 @@ class BaccoCalculator(object):
             pk = self.mpk.get_nonlinear_pk(baryonic_boost=False, cold=False,
                                            k=k_sh_sh_for_bacco,
                                            **cospar_and_a)[1]/h**3
+
         if baryonic_boost:
             Sk = self.get_baryonic_boost(cosmo, bcmpar, k_sh_sh_for_bacco)
         else:
             Sk = np.ones_like(pk)
+
+        if self.allow_halofit_extrapolation_for_shear_on_k:
+            cosmo.compute_nonlin_power()
+            pknl = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+            kix = self.mask_ks_sh_sh_for_bacco[-1] + 1
+            pkhfit = [pknl(self.ks_sh_sh[kix:], a) for a in self.a_s]
+            pk = np.concatenate([pk, pkhfit], axis=1)
+            # Extrapolating as in CCL. We could come up with different
+            # extrapolation schemes (e.g. Sk = constant?)
+            Sk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
+                            pk_arr=np.log(Sk), is_logp=True)
+            Sk = np.array([Sk2d(self.ks_sh_sh, ai) for ai in self.a_s])
 
         self.pk_temp_sh_sh = pk * Sk
         self.Sk_temp = Sk
@@ -290,15 +305,28 @@ class BaccoCalculator(object):
                 's2k2': 0.5,
                 'k2k2': 1.0}
 
+        print(1)
         if kind == 'Sk':
+            print(2)
             pk = np.log(self.Sk_temp)
-            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
-                            pk_arr=pk, is_logp=True)
+            if self.allow_halofit_extrapolation_for_shear_on_k:
+                k = self.ks_sh_sh
+            else:
+                k = self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]
+            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(k), pk_arr=pk,
+                            is_logp=True)
+            print(3)
             self.pk2d_computed[kind] = pk2d
         elif kind == 'mm_sh_sh':
+            print(4)
+            if self.allow_halofit_extrapolation_for_shear_on_k:
+                k = self.ks_sh_sh
+            else:
+                k = self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]
             pk = np.log(self.pk_temp_sh_sh)
-            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
-                            pk_arr=pk, is_logp=True)
+            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(k), pk_arr=pk,
+                            is_logp=True)
+            print(5)
             self.pk2d_computed[kind] = pk2d
         else:
             if not self.ignore_lbias:

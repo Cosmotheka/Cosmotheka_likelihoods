@@ -72,7 +72,8 @@ def get_info(A_sE9=True):
                        },
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
-                               "matter_pk": "linear",
+                               # "matter_pk": "linear",
+                               "matter_pk": "halofit",
                                "baryons_pk": "nobaryons"},
                        "limber": {"external": Limber,
                                   "nz_model": "NzShift",
@@ -219,3 +220,56 @@ def test_get_pars_and_a_for_bacco(ptc):
     for pn, pv in bcmpar.items():
         assert np.all(combined_pars[pn] == np.array([pv] * len(a_arr)))
 
+def test_hfit_extrapolation(ptc):
+    info = get_info()
+    info['theory']['Pk']['allow_halofit_extrapolation_for_shear_on_k'] = True
+    pars = info['params']
+
+    cosmo = ccl.Cosmology(Omega_c=pars['Omega_c'],
+                          Omega_b=pars['Omega_b'],
+                          h=pars['h'],
+                          n_s=pars['n_s'],
+                          A_s=pars['A_sE9']*1e-9,
+                          m_nu=pars['m_nu'])
+
+    bcmpar = {
+               "M_c" :  14,
+               "eta" : -0.3,
+               "beta" : -0.22,
+               "M1_z0_cen" : 10.5,
+               "theta_out" : 0.25,
+               "theta_inn" : -0.86,
+               "M_inn" : 13.4,
+    }
+
+    ptc.update_pk(cosmo, bcmpar=None)
+    a_arr, lnk, pk = ptc.get_pk('mm_sh_sh').get_spline_arrays()
+    ptc.update_pk(cosmo, bcmpar=bcmpar)
+    pkb = ptc.get_pk('mm_sh_sh')
+    Sk = ptc.get_pk('Sk')
+
+    cosmo.compute_nonlin_power()
+    pkh = cosmo.get_nonlin_power()
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    lkl = model.likelihood['ClLike']
+    a_arr, lnk2, pkb2 = lkl.provider.get_Pk()['pk_data']['pk_ww'].get_spline_arrays()
+    a_arr, lnk2, Sk2 = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()
+    k = np.exp(lnk)
+    k2 = np.exp(lnk2)
+    for i, ai in enumerate(a_arr):
+        sel = lnk2 > lnk[-1]
+        # k < baccoemu kmax
+        assert Sk(k, ai) == pytest.approx(Sk2[i, ~sel], rel=1e-3)
+        assert pkb(k, ai) == pytest.approx(pkb2[i, ~sel], rel=1e-3)
+        # k > baccoemu kmax
+        from matplotlib import pyplot as plt
+        # plt.loglog(k2[sel], pkh(k2[sel], ai) * Sk(k2[sel], ai))
+        # plt.loglog(k2[sel], pkb2[i, sel])
+        plt.loglog(k2, pkb(k2, ai))
+        plt.loglog(k2, pkb2[i])
+        plt.loglog(k2, pkh(k2, ai) * Sk(k2, ai), ls='--')
+        plt.show()
+        assert pkh(k2[sel], ai) * Sk(k2[sel], ai)  == pytest.approx(pkb2[i, sel], rel=1e-3)
