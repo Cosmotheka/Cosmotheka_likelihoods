@@ -305,9 +305,7 @@ class BaccoCalculator(object):
                 's2k2': 0.5,
                 'k2k2': 1.0}
 
-        print(1)
         if kind == 'Sk':
-            print(2)
             pk = np.log(self.Sk_temp)
             if self.allow_halofit_extrapolation_for_shear_on_k:
                 k = self.ks_sh_sh
@@ -315,10 +313,8 @@ class BaccoCalculator(object):
                 k = self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]
             pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(k), pk_arr=pk,
                             is_logp=True)
-            print(3)
             self.pk2d_computed[kind] = pk2d
         elif kind == 'mm_sh_sh':
-            print(4)
             if self.allow_halofit_extrapolation_for_shear_on_k:
                 k = self.ks_sh_sh
             else:
@@ -326,7 +322,6 @@ class BaccoCalculator(object):
             pk = np.log(self.pk_temp_sh_sh)
             pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(k), pk_arr=pk,
                             is_logp=True)
-            print(5)
             self.pk2d_computed[kind] = pk2d
         else:
             if not self.ignore_lbias:

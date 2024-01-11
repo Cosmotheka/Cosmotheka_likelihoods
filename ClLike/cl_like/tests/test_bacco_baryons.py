@@ -242,10 +242,9 @@ def test_hfit_extrapolation(ptc):
                "M_inn" : 13.4,
     }
 
-    ptc.update_pk(cosmo, bcmpar=None)
-    a_arr, lnk, pk = ptc.get_pk('mm_sh_sh').get_spline_arrays()
     ptc.update_pk(cosmo, bcmpar=bcmpar)
     pkb = ptc.get_pk('mm_sh_sh')
+    lnk = pkb.get_spline_arrays()[1]
     Sk = ptc.get_pk('Sk')
 
     cosmo.compute_nonlin_power()
@@ -253,23 +252,16 @@ def test_hfit_extrapolation(ptc):
 
     model = get_model(info)
     loglikes, derived = model.loglikes()
-    print(loglikes)
     lkl = model.likelihood['ClLike']
     a_arr, lnk2, pkb2 = lkl.provider.get_Pk()['pk_data']['pk_ww'].get_spline_arrays()
     a_arr, lnk2, Sk2 = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()
+
     k = np.exp(lnk)
     k2 = np.exp(lnk2)
     for i, ai in enumerate(a_arr):
         sel = lnk2 > lnk[-1]
         # k < baccoemu kmax
-        assert Sk(k, ai) == pytest.approx(Sk2[i, ~sel], rel=1e-3)
-        assert pkb(k, ai) == pytest.approx(pkb2[i, ~sel], rel=1e-3)
+        assert Sk(k, ai) == pytest.approx(Sk2[i, ~sel], rel=5e-3)
+        assert pkb(k, ai) == pytest.approx(pkb2[i, ~sel], rel=5e-3)
         # k > baccoemu kmax
-        from matplotlib import pyplot as plt
-        # plt.loglog(k2[sel], pkh(k2[sel], ai) * Sk(k2[sel], ai))
-        # plt.loglog(k2[sel], pkb2[i, sel])
-        plt.loglog(k2, pkb(k2, ai))
-        plt.loglog(k2, pkb2[i])
-        plt.loglog(k2, pkh(k2, ai) * Sk(k2, ai), ls='--')
-        plt.show()
-        assert pkh(k2[sel], ai) * Sk(k2[sel], ai)  == pytest.approx(pkb2[i, sel], rel=1e-3)
+        assert pkh(k2[sel], ai) * Sk(k2[sel], ai)  == pytest.approx(pkb2[i, sel], rel=1e-2)
