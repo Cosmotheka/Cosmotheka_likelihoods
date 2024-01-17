@@ -42,4 +42,5 @@ def test_dum():
     model = get_model(info)
     loglikes, derived = model.loglikes()
     assert np.isfinite(loglikes)
-    assert loglikes[0] < 50
+    chi2 = -2 * loglikes[0]
+    assert (chi2 >= 0) and (chi2 < 50)

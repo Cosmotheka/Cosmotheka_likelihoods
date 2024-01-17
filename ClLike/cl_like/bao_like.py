@@ -74,4 +74,4 @@ class BAOLike(Likelihood):
         cosmo = self.provider.get_CCL()["cosmo"]
         theory = self.get_theory(cosmo)
         res = theory-self.mean
-        return np.dot(res, np.dot(self.icov, res))
+        return -0.5 * np.dot(res, np.dot(self.icov, res))
