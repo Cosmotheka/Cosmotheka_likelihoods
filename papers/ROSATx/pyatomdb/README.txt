@@ -214,3 +214,23 @@ Corrected bug with return_spectrum leading to overestimate in E-E brems of ~20%
 0.10.13
 February 6th 2023
 Another attempt to fix issues with curl library
+
+0.11.0
+October 5th 2023
+Added rsapec model
+
+0.11.1
+November 13th 2023
+Bugfix to atomic.elsymb_to_Z. Thank you to Guan-Fu Liu for spotting this.
+
+0.11.2
+November 22nd 2023
+Added formatting to level list print outs, in spectrum.CIESession.format_linelist
+
+0.11.3
+December 5th 2023
+Bugfix to spectrum.py, resolving issue 47
+
+0.11.4
+January 17th 2024
+Updated atomic.py to hold uniform L shell labels up to L=27

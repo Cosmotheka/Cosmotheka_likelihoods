@@ -1,6 +1,7 @@
 __all__=["atomdb","util","atomic","spectrum","const","apec"]
 
-from .atomdb import *
+#from .atomdb import *
+import os
 from . import spectrum
 from . import atomic
 import ctypes
@@ -8,13 +9,11 @@ from . import apec
 from . import util
 import sys, glob
 
-__version__="0.10.13"
+__version__="0.11.4"
 
 try:
   PATH = os.path.dirname(__file__)
-  print(PATH)
   g = glob.glob("%s/../linear_approx*.dylib"%(PATH))
-  print(len(g))
   if len(g) ==1:
     liblinapprox_file = os.path.join(PATH,g[0])
   else:
