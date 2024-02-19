@@ -740,6 +740,139 @@ class HaloProfilePressureHE(_HaloProfileHE):
                          alpha_T=alpha_T,
                          kind=kind,
                          quantity="pressure")
+        
+        self._fourier_interp = None
+
+
+    def _Pbound_shape_interp(self):
+        """
+        """
+        qs = np.geomspace(1e-4, 1e2, 256)
+        
+        gammas = np.linspace(1.001, 3., 512)
+        Gs = 1 / (gammas - 1)
+
+        #G = 1 / (self.gamma - 1)
+        def integrand(x, G):
+            return x*self._F_bound(x, G+1)
+
+        f_arr = np.array(
+            [
+                [
+                    quad(
+                        integrand,
+                        args=(G,),
+                        a=1e-4,
+                        b=np.inf,
+                        weight="sin",
+                        wvar=q)[0] / q
+                    
+                    for G in Gs
+                ]
+                for q in qs
+            ])
+
+        Fqb = RegularGridInterpolator(
+            (np.log(qs), gammas),
+            np.log(f_arr),
+            fill_value=None,
+            bounds_error=False,
+            method="linear",
+        )
+
+        return Fqb
+    
+
+    def _fourier(self, cosmo, k, M, a):
+        """
+        """
+
+        if self._fourier_interp is None:
+            with ccl.UnlockInstance(self):
+                self._fourier_interp = self._Pbound_shape_interp()
+        k_use = np.atleast_1d(k)
+        M_use = np.atleast_1d(M)
+
+        Delta = self.mass_def.get_Delta(cosmo, a)
+        rDelta = self.mass_def.get_radius(cosmo, M_use, a) / a
+        cM = self.concentration(cosmo, M_use, a)
+        rs = rDelta/cM
+        am3 = 1/a**3
+        qs = k_use[None, :] * rs[:, None]
+
+        # Mass fractions
+        fb, fe, _ = self._get_fractions(cosmo, M)
+
+        # Temp. ejected gas
+        k_boltz = 8.61732814974493e-05
+        T_ejected = k_boltz * 10**self.logTw0 * np.exp(self.Tw1*(1/a-1))
+
+        # Density ejected gas (fourier)
+        x_esc = (self.eta_b * 0.375 * np.sqrt(Delta) * cM)[:, None]
+        density_ejected_fourier = np.exp(-0.5*(qs*x_esc)**2)
+
+        # Pressure bound gas
+        Pbound_integral_interp = self._fourier_interp
+
+        gammas = np.full_like(qs, self.gamma)
+        ev = np.array(
+            [np.log(qs).flatten(), gammas.flatten()]
+        ).T
+        Pbound_shape_fourier = np.exp(Pbound_integral_interp(ev)).reshape([-1, len(k)])
+
+        # Normalize Pbound
+        # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
+        mu_p = 0.61  # See footnote 8 in arXiv:2005.00009
+        G_mp = 4.49158049E-11
+        T_bound_num = 2 * self.alpha_T * G_mp * mu_p * M_use
+        T_bound_den = 3 * a * rDelta
+        T_bound_norm = (T_bound_num / T_bound_den)[:, None]
+
+        G = 1./(self.gamma-1)
+        xnorm = np.array([np.full_like(cM, G), cM]).T
+        norm = np.exp(self.norm_interp(np.log(xnorm)))
+        rho_bound_norm = (am3*M_use*fb/norm)[:,None]
+
+        density_ejected_norm = (am3*M_use*fe)[:,None]
+
+        prof = (Pbound_shape_fourier * T_bound_norm * rho_bound_norm + density_ejected_fourier * T_ejected * density_ejected_norm) * self.prefac_rho
+        if np.ndim(rs) == 0:
+            prof = np.squeeze(prof, axis=-1)
+        if np.ndim(M) == 0:
+            prof = np.squeeze(prof, axis=0)
+
+        return prof
+
+
+    def _fourier_num_slow(self, cosmo, k, M, a):
+        """
+        """
+        M = np.atleast_1d(M)
+        k = np.atleast_1d(k)
+
+        r0 = self.mass_def.get_radius(cosmo, M, a) / a
+        print(f"Shape of r0 is {r0.shape}")
+        print(f"Shape of k is {k.shape}")
+        print(f"Shape of M is {M.shape}")
+        func = lambda x, rval, mval: self._real(cosmo, rval * x, mval, a) * x
+        qs = k[None, :] * r0[:, None]
+        rvals = np.ones(len(k))[None, :] * r0[:, None]
+        mvals = np.ones(len(k))[None, :] * M[:, None]
+
+        qs = qs.flatten()
+        rvals = rvals.flatten()
+        mvals = mvals.flatten()
+
+        print(qs.shape)
+        fq = np.array(
+            [quad(func, args=(rvals[i], mvals[i]), a=1e-5, b=np.inf, weight="sin", wvar=q)[0] /
+            q for i,q in enumerate(qs)]
+        )
+        
+        fq *= 4 * np.pi * rvals ** 3
+        fq = fq.reshape([-1, len(k)])
+
+        return fq 
 
 
 class _HaloProfileNFW(ccl.halos.HaloProfile):
