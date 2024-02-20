@@ -19,24 +19,28 @@ params:
       max: 15.0
     ref: 14.2
     proposal: 0.01
+    latex: \log_{10}M_c
   alpha_T:
     prior:
       min: 0.5
       max: 2.0
     ref: 1.0
     proposal: 0.01
+    latex: \alpha_T
   eta_b:
     prior:
       min: 0.2
       max: 2.0
     ref: 0.5
     proposal: 0.01
+    latex: \eta_b
   gamma:
     prior:
       min: 1.1
       max: 1.5
     ref: 1.19
     proposal: 0.01
+    latex: \Gamma
 sampler:
   mcmc:
     burn_in: 0
