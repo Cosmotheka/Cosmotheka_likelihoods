@@ -1,4 +1,4 @@
-#import pyatomdb as padb
+import pyatomdb as padb
 import numpy as np
 from astropy.io import fits
 

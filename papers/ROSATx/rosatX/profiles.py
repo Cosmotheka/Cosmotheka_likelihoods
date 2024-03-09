@@ -146,12 +146,10 @@ class HaloProfileDensityBattaglia(ccl.halos.HaloProfile):
             self.alpha_aM = alpha_aM
         if alpha_az is not None:
             self.alpha_az = alpha_az
+        if xc is not None:
+            self.xc = xc
 
         re_fourier = False
-        if xc is not None:
-            if xc != self.xc:
-                re_fourier = True
-            self.xc = xc
         if gamma is not None:
             if gamma != self.gamma:
                 re_fourier = True
@@ -551,6 +549,9 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
 
         super().__init__(mass_def=mass_def, concentration=concentration)
 
+    def _F_bound(self, x, G):
+        return (np.log(1 + x) / x)**G
+
     def get_dens_norm_interp(self):
         cs = np.geomspace(1E-2, 100, 64)
         gs = np.geomspace(0.1, 10, 64)
@@ -630,14 +631,11 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
     def _get_fractions(self, cosmo, M):
         fb = get_fb(cosmo)
         Mbeta = (cosmo['h']*M*10**(-self.lMc))**self.beta
-        f_bound = fb*Mbeta/(1+Mbeta)
         f_star = self.A_star * \
             np.exp(-0.5*((np.log10(cosmo["h"]*M)-12.5)/self.sigma_star)**2)
+        f_bound = (fb-f_star)*Mbeta/(1+Mbeta)
         f_ejected = fb-f_bound-f_star
         return f_bound, f_ejected, f_star
-
-    def _F_bound(self, x, G):
-        return (np.log(1 + x) / x)**G
 
     def _real(self, cosmo, r, M, a):
         # Real-space profile.
@@ -661,6 +659,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
         xnorm = np.array([np.full_like(cM, G), cM]).T
         norm = np.exp(self.norm_interp(np.log(xnorm)))
         shape = self._F_bound(x, G)
+        # TODO: should we truncate at r=r_Delta?
         rho_bound = (am3*M_use*fb/(4*np.pi*rs**3*norm))[:, None]*shape
 
         # Ejected gas
@@ -683,7 +682,7 @@ class _HaloProfileHE(ccl.halos.HaloProfile):
             # The quantity above is: G*(1 Msun)*(proton mass)/(1 Mpc)/(1 eV)
             # I.e. gravitational potential of a proton 1Mpc away from the sun
             # in eV.
-            T_bound_shape = np.log(1+x)/x
+            T_bound_shape = shape**(self.gamma-1)
             T_bound_num = 2 * self.alpha_T * G_mp * mu_p * M_use
             T_bound_den = 3 * a * rDelta
             T_bound = (T_bound_num / T_bound_den)[:, None] * T_bound_shape
@@ -873,107 +872,6 @@ class HaloProfilePressureHE(_HaloProfileHE):
         fq = fq.reshape([-1, len(k)])
 
         return fq 
-
-
-class _HaloProfileNFW(ccl.halos.HaloProfile):
-    """Simple gas density profile assuming NFW (times cosmic
-    baryon fraction).
-    """
-    def __init__(self, *, mass_def, concentration,
-                 truncated=True,
-                 par_A=4.295,
-                 par_B=0.514,
-                 par_C=-0.039,
-                 m_fid=3e14,
-                 kind="rho_gas",
-                 quantity="density"):
-        self.nfw = ccl.halos.HaloProfileNFW(
-            mass_def=mass_def,
-            concentration=concentration,
-            fourier_analytic=True,
-            projected_analytic=False,
-            cumul2d_analytic=False,
-            truncated=truncated)
-        self.kind = kind
-        self.prefac_rho = get_prefac_rho(self.kind)
-        self.par_A = par_A
-        self.par_B = par_B
-        self.par_C = par_C
-        self.m_fid = m_fid
-        self.quantity = quantity
-        super().__init__(mass_def=mass_def, concentration=concentration)
-
-    def _norm(self, cosmo):
-        return get_fb(cosmo) * self.prefac_rho
-
-    def _get_T(self, cosmo, M, a):
-        m_ratio = M / self.m_fid
-        exponent = self.par_B + self.par_C * np.log10(m_ratio)
-        cosmo_model = ccl.h_over_h0(cosmo, a) ** (2 / 3)
-
-        return 1E3*cosmo_model * self.par_A * m_ratio ** exponent
-
-    def _real(self, cosmo, r, M, a):
-        r_use = np.atleast_1d(r)
-        M_use = np.atleast_1d(M)
-
-        norm = self._norm(cosmo)
-        prof = norm * self.nfw._real(cosmo, r_use, M_use, a)
-
-        if self.quantity == 'pressure':
-            T = self._get_T(cosmo, M_use, a)
-            prof *= T[:, None]
-
-        if np.ndim(r) == 0:
-            prof = np.squeeze(prof, axis=-1)
-        if np.ndim(M) == 0:
-            prof = np.squeeze(prof, axis=0)
-        return prof
-
-    def _fourier(self, cosmo, k, M, a):
-        k_use = np.atleast_1d(k)
-        M_use = np.atleast_1d(M)
-
-        norm = self._norm(cosmo)
-        prof = norm * self.nfw._fourier(cosmo, k_use, M_use, a)
-
-        if self.quantity == 'pressure':
-            T = self._get_T(cosmo, M_use, a)
-            prof *= T[:, None]
-
-        if np.ndim(k) == 0:
-            prof = np.squeeze(prof, axis=-1)
-        if np.ndim(M) == 0:
-            prof = np.squeeze(prof, axis=0)
-        return prof
-
-
-class HaloProfileDensityNFW(_HaloProfileNFW):
-    def __init__(self, *, mass_def, concentration,
-                 truncated=True,
-                 par_A=4.295,
-                 par_B=0.514,
-                 par_C=-0.039,
-                 m_fid=3e14,
-                 kind="rho_gas"):
-        super().__init__(mass_def=mass_def, concentration=concentration,
-                         truncated=truncated,
-                         par_A=par_A, par_B=par_B, par_C=par_C,
-                         m_fid=m_fid, kind=kind, quantity='density')
-
-
-class HaloProfilePressureNFW(_HaloProfileNFW):
-    def __init__(self, *, mass_def, concentration,
-                 truncated=True,
-                 par_A=4.295,
-                 par_B=0.514,
-                 par_C=-0.039,
-                 m_fid=3e14,
-                 kind="rho_gas"):
-        super().__init__(mass_def=mass_def, concentration=concentration,
-                         truncated=truncated,
-                         par_A=par_A, par_B=par_B, par_C=par_C,
-                         m_fid=m_fid, kind=kind, quantity='pressure')
 
 
 class HaloProfileXray(ccl.halos.HaloProfile):
