@@ -1,13 +1,28 @@
 import pyatomdb as padb
 import numpy as np
 from astropy.io import fits
+import os
+import pickle
 
 
 class ROSATResponse(object):
-    def __init__(self, fname_rsp, Zmetal=0.3):
+    def __init__(self, fname_rsp=None, fname_rmf=None,
+                 fname_arf=None, Zmetal=0.3):
+        if (fname_rsp is None) and (fname_rmf is None):
+            raise ValueError("Need either RSP or RMF + ARF files")
+        # We prioritise RMF + ARF
+        if fname_rmf is not None:
+            if fname_arf is None:
+                raise ValueError("Need ARF with RMF")
+            self.rsp_h = fits.open(fname_rmf)[1].data
+            self.chans_h = fits.open(fname_rmf)[2].data
+            self.arf_h = fits.open(fname_arf)[1].data
+        else:
+            self.rsp_h = fits.open(fname_rsp)[1].data
+            self.chans_h = fits.open(fname_rsp)[2].data
+            self.arf_h = None
+
         self.Zmetal = Zmetal
-        self.rsp_h = fits.open(fname_rsp)[1].data
-        self.chans_h = fits.open(fname_rsp)[2].data
 
         # Check channels are monotonously increasing
         if np.any(np.diff(self.chans_h['E_MAX']) <= 0):
@@ -33,6 +48,9 @@ class ROSATResponse(object):
             n_ch = self.rsp_h['N_CHAN'][i]
             row = self.rsp_h['MATRIX'][i]
             self.m_x_A[i, i_first:i_first+n_ch] = row[:n_ch]
+
+        if self.arf_h is not None:
+            self.m_x_A = self.m_x_A*self.arf_h['SPECRESP'][:, None]
 
         self.energ_bins = np.zeros(self.n_energ+1)
         self.energ_bins[:-1] = self.rsp_h['ENERG_LO']
@@ -95,6 +113,11 @@ class ROSATResponse(object):
                                        dopseudo=dopseudo)
         return self._get_convolved_spectrum(spec_in)
 
+    def get_bandpass(self, emin, emax):
+        imin, imax = self._get_channel_limits(emin, emax)
+        bpass = np.sum(self.m_x_A[:, imin:imax+1], axis=1)
+        return bpass
+
     def get_integrated_spectrum(self, kT, z, emin, emax,
                                 dolines=True, docont=True,
                                 dopseudo=True):
@@ -106,6 +129,15 @@ class ROSATResponse(object):
                                                    dopseudo=dopseudo)
         i_min, i_max = self._get_channel_limits(emin, emax)
         return np.sum(spec_out[i_min:i_max+1])
+
+    def get_arbitrary_integrated_spectrum(self, fe, z, emin, emax):
+        energ_o_bins = self.energ_bins
+        energ_i_bins = energ_o_bins*(1+z)
+        energ_i_bins = np.sqrt(energ_i_bins[1:]*energ_i_bins[:-1])
+        farr = fe(energ_i_bins)*np.diff(energ_o_bins)/energ_i_bins
+        f_M_A = self._get_convolved_spectrum(farr)
+        i_min, i_max = self._get_channel_limits(emin, emax)
+        return np.sum(f_M_A[i_min:i_max+1])
 
     def get_integrated_spectrum_interp(self, kT_min, kT_max, n_kT,
                                        zmax, n_z, emin, emax,
@@ -129,7 +161,43 @@ class ROSATResponse(object):
                                                         docont=docont,
                                                         dopseudo=dopseudo)
                            for z in z_arr] for kT in kT_arr])
-        interp = RegularGridInterpolator([np.log(kT_arr), z_arr], np.log(specs),
+        interp = RegularGridInterpolator([np.log(kT_arr), z_arr],
+                                         np.log(specs),
                                          method='linear', fill_value=None,
                                          bounds_error=False)
         return interp
+
+    def get_spectrum_interp_cached(self, lines=True,
+                                   kTmin=0.02, kTmax=50.0, nkT=32,
+                                   zmax=4.0, nz=16, emin=0.5, emax=2.0):
+        kTmin = 0.02
+        kTmax = 50.0
+        nkT = 32
+        zmax = 4.0
+        nz = 16
+        emin = 0.5
+        emax = 2.0
+
+        fname = 'data/J'
+        if lines:
+            fname += 'tot'
+        else:
+            fname += 'cont'
+        fname += '_Z%.2lf' % self.Zmetal
+        fname += '_Emin%.2lf' % emin
+        fname += '_Emax%.2lf' % emax
+        if self.arf_h is not None:
+            fname += '_padb'
+        fname += '.pck'
+        if os.path.isfile(fname):
+            print(f"Found {fname}")
+            with open(fname, "rb") as f:
+                J = pickle.load(f)
+        else:
+            J = self.get_integrated_spectrum_interp(kTmin, kTmax, nkT,
+                                                    zmax, nz, emin, emax,
+                                                    dolines=lines,
+                                                    dopseudo=lines)
+            with open(fname, "wb") as f:
+                pickle.dump(J, f)
+        return J

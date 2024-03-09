@@ -4,6 +4,7 @@ from scipy.integrate import quad, simps
 from scipy.interpolate import RegularGridInterpolator, interp1d
 from scipy.special import sici
 
+
 def get_prefac_rho(kind, XH=0.76):
     """Prefactor that transforms gas mas density into
     other types of density, depending on the hydrogen mass
@@ -739,19 +740,17 @@ class HaloProfilePressureHE(_HaloProfileHE):
                          alpha_T=alpha_T,
                          kind=kind,
                          quantity="pressure")
-        
-        self._fourier_interp = None
 
+        self._fourier_interp = None
 
     def _Pbound_shape_interp(self):
         """
         """
         qs = np.geomspace(1e-4, 1e2, 256)
-        
         gammas = np.linspace(1.001, 3., 512)
         Gs = 1 / (gammas - 1)
 
-        #G = 1 / (self.gamma - 1)
+        # G = 1 / (self.gamma - 1)
         def integrand(x, G):
             return x*self._F_bound(x, G+1)
 
@@ -765,7 +764,6 @@ class HaloProfilePressureHE(_HaloProfileHE):
                         b=np.inf,
                         weight="sin",
                         wvar=q)[0] / q
-                    
                     for G in Gs
                 ]
                 for q in qs
@@ -780,7 +778,6 @@ class HaloProfilePressureHE(_HaloProfileHE):
         )
 
         return Fqb
-    
 
     def _fourier(self, cosmo, k, M, a):
         """
@@ -808,7 +805,7 @@ class HaloProfilePressureHE(_HaloProfileHE):
 
         # Density ejected gas (fourier)
         x_esc = (self.eta_b * 0.375 * np.sqrt(Delta) * cM)[:, None]
-        density_ejected_fourier = np.exp(-0.5*(qs*x_esc)**2)
+        rho_ejected_fourier = np.exp(-0.5*(qs*x_esc)**2)
 
         # Pressure bound gas
         Pbound_integral_interp = self._fourier_interp
@@ -817,7 +814,8 @@ class HaloProfilePressureHE(_HaloProfileHE):
         ev = np.array(
             [np.log(qs).flatten(), gammas.flatten()]
         ).T
-        Pbound_shape_fourier = np.exp(Pbound_integral_interp(ev)).reshape([-1, len(k)])
+        Pbound_shape_fourier = \
+            np.exp(Pbound_integral_interp(ev)).reshape([-1, len(k)])
 
         # Normalize Pbound
         # Gravitational constant in eV*(Mpc^4)/(cm^3*Msun^2)
@@ -830,48 +828,20 @@ class HaloProfilePressureHE(_HaloProfileHE):
         G = 1./(self.gamma-1)
         xnorm = np.array([np.full_like(cM, G), cM]).T
         norm = np.exp(self.norm_interp(np.log(xnorm)))
-        rho_bound_norm = (am3*M_use*fb/norm)[:,None]
+        rho_bound_norm = (am3*M_use*fb/norm)[:, None]
 
-        density_ejected_norm = (am3*M_use*fe)[:,None]
+        rho_ejected_norm = (am3*M_use*fe)[:, None]
 
-        prof = (Pbound_shape_fourier * T_bound_norm * rho_bound_norm + density_ejected_fourier * T_ejected * density_ejected_norm) * self.prefac_rho
+        prof = ((Pbound_shape_fourier *
+                 T_bound_norm * rho_bound_norm) +
+                (rho_ejected_fourier *
+                 T_ejected * rho_ejected_norm)) * self.prefac_rho
         if np.ndim(rs) == 0:
             prof = np.squeeze(prof, axis=-1)
         if np.ndim(M) == 0:
             prof = np.squeeze(prof, axis=0)
 
         return prof
-
-
-    def _fourier_num_slow(self, cosmo, k, M, a):
-        """
-        """
-        M = np.atleast_1d(M)
-        k = np.atleast_1d(k)
-
-        r0 = self.mass_def.get_radius(cosmo, M, a) / a
-        print(f"Shape of r0 is {r0.shape}")
-        print(f"Shape of k is {k.shape}")
-        print(f"Shape of M is {M.shape}")
-        func = lambda x, rval, mval: self._real(cosmo, rval * x, mval, a) * x
-        qs = k[None, :] * r0[:, None]
-        rvals = np.ones(len(k))[None, :] * r0[:, None]
-        mvals = np.ones(len(k))[None, :] * M[:, None]
-
-        qs = qs.flatten()
-        rvals = rvals.flatten()
-        mvals = mvals.flatten()
-
-        print(qs.shape)
-        fq = np.array(
-            [quad(func, args=(rvals[i], mvals[i]), a=1e-5, b=np.inf, weight="sin", wvar=q)[0] /
-            q for i,q in enumerate(qs)]
-        )
-        
-        fq *= 4 * np.pi * rvals ** 3
-        fq = fq.reshape([-1, len(k)])
-
-        return fq 
 
 
 class HaloProfileXray(ccl.halos.HaloProfile):
@@ -1235,11 +1205,10 @@ class HaloProfileNFWBaryon(ccl.halos.HaloProfileMatter):
                       bounds_error=False)
         return ip
 
-
     def get_bound_norm_interp(self, gamma):
         cs = np.geomspace(1E-2, 100, 64)
-        norms = np.array([quad(lambda x: x**2*self._F_bound(x, 1/(gamma-1)), 0, c)[0]
-                          for c in cs])
+        norms = np.array([quad(lambda x: x**2*self._F_bound(x, 1/(gamma-1)),
+                               0, c)[0] for c in cs])
         ip = interp1d(np.log(cs), np.log(norms),
                       fill_value='extrapolate', bounds_error=False)
         return ip

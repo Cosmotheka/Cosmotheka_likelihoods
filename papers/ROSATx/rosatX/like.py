@@ -3,7 +3,6 @@ import pickle
 import sacc
 import numpy as np
 import pyccl as ccl
-from .rosat import ROSATResponse
 from .profiles import (HaloProfileDensityHE,
                        HaloProfilePressureHE,
                        HaloProfileXray,
@@ -82,11 +81,6 @@ class ROSATxLike(object):
         return np.exp(-0.5*sigma_tot_2*ell*(ell+1))
 
     def get_spectrum(self):
-        kTmin = 0.02
-        kTmax = 50.0
-        nkT = 32
-        zmax = 4.0
-        nz = 16
         emin = 0.5
         emax = 2.0
 
@@ -96,37 +90,16 @@ class ROSATxLike(object):
         else:
             fname += 'cont'
         fname += '_Z%.2lf' % self.Zmetal
+        fname += '_Emin%.2lf' % emin
+        fname += '_Emax%.2lf' % emax
         if self.spec_pyatomdb:
             fname += '_padb'
         fname += '.pck'
-        #print(fname)
         if os.path.isfile(fname):
             with open(fname, "rb") as f:
                 J = pickle.load(f)
         else:
-            if self.spec_pyatomdb:
-                import pyatomdb
-                from astropy.io import fits
-                rmf = fits.open('data/pspcb_gain2_256.rmf')
-                arf = fits.open('data/pspcb_gain2_256.arf')
-                rosat_spectrum = pyatomdb.spectrum.CIESession()
-                rosat_spectrum.set_response(rmf, arf)
-                # Set metallicity
-                Zs = np.ones(31)
-                Zs[3:] = self.Zmetal
-                rosat_spectrum.set_abund(np.arange(31, dtype=int), Zs)
-                J = rosat_spectrum.return_integrated_spectrum_interp(kTmin, kTmax, nkT,
-                                                                     zmax, nz, emin, emax,
-                                                                     dolines=self.lines,
-                                                                     dopseudo=self.lines)
-            else:
-                rs = ROSATResponse('data/pspcc_gain1_256.rsp', Zmetal=self.Zmetal)
-                J = rs.get_integrated_spectrum_interp(kTmin, kTmax, nkT,
-                                                      zmax, nz, emin, emax,
-                                                      dolines=self.lines,
-                                                      dopseudo=self.lines)
-            with open(fname, "wb") as f:
-                pickle.dump(J, f)
+            raise ValueError("J factor should be precomputed")
         self.J = J
 
     def init_model(self):
@@ -198,7 +171,6 @@ class ROSATxLike(object):
                       for k in ['lMc', 'eta_b',
                                 'gamma', 'logTAGN']}
             self.prof_matter.update_parameters(**kwargs)
-            
 
     def get_model(self, **kwargs):
         self.update_params(kwargs)
