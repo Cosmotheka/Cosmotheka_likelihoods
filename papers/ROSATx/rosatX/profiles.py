@@ -3,6 +3,7 @@ import pyccl as ccl
 from scipy.integrate import quad, simps
 from scipy.interpolate import RegularGridInterpolator, interp1d
 from scipy.special import sici
+import os
 
 
 def get_prefac_rho(kind, XH=0.76):
@@ -744,30 +745,33 @@ class HaloProfilePressureHE(_HaloProfileHE):
         self._fourier_interp = None
 
     def _Pbound_shape_interp(self):
-        """
-        """
         qs = np.geomspace(1e-4, 1e2, 256)
         gammas = np.linspace(1.001, 3., 512)
         Gs = 1 / (gammas - 1)
 
-        # G = 1 / (self.gamma - 1)
-        def integrand(x, G):
-            return x*self._F_bound(x, G+1)
+        fname = 'pressure_fourier_interp.npz'
+        if os.path.isfile(fname):
+            f_arr = np.load(fname)['fk']
+        else:
+            # G = 1 / (self.gamma - 1)
+            def integrand(x, G):
+                return x*self._F_bound(x, G+1)
 
-        f_arr = np.array(
-            [
+            f_arr = np.array(
                 [
-                    quad(
-                        integrand,
-                        args=(G,),
-                        a=1e-4,
-                        b=np.inf,
-                        weight="sin",
-                        wvar=q)[0] / q
-                    for G in Gs
-                ]
-                for q in qs
-            ])
+                    [
+                        quad(
+                            integrand,
+                            args=(G,),
+                            a=1e-4,
+                            b=np.inf,
+                            weight="sin",
+                            wvar=q)[0] / q
+                        for G in Gs
+                    ]
+                    for q in qs
+                ])
+            np.savez(fname, fk=f_arr)
 
         Fqb = RegularGridInterpolator(
             (np.log(qs), gammas),
