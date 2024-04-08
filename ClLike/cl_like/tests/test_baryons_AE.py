@@ -8,7 +8,6 @@ import pytest
 import os
 import shutil
 import sacc
-import pyccl as ccl
 
 
 # Cleaning the tmp dir before running and after running the tests
@@ -18,24 +17,25 @@ def run_clean_tmp():
         shutil.rmtree("dum")
 
 
-def get_info(bias, A_sE9=True):
+def get_info(bias, A_AE):
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
-
     if bias == 'Linear':
-        data += "cl_like/tests/data/sh_bcm_baryons.fits.gz"
+        data += "cl_like/tests/data/linear_halofit_5x2pt.fits.gz"
         pk_dict = {"external": Pk,
-                   "bias_model": "Linear"}
+                   "bias_model": "Linear",
+                   }
     elif bias == 'BaccoPT':
-        data += "cl_like/tests/data/sh_PkmmBacco_bcm.fits.gz"
+        data += "cl_like/tests/data/linear_baccopt_5x2pt.fits.gz"
         pk_dict = {"external": Pk,
                    "bias_model": "BaccoPT",
                    "zmax_pks": 1.5,  # For baccoemu with baryons
-                   "use_baryon_boost" : True,
-                   "ignore_lbias": True,
-                   "baryon_model": 'CCL_BCM'}
+                   "ignore_lbias": False}
     else:
         raise ValueError(f'bias {bias} not implemented')
 
+    pk_dict.update({"use_baryon_boost" : True,
+                    "baryon_model": 'Amon-Efstathiou'
+                    })
 
 
     info = {"params": {"A_sE9": 2.1265,
@@ -44,6 +44,7 @@ def get_info(bias, A_sE9=True):
                        "h": 0.67,
                        "n_s": 0.96,
                        "m_nu": 0.15,
+                       "T_CMB": 2.7255,
                        # m
                        "bias_sh0_m": 0.1,
                        "bias_sh1_m": 0.3,
@@ -60,16 +61,14 @@ def get_info(bias, A_sE9=True):
                        "limber_sh2_eta_IA": 1,
                        "bias_sh2_A_IA": 0.1,
                        # Baryons
-                       "bcm_log10Mc": 14,
-                       "bcm_etab": 0.6,
-                       "bcm_ks": 50,
+                       "A_AE": A_AE,
                        # Derived
                        "sigma8": None,
                        },
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
                                "matter_pk": "halofit",
-                               "baryons_pk": "bcm"},
+                               },
                        "limber": {"external": Limber,
                                   "nz_model": "NzShift",
                                   "input_params_prefix": "limber",
@@ -97,20 +96,14 @@ def get_info(bias, A_sE9=True):
                            },
             "debug": False}
 
-    if not A_sE9:
-        info["params"]["sigma8"] = 0.78220521
-        del info["params"]["A_sE9"]
-
     return info
 
 
 @pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
 def test_dum(bias):
-    info = get_info(bias)
+    info = get_info(bias, A_AE=1)
     model = get_model(info)
     loglikes, derived = model.loglikes()
-
-    assert derived[0] == pytest.approx(0.78220521, rel=1e-3)
 
     # from matplotlib import pyplot as plt
     # sd = model.likelihood['ClLike'].get_cl_data_sacc()
@@ -130,38 +123,46 @@ def test_dum(bias):
     #     ax[i, j].legend()
     # plt.show()
 
+    if bias != 'BaccoPT':
+        assert np.fabs(loglikes[0]) < 3E-3
+    else:
+        # For some reason I cannot push it lower than this.
+        assert np.fabs(loglikes[0]) < 0.2
 
-    # TODO: Ideally, I should be able to recover exactly the data vector.
-    # However, I cannot push chi2 < 0.2 for bcm_ks=50. Not sure where the
-    # missmatch is.
-    assert np.fabs(loglikes[0]) < 0.2
-
-
-@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
-def test_Sk(bias):
-    info = get_info(bias)
+    # A_AE = 0 (i.e. pk_ww = pklin
+    info = get_info(bias, A_AE=0)
     model = get_model(info)
     loglikes, derived = model.loglikes()
 
-    pars = info['params']
+    lkl = model.likelihood['ClLike']
+    pkww = lkl.provider.get_Pk()['pk_data']['pk_ww']
+    pk2d_lin = lkl.provider.get_CCL()['cosmo'].get_linear_power()
+    alin, lnklin, pklin = pk2d_lin.get_spline_arrays()
 
-    # cosmo = ccl.CosmologyVanillaLCDM()
-    cosmo = ccl.Cosmology(Omega_c=pars['Omega_c'],
-                          Omega_b=pars['Omega_b'],
-                          h=pars['h'],
-                          n_s=pars['n_s'],
-                          A_s=pars['A_sE9']*1e-9,
-                          m_nu=pars['m_nu'],
-                          bcm_log10Mc=pars['bcm_log10Mc'],
-                          bcm_etab=pars['bcm_etab'],
-                          bcm_ks=pars['bcm_ks'],
-                          baryons_power_spectrum='bcm'
-                          )
+    for i, ai in enumerate(alin):
+        assert pklin[i] == pytest.approx(pkww.eval(np.exp(lnklin), ai),
+                                         rel=1e-5)
+
+@pytest.mark.parametrize('bias', ['BaccoPT'])
+def test_Sk(bias):
+    info = get_info(bias, A_AE=0)
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
 
     lkl = model.likelihood['ClLike']
-    a_arr, lnk, Sk = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()
+    pk2d_lin = lkl.provider.get_CCL()['cosmo'].get_linear_power()
+    a_arr, lnk, pk2d_nlin = \
+        lkl.provider.get_Pk()['pk_data']['pk_ww'].get_spline_arrays()
+
     k = np.exp(lnk)
 
     for i, ai in enumerate(a_arr):
-        assert Sk[i] == pytest.approx(ccl.bcm.bcm_model_fka(cosmo, k, ai),
-                                      rel=1e-3)
+        assert pk2d_nlin[i] == pytest.approx(pk2d_lin.eval(k, ai), rel=1e-4)
+
+    info = get_info(bias, A_AE=1)
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+
+    lkl = model.likelihood['ClLike']
+    Sk = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()[-1]
+    assert Sk == pytest.approx(1, rel=1e-9)

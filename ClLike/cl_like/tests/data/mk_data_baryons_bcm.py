@@ -14,7 +14,7 @@ cosmo = ccl.Cosmology(Omega_c=0.26,
                       baryons_power_spectrum='bcm',
                       bcm_log10Mc=14,
                       bcm_etab=0.6,
-                      bcm_ks=0.6,
+                      bcm_ks=50,
                       matter_power_spectrum='halofit')
 
 
@@ -88,6 +88,7 @@ for i1, i2, ix, _ in get_pairs():
     cl *= (1+m_sh[i1])
     cl *= (1+m_sh[i2])
     sls[i1, i2, :] = cl
+    sls[i2, i1, :] = cl
 nls = np.zeros([n_tracers, n_tracers, nbpw])
 # 4 gal per arcmin^2
 for i in range(n_tracers):

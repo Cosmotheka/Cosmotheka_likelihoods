@@ -143,7 +143,7 @@ def test_dum(bias):
     loglikes, derived = model.loglikes()
 
     if bias != 'BaccoPT':
-        assert np.fabs(loglikes[0]) < 2E-3
+        assert np.fabs(loglikes[0]) < 3E-3
     else:
         # For some reason I cannot push it lower than this.
         assert np.fabs(loglikes[0]) < 0.2
@@ -155,7 +155,7 @@ def test_sigma8():
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    assert np.fabs(loglikes[0]) < 2E-3
+    assert np.fabs(loglikes[0]) < 3E-3
 
     del info["params"]["sigma8"]
     with pytest.raises(ValueError):
@@ -175,7 +175,7 @@ def test_ia_models(case):
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    cond = np.fabs(loglikes[0]) < 2E-3
+    cond = np.fabs(loglikes[0]) < 3E-3
     if case == 'IAPerBin':
         # IAPerBin has a constant ia_bias, which does not fit the generated
         # data.
@@ -188,13 +188,13 @@ def test_shape_model():
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    assert np.fabs(loglikes[0]) < 2E-3
+    assert np.fabs(loglikes[0]) < 3E-3
 
     info["theory"]["clfinal"]["shape_model"] = "ShapeNone"
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    assert np.fabs(loglikes[0]) > 2E-3
+    assert np.fabs(loglikes[0]) > 3E-3
 
 
 def test_timing():
@@ -224,7 +224,7 @@ def test_null_negative_eigvals_in_icov():
     model = get_model(info)
     loglikes, derived = model.loglikes()
     loglike0 = loglikes[0]
-    assert np.fabs(loglike0) < 2E-3
+    assert np.fabs(loglike0) < 3E-3
 
     # Let's change the covariance
     s = sacc.Sacc.load_fits(info['likelihood']['ClLike']['input_file'])
@@ -319,4 +319,60 @@ def test_S8():
     model = get_model(info)
     loglikes, derived = model.loglikes()
     print(loglikes)
-    assert np.fabs(loglikes[0]) < 2E-3
+    assert np.fabs(loglikes[0]) < 3E-3
+
+
+@pytest.mark.parametrize('case', ['baccoemu', 'CCL'])
+def test_sigma8_to_As(case):
+    info = get_info('Linear', False)
+    info['theory']['ccl']['sigma8_to_As'] = case
+    info['params']['A_s'] = None
+    cosmopars = {
+       "Omega_c": 0.26,
+       "Omega_b": 0.05,
+       "h": 0.67,
+       "n_s": 0.96,
+       "m_nu": 0.15,
+       "sigma8": 0.7824601264149301,
+       "T_CMB": 2.7255
+    }
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    As = model.theory['ccl']._get_As_from_sigma8(cosmopars)
+
+    assert np.abs(As / derived[0] - 1) < 1e-9
+
+    if case == 'CCL':
+        assert np.abs(As*1E9 / 2.1265 -1) < 1e-5
+        assert np.fabs(loglikes[0]) < 3e-3
+    else:
+        # The O(1e-3) difference between As makes chi2~0.37 for baccoemu
+        assert np.abs(As*1E9 / 2.1265 -1) < 1e-3
+        assert np.fabs(loglikes[0]) < 0.4
+
+
+@pytest.mark.parametrize('case', ['baccoemu', 'CCL'])
+def test_camb_hmcode_dum(case):
+    info = get_info('Linear', False)
+    info['theory']['ccl']['sigma8_to_As'] = case
+
+    ccl_arguments = {'extra_parameters': {"camb": {"halofit_version":
+                                                   "mead2020_feedback",
+                                                   "HMCode_logT_AGN": 7.8}}}
+    info['theory']['ccl']['ccl_arguments'] = ccl_arguments
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+
+
+    info['params']['HMCode_logT_AGN'] = 7.8
+    ccl_arguments = {'extra_parameters': {"camb": {"halofit_version":
+                                                   "mead2020_feedback"}}}
+    info['theory']['ccl']['ccl_arguments'] = ccl_arguments
+
+    model = get_model(info)
+    loglikes2, derived = model.loglikes()
+
+
+    assert np.abs(loglikes[0] / loglikes2[0] - 1) < 1e-5

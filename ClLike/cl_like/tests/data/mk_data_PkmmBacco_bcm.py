@@ -13,8 +13,8 @@ nonlinear_emu_details = None
 mpk = baccoemu.Matter_powerspectrum(nonlinear_emu_path=nonlinear_emu_path,
                                     nonlinear_emu_details=nonlinear_emu_details) # this generates many warnings from tensorflow, it's normal
 
-# Scale factor
-a = np.linspace(mpk.emulator['baryon']['bounds'][-1][0], 1, 100)
+# Scale factor ('nonlinear' as in bacco.py when baryons not requested)
+a = np.linspace(mpk.emulator['nonlinear']['bounds'][-1][0], 1, 100)
 
 # Hubble
 h = 0.67
@@ -42,25 +42,14 @@ cosmopars = {'omega_cold' : 0.31, # this is cold = cdm + baryons
              'w0' : -1,
              'wa' : 0 }
 
-bcmpars = {'M_c' : 14,
-           'eta': -0.3,
-           'beta' : -0.22,
-           'M1_z0_cen' : 10.5,
-           'theta_out' : 0.25,
-           'theta_inn' : -0.86,
-           'M_inn' : 13.4 }
-
 combined_pars = {}
 for key in cosmopars.keys():
     combined_pars[key] = np.full((len(a)), cosmopars[key])
-
-for key in bcmpars.keys():
-    combined_pars[key] = np.full((len(a)), bcmpars[key])
 combined_pars['expfactor'] = a
 
 pklin_emu = mpk.get_linear_pk(cold=False, k=k_sh_sh_for_bacco,
                               **combined_pars)[1] / h**3
-pk_emu = mpk.get_nonlinear_pk(baryonic_boost=True, cold=False,
+pk_emu = mpk.get_nonlinear_pk(baryonic_boost=False, cold=False,
                               k=k_sh_sh_for_bacco, **combined_pars)[1] / h**3
 
 # get_sigma8 always returns sigma8 at z=0
@@ -69,7 +58,7 @@ print('sigma8 =', mpk.get_sigma8(**combined_pars, cold=False)[0])
 pk_linear = {'a': a, 'k': k_emu, 'delta_matter:delta_matter': pklin_emu}
 pk_nonlinear = {'a': a, 'k': k_emu, 'delta_matter:delta_matter': pk_emu}
 
-np.savez_compressed('pk_nonlinear_baryons.npz', **pk_nonlinear)
+# np.savez_compressed('pk_nonlinear_baryons.npz', **pk_nonlinear)
 
 cosmo = ccl.CosmologyCalculator(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
                                 Omega_b=cosmopars['omega_baryon'],
@@ -80,17 +69,24 @@ cosmo = ccl.CosmologyCalculator(Omega_c=cosmopars['omega_cold'] - cosmopars['ome
                                 w0=cosmopars['w0'],
                                 wa=cosmopars['wa'],
                                 pk_linear=pk_linear,
-                                pk_nonlin=pk_nonlinear,
-                                T_CMB=2.7255)
+                                pk_nonlin=pk_nonlinear)
 
+cosmobcm = ccl.Cosmology(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
+                         Omega_b=cosmopars['omega_baryon'],
+                         h=cosmopars['hubble'],
+                         n_s=cosmopars['ns'],
+                         A_s=cosmopars['A_s'],
+                         m_nu = cosmopars['neutrino_mass'],
+                         w0=cosmopars['w0'],
+                         wa=cosmopars['wa'],
+                         matter_power_spectrum="halofit",
+                         bcm_log10Mc=14,
+                         bcm_etab=0.6,
+                         bcm_ks=50)
 
-pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-apk2d, logkpk2d, pkpk2d = pkmm.get_spline_arrays()
-np.savez_compressed('pk_nonlinear_baryons_ccl.npz', a=apk2d, k=np.exp(logkpk2d),
-                    pk=pkpk2d)
+ccl.bcm.bcm_correct_pk2d(cosmobcm, cosmo.get_nonlin_power())
 
-
-
+# Compute the Cells. This code is the same as in mk_data_baryons.py
 zs = np.linspace(0., 1.5, 1024)
 nz = interp1d(zs, np.exp(-0.5*((zs-0.5)/0.05)**2), bounds_error=False,
               fill_value=0)
@@ -106,9 +102,9 @@ A_IA = A0 * ((1+zs)/1.62)**eta
 ia_bias = (zs, A_IA)
 
 # CCL tracers
-for dzi in dz_sh:
-    plt.plot(zs, nz(zs - dzi))
-plt.show()
+# for dzi in dz_sh:
+#     plt.plot(zs, nz(zs - dzi))
+# plt.show()
 
 tracers = [ccl.WeakLensingTracer(cosmo, dndz=(zs, nz(zs - dzi)),
                               ia_bias=ia_bias) for dzi in dz_sh]
@@ -175,6 +171,10 @@ for i1, i2, ix, _ in get_pairs():
         cov[ix, :, jx, :] = np.diag((cls[i1, j1]*cls[i2, j2] +
                                      cls[i1, j2]*cls[i2, j1])/nmodes)
 cov = cov.reshape([nx*nbpw, nx*nbpw])
+# Plot covariance
+plt.imshow(np.log10(np.abs(cov)))
+plt.colorbar()
+plt.show()
 
 s = sacc.Sacc()
 for i in range(n_tracers):
@@ -197,5 +197,5 @@ for i1, i2, ix, typ in get_pairs():
     plt.loglog()
     plt.title(f"{tracer_names[i1]}, {tracer_names[i2]}")
 plt.show()
-s.save_fits("sh_baccoemu_baryons.fits", overwrite=True)
-os.system('gzip sh_baccoemu_baryons.fits')
+s.save_fits("sh_PkmmBacco_bcm.fits", overwrite=True)
+os.system('gzip sh_PkmmBacco_bcm.fits')

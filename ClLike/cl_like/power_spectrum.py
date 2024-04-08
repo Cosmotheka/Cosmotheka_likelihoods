@@ -53,9 +53,11 @@ class Pk(Theory):
     nonlinear_emu_path = None
     nonlinear_emu_details = None
     use_baryon_boost : bool = False
+    baryon_model: str = ''
     ignore_lbias : bool = False
     allow_bcm_emu_extrapolation_for_shear : bool = True
     allow_halofit_extrapolation_for_shear : bool = False
+    allow_halofit_extrapolation_for_shear_on_k: bool = False
 
     def initialize(self):
         # Bias model
@@ -109,15 +111,29 @@ class Pk(Theory):
         elif self.bias_model == 'BaccoPT' and not HAVE_BACCO:
             raise BACCO_exception
 
+        if self.baryon_model not in ['', 'Bacco', 'CCL_BCM', 'Amon-Efstathiou']:
+            raise ValueError("baryon_model must be one of '', 'Bacco' or "
+                             "'CCL_BCM', 'Amon-Efstathiou'")
+
         if self.bias_model == 'BaccoPT':
+            if self.use_baryon_boost and self.baryon_model == '':
+                    self.baryon_model = 'Bacco'
+
+            use_baryon_boost = self.use_baryon_boost and \
+                               self.baryon_model == 'Bacco'
             self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks,
                                               nonlinear_emu_path=self.nonlinear_emu_path,
                                               nonlinear_emu_details=self.nonlinear_emu_details,
-                                              use_baryon_boost=self.use_baryon_boost,
+                                              use_baryon_boost=use_baryon_boost,
                                               ignore_lbias=self.ignore_lbias,
                                               allow_bcm_emu_extrapolation_for_shear=self.allow_bcm_emu_extrapolation_for_shear,
-                                              allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear
+                                              allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear,
+                                              allow_halofit_extrapolation_for_shear_on_k=self.allow_halofit_extrapolation_for_shear_on_k
                                              )
+        else:
+            if self.baryon_model == 'Bacco':
+                raise ValueError("baryon_model 'Bacco' can only be used with "
+                                 "bias_model 'BaccoPT' at the moment.")
 
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
@@ -126,28 +142,34 @@ class Pk(Theory):
         return {"CCL": None}
 
     def get_can_support_params(self):
-        return ["M_c", "eta", "beta", "M1_z0_cen", "theta_out", "theta_inn", "M_inn"]
+        # TODO: We should better use an input_params_prefix to avoid confusion
+        # with CCL params and maybe split the baryons stuff
+        return ["M_c", "eta", "beta", "M1_z0_cen", "theta_out", "theta_inn",
+                "M_inn", "A_AE"]
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
         bcmpar = None
         if self.use_baryon_boost:
-            M_c = self.provider.get_param('M_c')
-            eta = self.provider.get_param('eta')
-            beta = self.provider.get_param('beta')
-            M1_z0_cen = self.provider.get_param('M1_z0_cen')
-            theta_out = self.provider.get_param('theta_out')
-            theta_inn = self.provider.get_param('theta_inn')
-            M_inn = self.provider.get_param('M_inn')
-            bcmpar = {
-                'M_c'  : M_c,
-                'eta' : eta,
-                'beta' : beta,
-                'M1_z0_cen' : M1_z0_cen,
-                'theta_out' : theta_out,
-                'theta_inn' : theta_inn,
-                'M_inn' : M_inn
-            }
+            if self.baryon_model == 'Bacco':
+                M_c = self.provider.get_param('M_c')
+                eta = self.provider.get_param('eta')
+                beta = self.provider.get_param('beta')
+                M1_z0_cen = self.provider.get_param('M1_z0_cen')
+                theta_out = self.provider.get_param('theta_out')
+                theta_inn = self.provider.get_param('theta_inn')
+                M_inn = self.provider.get_param('M_inn')
+                bcmpar = {
+                    'M_c'  : M_c,
+                    'eta' : eta,
+                    'beta' : beta,
+                    'M1_z0_cen' : M1_z0_cen,
+                    'theta_out' : theta_out,
+                    'theta_inn' : theta_inn,
+                    'M_inn' : M_inn
+                }
+            elif self.baryon_model == 'Amon-Efstathiou':
+                bcmpar = {'A_AE': self.provider.get_param('A_AE')}
 
         state['Pk'] = {'pk_data': self._get_pk_data(cosmo, bcmpar=bcmpar)}
 
@@ -225,12 +247,57 @@ class Pk(Theory):
                     if op1 != op2:
                         comb_21 = op2+op1
                         pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
-            if (self.bias_model == 'BaccoPT') and \
-                (self.use_baryon_boost or self.ignore_lbias):
-                # TODO: This assumes LCDM, but as above. BACCOemu is trained
-                # only in LCDM, anyway. What to do with the cross pk's? At the
-                # moment they don't have the correction.
+            if (self.bias_model == 'BaccoPT') and self.ignore_lbias:
+                # TODO: Move this to bacco.py
+                # In case we don't request the bias expansion, use the pk from
+                # the matter pk emulator
                 pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
+
+        # Add baryon correction
+        baryons_in_cosmo = cosmo._config_init_kwargs['baryons_power_spectrum']
+        if self.use_baryon_boost or (baryons_in_cosmo != 'nobaryons'):
+            if self.is_PT_bias and (self.bias_model == 'BaccoPT') and \
+                (self.baryon_model == 'Bacco'):
+                # TODO: This assumes LCDM, but as above. BACCOemu is
+                # trained only in LCDM, anyway. What to do with the cross
+                # pk's? At the moment they don't have the correction.
+                pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
+                pkd['Sk'] = ptc.get_pk('Sk')
+            elif (self.baryon_model == 'CCL_BCM') or \
+                (baryons_in_cosmo == 'bcm'):
+                if self.is_PT_bias:
+                    # The correction happens in place
+                    # If bias is Linear, then the pk already has the baryon
+                    # boost applied.
+                    ccl.bcm.bcm_correct_pk2d(cosmo, pkd['pk_ww'])
+                a_arr, lnk, pkww = pkd['pk_ww'].get_spline_arrays()
+                k = np.exp(lnk)
+                Sk = np.zeros_like(pkww)
+                for i, ai in enumerate(a_arr):
+                    Sk[i] = ccl.bcm.bcm_model_fka(cosmo, k, ai)
+                pkd['Sk'] = ccl.Pk2D(a_arr=a_arr, lk_arr=lnk,
+                                     pk_arr=np.log(Sk), is_logp=True)
+            elif self.baryon_model == 'Amon-Efstathiou':
+                pklin = cosmo.get_linear_power()
+                a, lnk, pklin = pklin.get_spline_arrays()
+                k = np.exp(lnk)
+                boost = np.zeros_like(pklin)
+                pknonlin = np.zeros_like(pklin)
+                for i, ai in enumerate(a):
+                    pknonlin[i] = pkd['pk_ww'].eval(k, ai, cosmo)
+                    boost[i] = pknonlin[i] - pklin[i]
+
+                pkb = pklin + bcmpar['A_AE']*boost
+                pkd['pk_ww'] = ccl.Pk2D(a_arr=a, lk_arr=lnk,
+                                        pk_arr=np.log(pkb),
+                                        is_logp=True)
+                Sk = pkb / pknonlin
+                pkd['Sk'] = ccl.Pk2D(a_arr=a, lk_arr=lnk, pk_arr=np.log(Sk),
+                                     is_logp=True)
+            else:
+                # TODO: Bacco returns a pk2d of 1's, maybe homogenize this
+                pkd['Sk'] = None
+
         return pkd
 
     def get_can_provide(self):
