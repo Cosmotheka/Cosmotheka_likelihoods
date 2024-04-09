@@ -1,4 +1,4 @@
-# xCell-likelihoods
+# Cosmotheka Likelihoods
 
 The aim of this repository is to act as a container for likelihoods used with data generated with [`xC-ell/xCell`](https://github.com/xC-ell/xCell). This includes code used in published papers as well as experiments, so take care before using these codes if you don't know what you're doing!
 
