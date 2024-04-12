@@ -1,4 +1,4 @@
-# last modified on 12/01/2024
+# last modified on 11/03/2024
 from typing import Optional
 from cobaya.likelihood import Likelihood
 import sacc
@@ -58,7 +58,7 @@ class xyshearLike(Likelihood):
                 ells, cls_ys, ind_ys = ells[mask], cls_ys[mask], ind_ys[mask]
                 self.ells.append(ells)
                 self.cls.append(cls_ys)
-                self.beam_array.append(np.ones_like(ells))
+                self.beam_array.append(self.beam(ells, mode="sy"))
                 indices += list(ind_ys)
 
                 self.probes_order.append(f"Planck__{self.DES_bin_id}")
@@ -74,7 +74,7 @@ class xyshearLike(Likelihood):
                 ells, cls_xs, ind_xs = ells[mask], cls_xs[mask], ind_xs[mask]
                 self.ells.append(ells)
                 self.cls.append(cls_xs)
-                self.beam_array.append(self.beam(ells))
+                self.beam_array.append(self.beam(ells, mode="sx"))
                 indices += list(ind_xs)
 
                 self.probes_order.append(f"ROSAT__{self.DES_bin_id}")
@@ -90,7 +90,7 @@ class xyshearLike(Likelihood):
                 ells, cls_xy, ind_xy = ells[mask], cls_xy[mask], ind_xy[mask]
                 self.ells.append(ells)
                 self.cls.append(cls_xy)
-                self.beam_array.append(self.beam(ells))
+                self.beam_array.append(self.beam(ells, mode="xy"))
                 indices += list(ind_xy)
 
                 self.probes_order.append("ROSATxPlanck")
@@ -144,9 +144,7 @@ class xyshearLike(Likelihood):
                 ells, cls_i, ind = ells[mask], cls_i[mask], ind[mask]
 
                 indices += list(ind)
-                #if i == 0:
-                #    self.cls = np.zeros((nspec * len(self.ells)))
-                #self.cls[i * len(self.ells): (i + 1) * len(self.ells)] = cls_i
+
                 self.ells.append(ells)
                 self.cls.append(cls_i)
 
@@ -170,26 +168,30 @@ class xyshearLike(Likelihood):
         self.initialize_model()
 
 
-    def beam(self, ell, nside=1024):
-        fwhm_hpx_amin = 60*41.7/nside
-        sigma_hpx = np.radians(fwhm_hpx_amin/60)/2.355
+    def beam(self, ell, mode="sx"):
+        fwhm_hpx_amin_1024 = 60*41.7/1024
+        fwhm_hpx_amin_2048 = 60*41.7/2048
+
+        sigma_hpx_1024 = np.radians(fwhm_hpx_amin_1024/60)/2.355
+        sigma_hpx_2048 = np.radians(fwhm_hpx_amin_2048/60)/2.355
         sigma_ROSAT = np.radians(1.8e0/60)/2.355
-        sigma_tot_2 = sigma_ROSAT**2 + 2*sigma_hpx**2
+
+        if mode == "sx":
+            sigma_tot_2 = sigma_ROSAT**2 + 2*sigma_hpx_1024**2
+        if mode == "sy":
+            sigma_tot_2 = sigma_hpx_1024**2 + sigma_hpx_2048**2
+        if mode == "xy":
+            sigma_tot_2 = sigma_ROSAT**2 + sigma_hpx_1024**2 + sigma_hpx_2048**2
         return np.exp(-0.5*sigma_tot_2*ell*(ell+1))
 
     # Necessary to estimate J(T) for Xray profile
     def get_spectrum(self):
-            kTmin = 0.02
-            kTmax = 50.0
-            nkT = 32
-            zmax = 4.0
-            nz = 16
             emin = 0.5
             emax = 2.0
 
             self.Zmetal = 0.3
             self.lines = True
-            self.spec_pyatomdb = True
+            self.spec_pyatomdb = False
             self.wclump = True
             self.A_IA = None
 
@@ -199,36 +201,20 @@ class xyshearLike(Likelihood):
             else:
                 fname += 'cont'
             fname += '_Z%.2lf' % self.Zmetal
+            fname += '_Emin%.2lf' % emin
+            fname += '_Emax%.2lf' % emax
+
             if self.spec_pyatomdb:
                 fname += '_padb'
             fname += '.pck'
+
+            print(fname)
             if os.path.isfile(fname):
                 with open(fname, "rb") as f:
                     J = pickle.load(f)
             else:
-                if self.spec_pyatomdb:
-                    import pyatomdb
-                    from astropy.io import fits
-                    rmf = fits.open(f'{self.rosat_data}/pspcb_gain2_256.rmf')
-                    arf = fits.open(f'{self.rosat_data}/pspcb_gain2_256.arf')
-                    rosat_spectrum = pyatomdb.spectrum.CIESession()
-                    rosat_spectrum.set_response(rmf, arf)
-                    # Set metallicity
-                    Zs = np.ones(31)
-                    Zs[3:] = self.Zmetal
-                    rosat_spectrum.set_abund(np.arange(31, dtype=int), Zs)
-                    J = rosat_spectrum.return_integrated_spectrum_interp(kTmin, kTmax, nkT,
-                                                                        zmax, nz, emin, emax,
-                                                                        dolines=self.lines,
-                                                                        dopseudo=self.lines)
-                else:
-                    rs = rosatX.rosat.ROSATResponse(f'{self.rosat_data}/pspcc_gain1_256.rsp', Zmetal=self.Zmetal)
-                    J = rs.get_integrated_spectrum_interp(kTmin, kTmax, nkT,
-                                                        zmax, nz, emin, emax,
-                                                        dolines=self.lines,
-                                                        dopseudo=self.lines)
-                with open(fname, "wb") as f:
-                    pickle.dump(J, f)
+                raise ValueError("J factor should be precomputed")
+
             self.J = J
 
 
@@ -453,7 +439,12 @@ class xyshearLike(Likelihood):
 
 
     def get_requirements(self):
-        return {par: None for par in ["lMc", "gamma", "alpha_T", "eta_b"]}
+        return {
+            par: None 
+            for par in ["lMc", "gamma", "alpha_T", "eta_b",
+                        "logTw0", "Tw1", "beta", "epsilon",
+                        "alpha_Tz", "alpha_Tm", "gamma_T"]
+        }
 
     def logp(self, **kwargs):
         
