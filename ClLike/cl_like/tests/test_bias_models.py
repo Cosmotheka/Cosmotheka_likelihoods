@@ -351,6 +351,16 @@ def test_scale_cuts():
     #kmax = 0.5 is ell ~ 1000
     assert np.all(ell > 500) * np.all(ell < 1800)
 
+    info = get_info("Linear")
+    info['likelihood']['ClLike']['defaults']['gc1']['lmax'] = 1800
+    model = get_model(info)
+    lkl = model.likelihood['ClLike']
+    s = lkl.get_cl_data_sacc()
+    ell, cl = s.get_ell_cl('cl_00', 'gc1', 'gc1')
+    #kmax = 0.5 is ell ~ 1000
+    assert np.any(ell > 1000) * np.all(ell < 1800)
+
+
 @pytest.mark.parametrize('case', ['baccoemu', 'CCL'])
 def test_sigma8_to_As(case):
     info = get_info('Linear', False)

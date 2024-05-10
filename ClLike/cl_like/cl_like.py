@@ -87,13 +87,14 @@ class ClLike(Likelihood):
             # Give galaxy clustering an ell_max
             if t.quantity == 'galaxy_density':
                 # Get lmax from kmax for galaxy clustering
-                if 'kmax' in self.defaults[b['name']]:
-                    kmax = self.defaults[b['name']]['kmax']
-                else:
-                    kmax = kmax_default
-                lmax = get_lmax_from_kmax(cosmo_lcdm,
-                                          kmax, zmid)
-                self.defaults[b['name']]['lmax'] = lmax
+                if 'lmax' not in self.defaults[b['name']]:
+                    if 'kmax' in self.defaults[b['name']]:
+                        kmax = self.defaults[b['name']]['kmax']
+                    else:
+                        kmax = kmax_default
+                    lmax = get_lmax_from_kmax(cosmo_lcdm,
+                                              kmax, zmid)
+                    self.defaults[b['name']]['lmax'] = lmax
 
                 # Do we want magnification bias for this tracer?
                 self.bin_properties[b['name']]['mag_bias'] = \
