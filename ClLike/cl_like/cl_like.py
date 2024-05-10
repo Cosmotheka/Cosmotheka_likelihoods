@@ -128,10 +128,16 @@ class ClLike(Likelihood):
                 continue
 
             # Scale cuts
-            lmin = np.max([self.defaults[tn1].get('lmin', 2),
-                           self.defaults[tn2].get('lmin', 2)])
-            lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
-                           self.defaults[tn2].get('lmax', 1E30)])
+            if 'lmin' in cl:
+                lmin = cl['lmin']
+            else:
+                lmin = np.max([self.defaults[tn1].get('lmin', 2),
+                               self.defaults[tn2].get('lmin', 2)])
+            if 'lmax' in cl:
+                lmax = cl['lmax']
+            else:
+                lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
+                               self.defaults[tn2].get('lmax', 1E30)])
             sel = (l > lmin) * (l < lmax)
             l = l[sel]
             c_ell = c_ell[sel]
