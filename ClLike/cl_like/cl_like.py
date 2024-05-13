@@ -87,13 +87,14 @@ class ClLike(Likelihood):
             # Give galaxy clustering an ell_max
             if t.quantity == 'galaxy_density':
                 # Get lmax from kmax for galaxy clustering
-                if 'kmax' in self.defaults[b['name']]:
-                    kmax = self.defaults[b['name']]['kmax']
-                else:
-                    kmax = kmax_default
-                lmax = get_lmax_from_kmax(cosmo_lcdm,
-                                          kmax, zmid)
-                self.defaults[b['name']]['lmax'] = lmax
+                if 'lmax' not in self.defaults[b['name']]:
+                    if 'kmax' in self.defaults[b['name']]:
+                        kmax = self.defaults[b['name']]['kmax']
+                    else:
+                        kmax = kmax_default
+                    lmax = get_lmax_from_kmax(cosmo_lcdm,
+                                              kmax, zmid)
+                    self.defaults[b['name']]['lmax'] = lmax
 
                 # Do we want magnification bias for this tracer?
                 self.bin_properties[b['name']]['mag_bias'] = \
@@ -128,10 +129,16 @@ class ClLike(Likelihood):
                 continue
 
             # Scale cuts
-            lmin = np.max([self.defaults[tn1].get('lmin', 2),
-                           self.defaults[tn2].get('lmin', 2)])
-            lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
-                           self.defaults[tn2].get('lmax', 1E30)])
+            if 'lmin' in cl:
+                lmin = cl['lmin']
+            else:
+                lmin = np.max([self.defaults[tn1].get('lmin', 2),
+                               self.defaults[tn2].get('lmin', 2)])
+            if 'lmax' in cl:
+                lmax = cl['lmax']
+            else:
+                lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
+                               self.defaults[tn2].get('lmax', 1E30)])
             sel = (l > lmin) * (l < lmax)
             l = l[sel]
             c_ell = c_ell[sel]

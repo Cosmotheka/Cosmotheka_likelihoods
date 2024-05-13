@@ -321,6 +321,45 @@ def test_S8():
     print(loglikes)
     assert np.fabs(loglikes[0]) < 3E-3
 
+def test_scale_cuts():
+    info = get_info("Linear")
+    info['likelihood']['ClLike']['twopoints'][0]['lmax'] = 1800
+
+    model = get_model(info)
+    lkl = model.likelihood['ClLike']
+    s = lkl.get_cl_data_sacc()
+    ell, cl = s.get_ell_cl('cl_00', 'gc0', 'gc0')
+    #kmax = 0.5 is ell ~ 1000
+    assert np.any(ell > 1000) * np.all(ell < 1800)
+
+    info = get_info("Linear")
+    info['likelihood']['ClLike']['twopoints'][0]['lmin'] = 500
+    model = get_model(info)
+    lkl = model.likelihood['ClLike']
+    s = lkl.get_cl_data_sacc()
+    ell, cl = s.get_ell_cl('cl_00', 'gc0', 'gc0')
+    #kmax = 0.5 is ell ~ 1000
+    assert np.all(ell > 500) * np.all(ell < 1000)
+
+    info = get_info("Linear")
+    info['likelihood']['ClLike']['twopoints'][0]['lmin'] = 500
+    info['likelihood']['ClLike']['twopoints'][0]['lmax'] = 1800
+    model = get_model(info)
+    lkl = model.likelihood['ClLike']
+    s = lkl.get_cl_data_sacc()
+    ell, cl = s.get_ell_cl('cl_00', 'gc0', 'gc0')
+    #kmax = 0.5 is ell ~ 1000
+    assert np.all(ell > 500) * np.all(ell < 1800)
+
+    info = get_info("Linear")
+    info['likelihood']['ClLike']['defaults']['gc1']['lmax'] = 1800
+    model = get_model(info)
+    lkl = model.likelihood['ClLike']
+    s = lkl.get_cl_data_sacc()
+    ell, cl = s.get_ell_cl('cl_00', 'gc1', 'gc1')
+    #kmax = 0.5 is ell ~ 1000
+    assert np.any(ell > 1000) * np.all(ell < 1800)
+
 
 @pytest.mark.parametrize('case', ['baccoemu', 'CCL'])
 def test_sigma8_to_As(case):
