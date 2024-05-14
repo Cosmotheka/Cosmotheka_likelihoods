@@ -66,6 +66,12 @@ class CCL(Theory):
         self._required_results = {}
         self.baccompk = None
 
+        # When ccl_arguments is not provided, Cobaya saves it in the
+        # updated.yaml as null. When resuming the chains, we need to change the
+        # type.
+        if self.ccl_arguments is None:
+            self.ccl_arguments = {}
+
     def initialize_with_params(self):
         if ('A_sE9' not in self.input_params) and \
             ('sigma8' not in self.input_params) and \
