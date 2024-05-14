@@ -39,7 +39,6 @@ import pyccl as ccl
 import numpy as np
 from packaging import version
 from cobaya.theory import Theory
-from cobaya.typing import InfoDict
 
 try:
     import baccoemu
