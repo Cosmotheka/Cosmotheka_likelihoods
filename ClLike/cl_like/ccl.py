@@ -39,6 +39,7 @@ import pyccl as ccl
 import numpy as np
 from packaging import version
 from cobaya.theory import Theory
+from cobaya.typing import InfoDict
 
 try:
     import baccoemu
@@ -65,6 +66,12 @@ class CCL(Theory):
     def initialize(self):
         self._required_results = {}
         self.baccompk = None
+
+        # When ccl_arguments is not provided, Cobaya saves it in the
+        # updated.yaml as null. When resuming the chains, we need to change the
+        # type.
+        if self.ccl_arguments is None:
+            self.ccl_arguments = {}
 
     def initialize_with_params(self):
         if ('A_sE9' not in self.input_params) and \

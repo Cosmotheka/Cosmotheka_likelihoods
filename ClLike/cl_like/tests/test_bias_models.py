@@ -8,13 +8,14 @@ import pytest
 import os
 import shutil
 import sacc
+from cobaya import run
 
 
-# Cleaning the tmp dir before running and after running the tests
-@pytest.fixture(autouse=True)
-def run_clean_tmp():
-    if os.path.isdir("dum"):
-        shutil.rmtree("dum")
+OUTDIR = 'dum'
+
+# Cleaning the tmp dir after running the tests (even if they fail)
+def teardown_module():
+    shutil.rmtree(OUTDIR)
 
 
 def get_info(bias, A_sE9=True):
@@ -359,6 +360,16 @@ def test_scale_cuts():
     ell, cl = s.get_ell_cl('cl_00', 'gc1', 'gc1')
     #kmax = 0.5 is ell ~ 1000
     assert np.any(ell > 1000) * np.all(ell < 1800)
+
+
+def test_resume():
+    info = get_info('Linear')
+    output = os.path.join(OUTDIR, 'chains/resume')
+    info.update({'sampler': {'mcmc': None}, 'output': output})
+    info['params']['A_sE9'] = {'prior': {'min': 1.5, 'max': 2.9}}
+
+    run(info, test=True)
+    run(output, test=True)
 
 
 @pytest.mark.parametrize('case', ['baccoemu', 'CCL'])
