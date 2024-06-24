@@ -1,0 +1,182 @@
+# Usalo per giocare inizialmente
+
+force: True #sovrascrivere catene
+# resume: True
+
+sampler:
+  #mcmc:
+  polychord: # nested sampling  instead of metropolis-hastings 
+    #burn_in: 1000
+    #max_tries: 1000
+
+params:
+  # List all the likelihood parameters here.
+  # You need to include `prior`, `ref` and
+  # `proposal` for all parameters you want
+  # to vary.
+
+  sigma8: 0.82
+    #prior:
+    #  min: 0.65
+    #  max: 0.9
+    #latex: \sigma_8
+    #proposal: 0.01
+
+  Omega_c: 0.27
+
+    #prior:
+    #  min: 0.15
+    #  max: 0.4
+    #ref: # in caso di parallelizzazione, scegli quattro valori di partenza da una stessa gaussiana
+    #  dist: norm
+    #  loc: 0.27
+    #  scale: 0.01
+    #latex: \Omega_c
+    #proposal: 0.01
+    # drop: True
+    
+# Tutti questi parametri sono fissati 
+
+  Omega_b: 0.049   
+
+  h: 0.67
+
+  n_s: 0.96
+
+  m_nu: 0.
+
+  # Omega_c:
+  #   value: 'lambda omega_c, h: omega_c / h**2'
+
+  # Omega_b:
+  #   value: 'lambda omega_b, h: omega_b / h**2'
+
+  # A_sE9:
+  #   value: 'lambda ln1e10A_s: np.exp(ln1e10A_s) * 0.1'
+
+  # sigma8:
+  #   latex: \sigma_8
+
+  # Bias parameters. Note that you can declare
+  # all nuisance parameters as
+  # `<prefix>_param_name` where `<prefix>` is
+  # whatever you've chosen as `input_params_prefix`
+  # further down. All such parameters will
+  # automatically be understood by cobaya and
+  # assigned to your likelihood.
+  # First-order bias
+
+#  cll_LOWZ__2_b1:
+#    prior:
+#      min: -3.0
+#      max: 3.0
+#    ref:
+#      dist: norm
+#      loc: 0.Z
+#      scale: 0.1
+#    latex: b^{\rm bin=2}_1
+#    proposal: 0.01
+
+#  cll_LOWZ__2_b2:
+#    prior:
+#      min: -3.0
+#      max: 3.0
+#    ref:
+#      dist: norm
+#      loc: 0.0
+#      scale: 0.1
+#    latex: b^{\rm bin=2}_2
+#    proposal: 0.01
+
+#  cll_LOWZ__2_bs:
+#    prior:
+#      min: -10
+#      max: 10
+#    ref:
+#      dist: norm
+#      loc: 0.0
+#      scale: 0.1
+#    latex: b^{\rm bin=2}_{s^2}
+#    proposal: 0.01
+
+#  cll_LOWZ__2_bk2: 
+#    prior:
+#      min: -10
+#      max: 10
+#    ref:
+#      dist: norm
+#      loc: 0.
+#      scale: 0.1
+#    latex: b^{\rm bin=2}_{\nabla^2\delta}
+#    proposal: 0.01
+
+########################################################   Setting teorici ##################################################################
+
+# CCL settings    
+theory:  # Cobaya ha bisono di un oggetto theory, che può essere camb, class o una classe apposta come in questo caso, cl_like. Non mi è solo chiaro come funziona
+# l'import dei nomi, non dovrebbe chiamarsi Cl_like, con la maiuscola?
+  cl_like.CCL: # il mo
+    baryons_pk: nobaryons
+    matter_pk: halofit
+    transfer_function: boltzmann_camb
+  cl_like.Pk:   # idem, chi è questo
+    bias_model: "BaccoPT"
+    zmax_pks: 1.5
+  cl_like.Limber: # ok trovato il modulo
+    nz_model: "NzShift"
+    ia_model: "IADESY1"
+    input_params_prefix: "limber"
+    sample_type: center
+  cl_like.ClFinal:   
+    input_params_prefix: cll
+    shape_model: ShapeMultiplicative
+######################################################### Setting della likelihood ###########################################################
+# Likelihood settings
+likelihood:
+  cl_like.ClLikeB:  # le variabili di seguito sono quelle della funzione di verosimiglianza ClLike (vedi file)
+    # Input sacc file 
+    input_file: ../../data/cls_ws8_3bin_covNG.fits
+    # List all relevant bins. The clustering
+    # bins are clX, the shear bins are shX.
+    bins: # leggi le chiavi "name".
+      - name: CMBK  # leggi il lensing
+      - name: LOWZ__2 # leggi bin di clustering lowz_2
+    # List all 2-points that should go into the
+    # data vector. For now we only include
+    # galaxy-galaxy auto-correlations, but all
+    # galaxy-shear and shear-shear correlations.
+    twopoints:
+      #bins: 
+      - bins: [LOWZ__2, CMBK]  # cross-correlazione 
+        lmin: 0
+      - bins: [LOWZ__2, LOWZ__2] 
+        lmin: 20
+      
+      #- lmin: 20
+      #- lmin: 20
+        
+        
+    defaults:
+      # Scale cut for galaxy clustering
+      # (ignored for shear-shear)
+      kmax: 0.15 # Mpc^{-1}
+      # These one will apply to all power
+      # spectra (unless the lmax corresponding
+      # to the chosen kmax is smaller).
+      lmin: 0
+      
+      #LOWZ__2:
+      
+      #lmin: 20
+      
+      #CMBK:
+        
+      #  lmin: 0
+      
+      lmax: 2000
+      
+      cl_00:
+        lmin: 20
+
+debug: False  # Mettilo a False per velocità di esecuzione
+output: 'chains/test_14_6_RUN_2MPZ_WlxSC_gg_gk_fixed_cosmo_kmax0.15'

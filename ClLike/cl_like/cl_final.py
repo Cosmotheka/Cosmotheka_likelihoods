@@ -28,10 +28,15 @@ class ClFinal(Theory):
         return {"ia_model": None, "bias_model": None, "is_PT_bias": None}
 
     def must_provide(self, **requirements):
-        if "cl_theory" not in requirements:
+        self.calculate_things = ("cl_theory" in requirements)
+        if 'cl_with_bias' not in requirements and self.calculate_things is False:
             return {}
 
-        options = requirements.get('cl_theory') or {}
+        if self.calculate_things:
+            options = requirements.get('cl_theory') or {}
+        else:
+            options = requirements.get('cl_with_bias') or {}
+
         self.cl_meta = options.get("cl_meta")
         self.tracer_qs = options.get("tracer_qs")
         self.bin_properties = options.get("bin_properties")
@@ -42,9 +47,8 @@ class ClFinal(Theory):
                 }
 
     def calculate(self, state, want_derived=True, **pars):
-        # First, gather all the necessary ingredients for the Cls without bias parameters
-        res = self.provider.get_Limber()
-        cld = res['cl_data']
+        if not self.calculate_things:
+            return
 
         # Construct bias vector
         bias = np.zeros(len(self.bias_names))
@@ -59,8 +63,19 @@ class ClFinal(Theory):
         global_bias = self._get_global_bias(**pars)
 
         # Theory model
-        state["cl_theory"] = self._model(cld, bias, global_bias)
-        # state["cl_theory_deriv"] = self._model_deriv(cld, bias, **pars)
+        state["cl_theory"], state["cl_theory_deriv"] = self.get_cl_with_bias(bias, global_bias)
+
+    def get_cl_with_bias(self, bias, global_bias):
+        # First, gather all the necessary ingredients for the Cls without bias parameters
+        res = self.provider.get_Limber()
+        cld = res['cl_data']
+        # Theory model
+        cl = self._model(cld, bias, global_bias)
+        dcl = self._model_deriv(cld, bias, global_bias)
+        return cl, dcl
+
+    def get_bias_info(self):
+        return self.bias_names, self.bias_info
 
     def get_cl_theory(self):
         return self._current_state["cl_theory"]

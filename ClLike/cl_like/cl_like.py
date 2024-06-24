@@ -275,6 +275,29 @@ class ClLike(Likelihood):
         return s
 
 
+class ClLikeB(ClLike):
+    def get_requirements(self):
+        return {"bias_info": {},
+                "cl_with_bias": {"cl_meta": self.cl_meta,
+                              "tracer_qs": self.tracer_qs,
+                              "bin_properties": self.bin_properties,
+                             },
+                }
+    def _get_chi2(self, **pars):
+        global_bias = {name: 1 for name in self.bin_properties.keys()}
+        bias = np.array([0.2, 0.0, 0.0, 0.0])
+        t, dt = self.provider.get_cl_with_bias(bias, global_bias)
+        #t = self.provider.get_cl_theory()
+        r = t - self.data_vec
+        chi2 = np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata)
+
+        # Jeffreys prior for bias?
+        dchi2_jeffrey = 0
+        if self.jeffrey_bias:
+            dchi2_jeffrey = self._get_jeffrey_bias_dchi2()
+        return chi2, dchi2_jeffrey
+
+
 class ClLikeFastBias(ClLike):
     # Bias parameters
     bias_params: dict = {}
