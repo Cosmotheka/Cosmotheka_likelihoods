@@ -30,6 +30,9 @@ class ClLike(Likelihood):
         # Read SACC file
         self._read_data()
 
+    def _get_bin_info_extra(self):
+        pass
+
     def _read_data(self):
         """
         Reads sacc file
@@ -106,7 +109,7 @@ class ClLike(Likelihood):
                     self.defaults[b['name']]['lmax'] = self.defaults['lmax']
 
         # Additional information specific for this likelihood
-        # self._get_bin_info_extra(s)
+        self._get_bin_info_extra()
 
         # 2. Iterate through two-point functions, apply scale cuts and collect
         # information about them (tracer names, bandpower windows etc.), and
@@ -276,6 +279,14 @@ class ClLike(Likelihood):
 
 
 class ClLikeB(ClLike):
+    bias_params: dict = {}
+
+    def _get_bin_info_extra(self):
+        self.bias_names = list(self.bias_params.keys())
+        self.bias0 = np.array([v['value'] for k, v in self.bias_params.items()])
+        self.bias_pr_mean = np.array([v['prior']['mean'] for k, v in self.bias_params.items()])
+        self.bias_pr_isigma2 = np.array([1/v['prior']['sigma']**2 for k, v in self.bias_params.items()])
+
     def get_requirements(self):
         return {"bias_info": {},
                 "cl_with_bias": {"cl_meta": self.cl_meta,
@@ -283,19 +294,54 @@ class ClLikeB(ClLike):
                               "bin_properties": self.bin_properties,
                              },
                 }
+    
+    def calculate(self, state, want_derived=True, **pars):
+        # Calculate chi2
+        chi2, dchi2_jeffrey, p = self._get_chi2(**pars)
+
+        state['logp'] = -0.5*(chi2+dchi2_jeffrey)
+        state['derived'] = dict(zip(self.bias_names, p.x))
+        state['derived']['dchi2_jeffrey'] = dchi2_jeffrey
+        state['derived']['nfev'] = p.nfev
+
     def _get_chi2(self, **pars):
+        bias_names, bias_info = self.provider.get_bias_info()
+        assert bias_names == self.bias_names
         global_bias = {name: 1 for name in self.bin_properties.keys()}
-        bias = np.array([0.2, 0.0, 0.0, 0.0])
-        t, dt = self.provider.get_cl_with_bias(bias, global_bias)
-        #t = self.provider.get_cl_theory()
-        r = t - self.data_vec
-        chi2 = np.dot(r, np.dot(self.inv_cov, r)) # (ndata) , (ndata, ndata) , (ndata)
+        ##bias0 = np.array([0.2, 0.0, 0.0, 0.0])
+        #bias_pr_isigma2 = np.ones(4)
+        #bias_pr_mean = np.zeros(4)
+
+        def chi2_f(bias):
+            t, g = self.provider.get_cl_with_bias(bias, global_bias)
+            r = t - self.data_vec
+            ic_r = np.dot(self.inv_cov, r)
+            chi2 = np.dot(r, ic_r) # (ndata) , (ndata, ndata) , (ndata)
+
+            dchi2 = 2*np.dot(ic_r, g) # (ndata, ndata) , (ndata) , (ndata, nbias)
+            # Bias prior
+            rb = bias - self.bias_pr_mean
+            chi2 += np.sum(rb**2*self.bias_pr_isigma2)
+            dchi2 += 2*rb*self.bias_pr_isigma2
+            return chi2, dchi2
+
+        def hessian_chi2_f(bias):
+            _, g = self.provider.get_cl_with_bias(bias, global_bias)
+            ic_g = np.dot(self.inv_cov, g) # (ndata, ndata) , (ndata, nbias)
+            ddchi2 = 2*np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
+            # Bias prior
+            ddchi2 += 2*np.diag(self.bias_pr_isigma2)
+            return ddchi2
+        
+        p = minimize(chi2_f, self.bias0, method='Newton-CG', jac=True,
+                     hess=lambda b: hessian_chi2_f(b))
+        chi2 = p.fun
 
         # Jeffreys prior for bias?
         dchi2_jeffrey = 0
-        if self.jeffrey_bias:
-            dchi2_jeffrey = self._get_jeffrey_bias_dchi2()
-        return chi2, dchi2_jeffrey
+        #if self.jeffrey_bias:
+        #    dchi2_jeffrey = self._get_jeffrey_bias_dchi2()
+        return chi2, dchi2_jeffrey, p
 
 
 class ClLikeFastBias(ClLike):

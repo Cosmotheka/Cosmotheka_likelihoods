@@ -66,49 +66,11 @@ params:
   # assigned to your likelihood.
   # First-order bias
 
-#  cll_LOWZ__2_b1:
-#    prior:
-#      min: -3.0
-#      max: 3.0
-#    ref:
-#      dist: norm
-#      loc: 0.Z
-#      scale: 0.1
-#    latex: b^{\rm bin=2}_1
-#    proposal: 0.01
-
-#  cll_LOWZ__2_b2:
-#    prior:
-#      min: -3.0
-#      max: 3.0
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    latex: b^{\rm bin=2}_2
-#    proposal: 0.01
-
-#  cll_LOWZ__2_bs:
-#    prior:
-#      min: -10
-#      max: 10
-#    ref:
-#      dist: norm
-#      loc: 0.0
-#      scale: 0.1
-#    latex: b^{\rm bin=2}_{s^2}
-#    proposal: 0.01
-
-#  cll_LOWZ__2_bk2: 
-#    prior:
-#      min: -10
-#      max: 10
-#    ref:
-#      dist: norm
-#      loc: 0.
-#      scale: 0.1
-#    latex: b^{\rm bin=2}_{\nabla^2\delta}
-#    proposal: 0.01
+  cll_LOWZ__2_b1:
+  cll_LOWZ__2_b2:
+  cll_LOWZ__2_bs:
+  cll_LOWZ__2_bk2:
+  nfev:
 
 ########################################################   Setting teorici ##################################################################
 
@@ -145,6 +107,28 @@ likelihood:
     # data vector. For now we only include
     # galaxy-galaxy auto-correlations, but all
     # galaxy-shear and shear-shear correlations.
+    bias_params:
+      cll_LOWZ__2_b1:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.2
+      cll_LOWZ__2_b2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      cll_LOWZ__2_bs:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      cll_LOWZ__2_bk2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+
     twopoints:
       #bins: 
       - bins: [LOWZ__2, CMBK]  # cross-correlazione 
