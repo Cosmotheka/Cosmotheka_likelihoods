@@ -95,7 +95,7 @@ theory:  # Cobaya ha bisono di un oggetto theory, che può essere camb, class o 
 ######################################################### Setting della likelihood ###########################################################
 # Likelihood settings
 likelihood:
-  cl_like.ClLikeB:  # le variabili di seguito sono quelle della funzione di verosimiglianza ClLike (vedi file)
+  cl_like.ClLikeFastBias:  # le variabili di seguito sono quelle della funzione di verosimiglianza ClLike (vedi file)
     # Input sacc file 
     input_file: ../../data/cls_ws8_3bin_covNG.fits
     # List all relevant bins. The clustering
@@ -103,6 +103,16 @@ likelihood:
     bins: # leggi le chiavi "name".
       - name: CMBK  # leggi il lensing
       - name: LOWZ__2 # leggi bin di clustering lowz_2
+
+    # Include Laplace term?
+    bias_laplace: True
+
+    # Include second derivatives in Laplace term?
+    bias_fisher_deriv2: False
+
+    # Update start point of minimiser every time?
+    bias_update_every: False
+
     # List all 2-points that should go into the
     # data vector. For now we only include
     # galaxy-galaxy auto-correlations, but all
