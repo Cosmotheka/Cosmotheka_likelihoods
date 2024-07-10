@@ -1,0 +1,158 @@
+debug: false
+likelihood:
+  cl_like.ClLike:
+    bins:
+    - name: sh1
+    - name: sh2
+    - name: sh3
+    - name: sh4
+    - name: sh5
+    defaults:
+      kmax: 0.15
+      lmax: 2000
+      lmin: 30
+    input_file: /mnt/zfsusers/anyabua/IA/xCell-likelihoods/papers/IAPrec/TATT_AMP_0_PHYSPERT.fits
+    twopoints:
+    - bins:
+      - sh1
+      - sh1
+    - bins:
+      - sh1
+      - sh2
+    - bins:
+      - sh1
+      - sh3
+    - bins:
+      - sh1
+      - sh4
+    - bins:
+      - sh1
+      - sh5
+    - bins:
+      - sh2
+      - sh2
+    - bins:
+      - sh2
+      - sh3
+    - bins:
+      - sh2
+      - sh4
+    - bins:
+      - sh2
+      - sh5
+    - bins:
+      - sh3
+      - sh3
+    - bins:
+      - sh3
+      - sh4
+    - bins:
+      - sh3
+      - sh5
+    - bins:
+      - sh4
+      - sh4
+    - bins:
+      - sh4
+      - sh5
+    - bins:
+      - sh5
+      - sh5
+output: chains/TATT_AMP_0_PHYSPERT/TATT_AMP_0_PHYSPERT
+params:
+  Omega_b: 0.05
+  Omega_m:
+    latex: \Omega_m
+    prior:
+      max: 0.7
+      min: 0.05
+    proposal: 0.01
+    ref:
+      dist: norm
+      loc: 0.3
+      scale: 0.01
+  bias_a1:
+    latex: A_1
+    prior:
+      max: 5
+      min: -5
+    proposal: 0.1
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+  bias_a2:
+    latex: A_2
+    prior:
+      max: 5
+      min: -5
+    proposal: 0.1
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+  bias_ad:
+    latex: A_\delta
+    prior:
+      max: 5
+      min: -5
+    proposal: 0.1
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.1
+  bias_sh1_m: 0.0
+  bias_sh2_m: 0.0
+  bias_sh3_m: 0.0
+  bias_sh4_m: 0.0
+  bias_sh5_m: 0.0
+  h: 0.7
+  limber_eta_IA:
+    latex: \eta_{IA}
+    prior:
+      max: 5
+      min: -5
+    proposal: 0.1
+    ref:
+      dist: norm
+      loc: 0.3
+      scale: 0.1
+  limber_sh1_dz: 0.0
+  limber_sh2_dz: 0.0
+  limber_sh3_dz: 0.0
+  limber_sh4_dz: 0.0
+  limber_sh5_dz: 0.0
+  m_nu: 0.0
+  n_s: 0.96
+  sigma8:
+    latex: \sigma_8
+    prior:
+      max: 1.2
+      min: 0.5
+    proposal: 0.001
+    ref:
+      dist: norm
+      loc: 0.81
+      scale: 0.01
+sampler:
+  mcmc:
+    Rminus1_stop: 0.01
+    burn_in: 0
+    drag: true
+    learn_proposal: true
+    max_tries: 1000
+    measure_speeds: true
+theory:
+  cl_like.CCL:
+    baryons_pk: nobaryons
+    matter_pk: halofit
+    transfer_function: boltzmann_camb
+  cl_like.ClFinal:
+    input_params_prefix: bias
+    shape_model: ShapeMultiplicative
+  cl_like.Limber:
+    input_params_prefix: limber
+    nz_model: NzShift
+  cl_like.Pk:
+    bias_model: Linear
+    ia_model: TATT
