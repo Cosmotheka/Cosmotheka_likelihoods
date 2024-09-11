@@ -609,13 +609,13 @@ class BaccoCalculator(object):
         
         # TEMP RIMUOVIMI: SERVE SOLO PER FAR FUNZIONARE IL CODICE SUCCESSIVAMENTE  
         
-        #without_bounds_mpk = np.array(['sigma8_cold','omega_cold'])
-        #to_start_value_mpk['sigma8_cold'] = 0.75
-        #to_start_value_mpk['omega_cold'] = 0.25 + cospar['omega_baryon']
-        #cosmopars_start_mpk['sigma8_cold'] = to_start_value_mpk['sigma8_cold']
-        #cosmopars_start_mpk['omega_cold'] = to_start_value_mpk['omega_cold']
-        #cosmopars_predict_mpk['sigma8_cold'] = cospar['sigma8_cold'] #to_start_value_mpk['sigma8_cold']
-        #cosmopars_predict_mpk['omega_cold'] = cospar['omega_cold']  #to_start_value_mpk['omega_cold']
+        without_bounds_mpk = np.array(['sigma8_cold','omega_cold'])
+        to_start_value_mpk['sigma8_cold'] = 0.75
+        to_start_value_mpk['omega_cold'] = 0.2 + cospar['omega_baryon'] #+ 0.02
+        cosmopars_start_mpk['sigma8_cold'] = to_start_value_mpk['sigma8_cold']
+        cosmopars_start_mpk['omega_cold'] = to_start_value_mpk['omega_cold']
+        cosmopars_predict_mpk['sigma8_cold'] = cospar['sigma8_cold']   #to_start_value_mpk['sigma8_cold']
+        cosmopars_predict_mpk['omega_cold'] =  cospar['omega_cold'] #-0.02  #to_start_value_mpk['omega_cold']
         
         
         #without_bounds_mpk_mpmatter = np.array(['sigma8_cold','omega_cold'])
@@ -629,8 +629,7 @@ class BaccoCalculator(object):
         #print('len(without_bounds_mpk)',len(without_bounds_mpk))
       
         if len(without_bounds_mpk) == 0: # if all parameters are within baccoemu narrower bounds, run Carlos' code.
-             
-            print('bacco.py is not performing any extrapolation, all parameters are within the bounds')
+        
         
             if self.ignore_lbias:
                 self.pk_temp = None
@@ -642,25 +641,20 @@ class BaccoCalculator(object):
                 self.k_can_be_useful = k_for_bacco
                 
             self.pk2d_computed = {}
-            
         else: # otherwise, handle extrapolation, which involves two different parts 
             
             #print('Sono qui, è falso')
             ########################  1) P_mm part ############################################################
         
             if len(without_bounds_mpk_mpmatter) == 0:  # if there are points beyond the narrower limits but not within the broader ones: 
-               
-               print('bacco.py is performing an extrapolation on the 15 perturbative terms, the parameters are within baccoemu extended dynamic range')
+            
                P_mm = self.mpmatter.get_nonlinear_pk(baryonic_boost=False, cold=False, k=k_for_bacco, **cosmopars_predict_mpk_mpmatter)[1]/h**3 # since the parameters are within the extended bounds, do the calculation with the prediction points, no the starting point ones. 
                
                # that is, P_mm is 1) a pure matter power spectrum, 2) nonlinear, 3) calculated at the prediction point 4) without baryonic boost and with cold = False, 
             
              
             else: # worst-case scenario, if the parameters are overshooting even the extended limits, then use halofit. 
-                
-               
-               print('bacco.py is performing an extrapolation on the 15 perturbative terms and is using halofit as matter power spectrum, the parameters are beyond baccoemu extended dynamic range') 
-               
+            
                P_mm = np.zeros((len(self.a_s),len(k_for_bacco)))
                # notice, halofit comes from pyccl, hence it receives k in units of Mpc^{-1}, not h/Mpc. Since I want to calculate it at k for bacco, I have to take 
                # the k_for bacco scales and convert them to the equivalent Mpc^{-1} values. H is set at the 
@@ -671,11 +665,19 @@ class BaccoCalculator(object):
             self.P_mm = P_mm  # for utility, promote to self.
             
             ##################  2) EXTRAPOLATION PART: GET r(k, theta+dtheta), that is, Taylor-expanded biased-tracers correction factor 
+            
+            print('Extrapolating')
                             
             # 2-1) Get r(k,theta), that is r(k) at the last useful point
 
             k_at_start = k_for_bacco * h/cosmopars_start_mpk['hubble'] #this is h/Mpc  -> I can't do calculations with baccoemu on biased tracers beyond the parameter limits ,hence k must be within the bounds 
+            
+            
             k_at_start, pnn_reference_term_by_term = self.lbias.get_nonlinear_pnn(k=k_at_start, **cosmopars_start_mpk.copy())#[1]/h**3
+            
+            print('cosmopars_start_mpk',cosmopars_start_mpk)
+            print('cosmopars_predict_mpk',cosmopars_predict_mpk)
+            
             ######### CHECK THIS!    
             
             #self.mpk.get_nonlinear_pnn(k=k_for_bacco, **cosmopars_start_mpk) 
@@ -708,6 +710,8 @@ class BaccoCalculator(object):
                 drk_dvariable_dictionary['drk_d' + par_name]  = self.central_derivator(self._get_drk_dparameter,to_start_value_mpk[par_name],dx=dx,args=(k_at_start,cosmopars_start_mpk.copy(),par_name))#[1]
                              # array of length k with the power spectrum derivative with respect to the desired parameter
                 rk_perturbation_term_dictionary[par_name] = drk_dvariable_dictionary['drk_d' + par_name] * ( cosmopars_predict_mpk.copy()[par_name] - cosmopars_start_mpk.copy()[par_name] ) # calculate dp/dpar * delta_par 
+                
+                print('deltah',( cosmopars_predict_mpk.copy()[par_name] - cosmopars_start_mpk.copy()[par_name] ))
                 total_perturbation_rk = total_perturbation_rk + rk_perturbation_term_dictionary[par_name] # add all the perturbations together, at first order it is linear	    
             
             self.drk_dvariable_dictionary = drk_dvariable_dictionary
