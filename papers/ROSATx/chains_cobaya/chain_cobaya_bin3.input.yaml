@@ -1,0 +1,32 @@
+likelihood:
+  rosatx: true
+params:
+  lMc:
+    prior:
+      min: 13.0
+      max: 15.0
+    ref: 14.2
+    proposal: 0.01
+  alpha_T:
+    prior:
+      min: 0.5
+      max: 2.0
+    ref: 1.0
+    proposal: 0.01
+  eta_b:
+    prior:
+      min: 0.2
+      max: 2.0
+    ref: 0.5
+    proposal: 0.01
+  gamma:
+    prior:
+      min: 1.1
+      max: 1.5
+    ref: 1.19
+    proposal: 0.01
+sampler:
+  mcmc:
+    max_samples: 10000
+    Rminus1_stop: 0.01
+output: chain_cobaya_bin3

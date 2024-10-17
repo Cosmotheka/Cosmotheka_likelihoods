@@ -1,0 +1,15 @@
+# Distribution / packaging
+build/
+dist/
+examples/
+pyatomdb.egg-info/
+MANIFEST
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Apple files
+.DS_Store
