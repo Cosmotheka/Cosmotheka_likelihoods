@@ -34,13 +34,14 @@ class LPTCalculator(object):
         else:
             self.wk_low = np.ones(nk_total)
 
-    def update_pk(self, pk, Dz):
+    def update_pk(self, cosmo, **kwargs):
         """ Update the internal PT arrays.
 
         Args:
-            pk (array_like): linear power spectrum sampled at the
-                internal `k` values used by this calculator.
+            cosmo
         """
+        pk = cosmo.linear_matter_power(self.ks, 1.)
+        Dz = cosmo.growth_factor(self.a_s)
         if pk.shape != self.ks.shape:
             raise ValueError("Input spectrum has wrong shape")
         if Dz.shape != self.a_s.shape:

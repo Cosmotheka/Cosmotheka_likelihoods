@@ -6,6 +6,7 @@ sampler:
   mcmc:
     burn_in: 0
     max_tries: 1000
+    drag: True
 
 params:
   # Cosmological parameters
@@ -440,9 +441,6 @@ likelihood:
         lmin: 79
       eBOSS__1:
         lmin: 102
-
-    # Prefix associated to all nuisance params
-    input_params_prefix: clk
 
 debug: False
 output: 'chains/FD_Garcia-Garcia2021_dzMarg_mMarg/FD_Garcia-Garcia2021_dzMarg_mMarg'

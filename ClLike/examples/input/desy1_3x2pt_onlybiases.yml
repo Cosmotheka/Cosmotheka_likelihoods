@@ -2,6 +2,7 @@ sampler:
   mcmc:
     burn_in: 0
     max_tries: 1000
+    drag: True
 
 params:
   # List all the likelihood parameters here.
@@ -292,9 +293,6 @@ likelihood:
         lmin: 30
       DESwl__3:
         lmin: 30
-
-    # Prefix associated to all nuisance params
-    input_params_prefix: clk
 
 debug: False
 output: 'chains/desy1_3x2pt_onlybiases/desy1_3x2pt_onlybiases'

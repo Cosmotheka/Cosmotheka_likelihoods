@@ -5,12 +5,10 @@ import copy
 from cobaya.likelihood import Likelihood
 from cobaya.log import LoggedError
 from scipy.optimize import minimize
+import sacc
 
 
 class ClLike(Likelihood):
-    # All parameters starting with this will be
-    # identified as belonging to this stage.
-    input_params_prefix: str = ""
     # Input sacc file
     input_file: str = ""
     # Angular resolution
@@ -23,6 +21,8 @@ class ClLike(Likelihood):
     twopoints: list = []
     # Jeffreys prior for bias params?
     jeffrey_bias: bool = False
+    # Null negative covariance eigenvalues when computing inverse cov?
+    null_negative_cov_eigvals_in_icov: bool = False
 
     def initialize(self):
         # Deep copy defaults to avoid modifying the input yaml
@@ -38,7 +38,6 @@ class ClLike(Likelihood):
         Reads tracer metadata (N(z))
         Reads covariance
         """
-        import sacc
 
         def get_cl_type(tr1, tr2):
             cltyp = 'cl_'
@@ -88,13 +87,14 @@ class ClLike(Likelihood):
             # Give galaxy clustering an ell_max
             if t.quantity == 'galaxy_density':
                 # Get lmax from kmax for galaxy clustering
-                if 'kmax' in self.defaults[b['name']]:
-                    kmax = self.defaults[b['name']]['kmax']
-                else:
-                    kmax = kmax_default
-                lmax = get_lmax_from_kmax(cosmo_lcdm,
-                                          kmax, zmid)
-                self.defaults[b['name']]['lmax'] = lmax
+                if 'lmax' not in self.defaults[b['name']]:
+                    if 'kmax' in self.defaults[b['name']]:
+                        kmax = self.defaults[b['name']]['kmax']
+                    else:
+                        kmax = kmax_default
+                    lmax = get_lmax_from_kmax(cosmo_lcdm,
+                                              kmax, zmid)
+                    self.defaults[b['name']]['lmax'] = lmax
 
                 # Do we want magnification bias for this tracer?
                 self.bin_properties[b['name']]['mag_bias'] = \
@@ -108,24 +108,9 @@ class ClLike(Likelihood):
         # Additional information specific for this likelihood
         # self._get_bin_info_extra(s)
 
-        # 2. Iterate through two-point functions and apply scale cuts
-        indices = []
-        for cl in self.twopoints:
-            tn1, tn2 = cl['bins']
-            lmin = np.max([self.defaults[tn1].get('lmin', 2),
-                           self.defaults[tn2].get('lmin', 2)])
-            lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
-                           self.defaults[tn2].get('lmax', 1E30)])
-            # Get the suffix for both tracers
-            cltyp = get_cl_type(s.tracers[tn1], s.tracers[tn2])
-            ind = s.indices(cltyp, (tn1, tn2),
-                            ell__gt=lmin, ell__lt=lmax)
-            indices += list(ind)
-        s.keep_indices(np.array(indices))
-
-        # 3. Iterate through two-point functions, collect information about
-        # them (tracer names, bandpower windows etc.), and put all C_ells in
-        # the right order
+        # 2. Iterate through two-point functions, apply scale cuts and collect
+        # information about them (tracer names, bandpower windows etc.), and
+        # put all C_ells in the right order
         indices = []
         self.cl_meta = []
         id_sofar = 0
@@ -135,14 +120,35 @@ class ClLike(Likelihood):
             # Get the suffix for both tracers
             tn1, tn2 = cl['bins']
             cltyp = get_cl_type(s.tracers[tn1], s.tracers[tn2])
+            # Get data
             l, c_ell, cov, ind = s.get_ell_cl(cltyp, tn1, tn2,
                                               return_cov=True,
                                               return_ind=True)
-            if c_ell.size > 0:
-                if tn1 not in self.tracer_qs:
-                    self.tracer_qs[tn1] = s.tracers[tn1].quantity
-                if tn2 not in self.tracer_qs:
-                    self.tracer_qs[tn2] = s.tracers[tn2].quantity
+            # Check it is not empty
+            if c_ell.size == 0:
+                continue
+
+            # Scale cuts
+            if 'lmin' in cl:
+                lmin = cl['lmin']
+            else:
+                lmin = np.max([self.defaults[tn1].get('lmin', 2),
+                               self.defaults[tn2].get('lmin', 2)])
+            if 'lmax' in cl:
+                lmax = cl['lmax']
+            else:
+                lmax = np.min([self.defaults[tn1].get('lmax', 1E30),
+                               self.defaults[tn2].get('lmax', 1E30)])
+            sel = (l > lmin) * (l < lmax)
+            l = l[sel]
+            c_ell = c_ell[sel]
+            cov = cov[sel][:, sel]
+            ind = ind[sel]
+
+            if tn1 not in self.tracer_qs:
+                self.tracer_qs[tn1] = s.tracers[tn1].quantity
+            if tn2 not in self.tracer_qs:
+                self.tracer_qs[tn2] = s.tracers[tn2].quantity
 
             bpw = s.get_bandpower_windows(ind)
             l_bpw = bpw.values
@@ -167,8 +173,22 @@ class ClLike(Likelihood):
         self.data_vec = s.mean[indices]
         self.cov = s.covariance.dense[indices][:, indices]
         # Invert covariance
-        self.inv_cov = np.linalg.inv(self.cov)
+        self.inv_cov = self.get_inv_cov(self.cov)
         self.ndata = len(self.data_vec)
+        # Keep indices in case we want so slice the original sacc file
+        self.indices = indices
+
+    def get_inv_cov(self, cov):
+        if self.null_negative_cov_eigvals_in_icov:
+            evals, evecs = np.linalg.eigh(cov)
+            inv_evals = 1/evals
+            sel = evals<0
+            print(f'Nulling {np.sum(sel)} negative eigenvalues:', evals[sel])
+            inv_evals[sel] = 0
+            inv_cov = evecs.dot(np.diag(inv_evals).dot(evecs.T))
+        else:
+            inv_cov = np.linalg.inv(cov)
+        return inv_cov
 
     def _get_jeffrey_bias_dchi2(self):
         g = self.provider.get_cl_theory_deriv()
@@ -202,6 +222,57 @@ class ClLike(Likelihood):
         chi2, dchi2_jeffrey = self._get_chi2(**pars)
         state['logp'] = -0.5*(chi2+dchi2_jeffrey)
         state['derived'] = {'dchi2_jeffrey': dchi2_jeffrey}
+
+    def get_cl_theory_sacc(self):
+        # Create empty file
+        s = sacc.Sacc()
+
+        # Add tracers
+        for n, p in self.bin_properties.items():
+            if n not in self.tracer_qs:
+                continue
+            q = self.tracer_qs[n]
+            spin = 2 if q == 'galaxy_shear' else 0
+            if q in ['galaxy_density', 'galaxy_shear']:
+                # TODO: These would better be the shifted Nz
+                s.add_tracer('NZ', n, quantity=q, spin=spin,
+                             z=p['z_fid'], nz=p['nz_fid'])
+            else:
+                s.add_tracer('Map', n, quantity=q, spin=spin,
+                             ell=np.arange(10), beam=np.ones(10))
+
+        # Calculate power spectra
+        cl = self.provider.get_cl_theory()
+        for clm in self.cl_meta:
+            p1 = 'e' if self.tracer_qs[clm['bin_1']] == 'galaxy_shear' else '0'
+            p2 = 'e' if self.tracer_qs[clm['bin_2']] == 'galaxy_shear' else '0'
+            cltyp = f'cl_{p1}{p2}'
+            if cltyp == 'cl_e0':
+                cltyp = 'cl_0e'
+            bpw = sacc.BandpowerWindow(clm['l_bpw'], clm['w_bpw'].T)
+            s.add_ell_cl(cltyp, clm['bin_1'], clm['bin_2'],
+                         clm['l_eff'], cl[clm['inds']], window=bpw)
+
+        return s
+
+    def get_cl_data_sacc(self):
+        s = self.sacc_file.copy()
+        s.keep_indices(self.indices)
+
+        # Reorder
+        indices = []
+        for clm in self.cl_meta:
+            indices.extend(list(s.indices(tracers=(clm['bin_1'], clm['bin_2']))))
+        s.reorder(indices)
+
+        tracers = []
+        for trs in s.get_tracer_combinations():
+            tracers.extend(trs)
+
+        # Use list(set()) to remove duplicates
+        s.keep_tracers(list(set(tracers)))
+
+        return s
 
 
 class ClLikeFastBias(ClLike):
