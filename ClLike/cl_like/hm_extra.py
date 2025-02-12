@@ -16,6 +16,9 @@ class HalomodCorrection(object):
     def __init__(self,
                  k_range=[1E-1, 5], nlk=20,
                  z_range=[0., 1.], nz=16):
+        raise NotImplementedError("This module is outdated. Need to be updated"
+                                  " to CCLv3")
+
         from scipy.interpolate import interp2d
 
         cosmo = ccl.CosmologyVanillaLCDM()
@@ -25,7 +28,8 @@ class HalomodCorrection(object):
         karr = 10.**lkarr
         zarr = np.linspace(z_range[0], z_range[1], nz)
 
-        pk_hm = np.array([ccl.halomodel_matter_power(cosmo, karr, a)
+        # Deprecated in CCLv3
+        pk_hm = np.array([ccl.halos.halomod_matter_power(cosmo, karr, a)
                           for a in 1. / (1 + zarr)])
         pk_hf = np.array([ccl.nonlin_matter_power(cosmo, karr, a)
                           for a in 1. / (1 + zarr)])

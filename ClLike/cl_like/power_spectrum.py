@@ -265,16 +265,17 @@ class Pk(Theory):
                 pkd['Sk'] = ptc.get_pk('Sk')
             elif (self.baryon_model == 'CCL_BCM') or \
                 (baryons_in_cosmo == 'bcm'):
+                # This can be optimized using BaryonsClass.update_params()
                 if self.is_PT_bias:
                     # The correction happens in place
                     # If bias is Linear, then the pk already has the baryon
                     # boost applied.
-                    ccl.bcm.bcm_correct_pk2d(cosmo, pkd['pk_ww'])
+                    pkd['pk_ww'] = cosmo.baryons.include_baryonic_effects(cosmo, pkd['pk_ww'])
                 a_arr, lnk, pkww = pkd['pk_ww'].get_spline_arrays()
                 k = np.exp(lnk)
                 Sk = np.zeros_like(pkww)
                 for i, ai in enumerate(a_arr):
-                    Sk[i] = ccl.bcm.bcm_model_fka(cosmo, k, ai)
+                    Sk[i] = cosmo.baryons.boost(cosmo, k, ai)
                 pkd['Sk'] = ccl.Pk2D(a_arr=a_arr, lk_arr=lnk,
                                      pk_arr=np.log(Sk), is_logp=True)
             elif self.baryon_model == 'Amon-Efstathiou':

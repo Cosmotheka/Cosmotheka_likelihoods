@@ -125,29 +125,30 @@ class CCL(Theory):
             return 0
 
         h = self.provider.get_param('h')
-        T_CMB = self._get_ccl_param_or_arg('T_CMB',
-                                           ccl.physical_constants.T_CMB)
-        if version.parse(ccl.__version__) < version.parse("2.8.0"):
-            Onu = ccl.neutrinos.Omeganuh2(1, m_nu, T_CMB=T_CMB)
-        else:
-            raise NotImplementedError("_get_Onu needs testing for "
-                                      "pyccl>2.8.0")
-            T_ncdm = self._get_ccl_param_or_arg('T_ncdm',
-                                                ccl.DefaultParams.T_ncdm)
-            # Copied from ccl/cosmology.py
-            import pyccl.physical_constants as const
-            c = const
-            g = (4/11)**(1/3)
-            T_nu = g * T_CMB
-            massless_limit = T_nu * c.KBOlTZ / c.EV_IN_J
+        T_CMB = self._get_ccl_param_or_arg('T_CMB',ccl.DefaultParams.T_CMB)
+        T_ncdm = self._get_ccl_param_or_arg('T_ncdm', ccl.DefaultParams.T_ncdm)
 
-            from pyccl.neutrinos import nu_masses
-            mass_split = self._get_ccl_param_or_arg('mass_split', 'normal')
-            mnu_list = nu_masses(m_nu=m_nu, mass_split=mass_split)
-            nu_mass = mnu_list[mnu_list > massless_limit]
-            Onu = pyccl.cosmology.Cosmology._OmNuh2(m_nu, len(m_nu), T_CMB, T_ncdm)
+        # from pyccl/cosmology.py
+        # g = (4/11)**(1/3)
+        # T_nu = g * T_CMB
+        # massless_limit = T_nu * \
+        #     ccl.physical_constants.KBOLTZ / ccl.physical_constants.EV_IN_J
 
-        return Onu / h**2
+        # # Read from input
+        # # mass_split = self.provider.get_param('mass_split')
+        # mnu_list = ccl.neutrinos.nu_masses(m_nu=m_nu, mass_split='normal')
+        # nu_mass = mnu_list[mnu_list > massless_limit]
+        # N_nu_mass = len(nu_mass)
+
+        # Onu = ccl.cosmology.Cosmology._OmNuh2(m_nu, N_nu_mass, T_CMB, T_ncdm)
+
+        # The above doesn't work, this works but probably is slow
+        cosmo = ccl.Cosmology(Omega_c=0.3, Omega_b=0.05, h=h, n_s=0.96,
+                              sigma8=0.811, m_nu=m_nu, T_CMB=T_CMB,
+                              T_ncdm=T_ncdm)
+        Onu = cosmo['Omega_nu_mass']
+
+        return Onu
 
     def _get_As_from_sigma8(self, pars):
         pars = pars.copy()
@@ -179,6 +180,26 @@ class CCL(Theory):
         A_s = (sigma8 / sigma8_fid)**2 * A_s_fid
 
         return A_s
+
+    def _get_baryons_instance(self, params):
+        """
+        Return a `ccl.Baryons` instance to instantiate the Cosmology object.
+        """
+        if self.baryons_pk == 'nobaryons':
+            return None
+        elif self.baryons_pk == 'schneider15':
+            BaryonsClass = ccl.baryons.BaryonsSchneider15
+        else:
+            raise NotImplementedError("Baryons class `{self.baryons_pk}` "
+                                      "not implemented.")
+
+        # Automatically detect the param names accepted by the Baryons class
+        args = {}
+        for p in BaryonsClass.__init__.__code__.co_varnames[1:]:
+            if p in params:
+                args[p] = params.pop(p)
+
+        return BaryonsClass(**args)
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Generate the CCL cosmology object which can then be used downstream
@@ -233,10 +254,13 @@ class CCL(Theory):
             params['A_s'] = self._get_As_from_sigma8(params)
             del params['sigma8']
 
+        BaryonsClass = self._get_baryons_instance(params)
+
+
         cosmo = ccl.Cosmology(**params,
                               transfer_function=self.transfer_function,
                               matter_power_spectrum=self.matter_pk,
-                              baryons_power_spectrum=self.baryons_pk,
+                              baryonic_effects=BaryonsClass,
                               **ccl_arguments)
 
         state['CCL'] = {'cosmo': cosmo}
