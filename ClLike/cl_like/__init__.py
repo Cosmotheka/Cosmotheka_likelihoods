@@ -1,6 +1,6 @@
 from . import cl_like, ccl  # noqa
 
-from .cl_like import ClLike, ClLikeFastBias  # noqa
+from .cl_like import ClLike, ClLikeP18flowtau, ClLikeFastBias  # noqa
 from .bao_like import BAOLike # noqa
 from .ccl import CCL  # noqa
 # TODO: Do we really need to import these classes here?

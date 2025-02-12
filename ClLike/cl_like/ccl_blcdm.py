@@ -158,7 +158,7 @@ class CCL_BLCDM(Theory):
         if 'mPk' in hc.pars['output']:
             sigma8 = hc.sigma8()
             params['S8'] = sigma8*np.sqrt(Omega_m/0.3)
-        if ('A_s' in self.input_params) and ('mPk' in hc.pars['output']):
+        if (('A_s' in self.input_params) or ('A_sE9' in self.input_params)) and ('mPk' in hc.pars['output']):
             params.update({'sigma8': sigma8})
         else:
             params.update({'A_s':

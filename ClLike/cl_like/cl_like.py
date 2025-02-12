@@ -7,6 +7,11 @@ from cobaya.log import LoggedError
 from scipy.optimize import minimize
 import sacc
 
+# For the flow
+import torch
+import sys
+sys.path.append('~/codes/emuflow')
+
 
 class ClLike(Likelihood):
     # Input sacc file
@@ -274,6 +279,48 @@ class ClLike(Likelihood):
 
         return s
 
+class ClLikeP18flowtau(ClLike):
+
+    def initialize(self):
+        super().initialize()
+        self.flow_tau = self.load_flow('P18_lcdm_nu_tau')
+
+    def load_flow(self, experiment: str):
+        """Load a pre-trained normalising flow.
+
+        Args:
+            experiment (str): name of the experiment (flow)
+
+        Returns:
+            NormFlow: the pre-trained normalising flow
+        """
+        fullpath = f"/mnt/users/gravityls_3/codes/emuflow/flows/{experiment}.pt"
+        flow = torch.load(fullpath)
+        return flow
+
+    def calculate(self, state, want_derived=True, **pars):
+        # Calculate chi2
+        chi2, dchi2_jeffrey = self._get_chi2(**pars)
+
+        cosmo = self.provider.get_CCL()['cosmo']
+        sigma8 = cosmo.sigma8() # self.provider.get_param('sigma8')
+        Omega_cdm = self.provider.get_param('Omega_cdm')
+        Omega_b = self.provider.get_param('Omega_b')
+        h = self.provider.get_param('h')
+        n_s = self.provider.get_param('n_s')
+        tau_reio = self.provider.get_param('tau_reio')
+
+        logp_P18flow = self.P18flow_tau_logp(sigma8, Omega_cdm, Omega_b, h, n_s, tau_reio)
+        state['logp'] = -0.5*(chi2+dchi2_jeffrey) + logp_P18flow
+        state['derived'] = {'dchi2_jeffrey': dchi2_jeffrey}
+
+    def P18flow_tau_logp(self, sigma8, Omega_cdm, Omega_b, h, n_s, tau_reio):
+        cosmology = np.array([sigma8, Omega_cdm, Omega_b, h, n_s, tau_reio])
+
+        log_density = self.flow_tau.loglike(cosmology).item()
+
+
+        return log_density
 
 class ClLikeFastBias(ClLike):
     # Bias parameters
