@@ -28,10 +28,15 @@ class ClFinal(Theory):
         return {"ia_model": None, "bias_model": None, "is_PT_bias": None}
 
     def must_provide(self, **requirements):
-        if "cl_theory" not in requirements:
+        self.calculate_things = ("cl_theory" in requirements)
+        if 'cl_with_bias' not in requirements and self.calculate_things is False:
             return {}
 
-        options = requirements.get('cl_theory') or {}
+        if self.calculate_things:
+            options = requirements.get('cl_theory') or {}
+        else:
+            options = requirements.get('cl_with_bias') or {}
+
         self.cl_meta = options.get("cl_meta")
         self.tracer_qs = options.get("tracer_qs")
         self.bin_properties = options.get("bin_properties")
@@ -42,9 +47,8 @@ class ClFinal(Theory):
                 }
 
     def calculate(self, state, want_derived=True, **pars):
-        # First, gather all the necessary ingredients for the Cls without bias parameters
-        res = self.provider.get_Limber()
-        cld = res['cl_data']
+        if not self.calculate_things:
+            return
 
         # Construct bias vector
         bias = np.zeros(len(self.bias_names))
@@ -59,14 +63,31 @@ class ClFinal(Theory):
         global_bias = self._get_global_bias(**pars)
 
         # Theory model
-        state["cl_theory"] = self._model(cld, bias, global_bias)
-        # state["cl_theory_deriv"] = self._model_deriv(cld, bias, **pars)
+        state["cl_theory"], state["cl_theory_deriv"] = self.get_cl_with_bias(bias, global_bias)
+
+    def get_cl_with_bias(self, bias, global_bias):
+        # First, gather all the necessary ingredients for the Cls without bias parameters
+        res = self.provider.get_Limber()
+        cld = res['cl_data']
+        # Theory model
+        cl = self._model(cld, bias, global_bias)
+        dcl = self._model_deriv(cld, bias, global_bias)
+        return cl, dcl
+
+    def get_bias_info(self):
+        return self.bias_names, self.bias_info
 
     def get_cl_theory(self):
         return self._current_state["cl_theory"]
 
     def get_cl_theory_deriv(self):
         return self._current_state["cl_theory_deriv"]
+
+    def get_cl_theory_dderiv(self, bias, global_bias):
+        # First, gather all the necessary ingredients for the Cls without bias parameters
+        res = self.provider.get_Limber()
+        cld = res['cl_data']
+        return self._model_dderiv(cld, bias, global_bias)
 
     def _get_global_bias(self, **pars):
         global_bias = {}
@@ -144,6 +165,25 @@ class ClFinal(Theory):
 
             cls_deriv[inds] = cls_grad.T
         return cls_deriv # (ndata, nbias)
+
+    def _model_dderiv(self, cld, bias_vec, global_bias):
+        nbias = len(bias_vec)
+        cls_dderiv = np.zeros((self.ndata, nbias, nbias))
+
+        for icl, clm in enumerate(self.cl_meta):
+            n1 = clm['bin_1']
+            n2 = clm['bin_2']
+            ind1 = self.bias_info[n1]['bias_ind']
+            ind2 = self.bias_info[n2]['bias_ind']
+            inds = clm['inds']
+
+            if (ind1 is not None) and (ind2 is not None):
+                cls_hess = np.zeros([nbias, nbias, len(clm['l_eff'])])
+                cls_hess[np.ix_(ind1, ind2)] += cld['cl11'][icl]
+                cls_hess[np.ix_(ind2, ind1)] += np.transpose(cld['cl11'][icl], axes=(1, 0, 2))
+                cls_dderiv[inds] = np.transpose(cls_hess, axes=(2, 0, 1))
+        return cls_dderiv # (ndata, nbias)
+
 
     def _get_bias_info(self, ia_model, bias_model, is_PT_bias):
         # Extract additional per-sample information from the sacc
