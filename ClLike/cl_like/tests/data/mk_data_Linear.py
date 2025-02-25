@@ -103,6 +103,7 @@ elif args.non_linear == 'halofit':
                           T_CMB=2.7255,
                           transfer_function='boltzmann_camb',
                           matter_power_spectrum='halofit')
+    print(cosmo.sigma8())
 
     # cosmo.compute_nonlin_power()
     # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')

@@ -128,25 +128,27 @@ class CCL(Theory):
         T_CMB = self._get_ccl_param_or_arg('T_CMB',ccl.DefaultParams.T_CMB)
         T_ncdm = self._get_ccl_param_or_arg('T_ncdm', ccl.DefaultParams.T_ncdm)
 
-        # from pyccl/cosmology.py
-        # g = (4/11)**(1/3)
-        # T_nu = g * T_CMB
-        # massless_limit = T_nu * \
-        #     ccl.physical_constants.KBOLTZ / ccl.physical_constants.EV_IN_J
+        # from pyccl/cosmology.py:
+        g = (4/11)**(1/3)
+        T_nu = g * T_CMB
+        massless_limit = T_nu * \
+            ccl.physical_constants.KBOLTZ / ccl.physical_constants.EV_IN_J
 
-        # # Read from input
-        # # mass_split = self.provider.get_param('mass_split')
-        # mnu_list = ccl.neutrinos.nu_masses(m_nu=m_nu, mass_split='normal')
-        # nu_mass = mnu_list[mnu_list > massless_limit]
-        # N_nu_mass = len(nu_mass)
+        # Read from input
+        # mass_split = self.provider.get_param('mass_split')
+        mnu_list = ccl.neutrinos.nu_masses(m_nu=m_nu, mass_split='normal')
+        nu_mass = mnu_list[mnu_list > massless_limit]
+        N_nu_mass = len(nu_mass)
 
-        # Onu = ccl.cosmology.Cosmology._OmNuh2(m_nu, N_nu_mass, T_CMB, T_ncdm)
+        # Setting "self" to None. This is a dirty hack
+        Onuh2 = ccl.cosmology.Cosmology._OmNuh2(None, nu_mass, N_nu_mass, T_CMB, T_ncdm)
+        Onu = Onuh2 / h**2
 
         # The above doesn't work, this works but probably is slow
-        cosmo = ccl.Cosmology(Omega_c=0.3, Omega_b=0.05, h=h, n_s=0.96,
-                              sigma8=0.811, m_nu=m_nu, T_CMB=T_CMB,
-                              T_ncdm=T_ncdm)
-        Onu = cosmo['Omega_nu_mass']
+        # cosmo = ccl.Cosmology(Omega_c=0.3, Omega_b=0.05, h=h, n_s=0.96,
+        #                       sigma8=0.811, m_nu=m_nu, T_CMB=T_CMB,
+        #                       T_ncdm=T_ncdm)
+        # Onu = cosmo['Omega_nu_mass']
 
         return Onu
 
@@ -185,9 +187,9 @@ class CCL(Theory):
         """
         Return a `ccl.Baryons` instance to instantiate the Cosmology object.
         """
-        if self.baryons_pk == 'nobaryons':
+        if self.baryons_pk.lower() == 'nobaryons':
             return None
-        elif self.baryons_pk == 'schneider15':
+        elif self.baryons_pk.lower() == 'schneider15':
             BaryonsClass = ccl.baryons.BaryonsSchneider15
         else:
             raise NotImplementedError("Baryons class `{self.baryons_pk}` "

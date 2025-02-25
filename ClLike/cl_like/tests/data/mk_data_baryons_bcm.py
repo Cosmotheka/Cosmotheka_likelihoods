@@ -5,16 +5,15 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import os
 
+bcm = ccl.baryons.BaryonsSchneider15(log10Mc=14, eta_b=0.6, k_s=50,)
+
 cosmo = ccl.Cosmology(Omega_c=0.26,
                       Omega_b=0.05,
                       h=0.67,
                       n_s=0.96,
                       A_s=2.1265e-9,
                       m_nu = 0.15,
-                      baryons_power_spectrum='bcm',
-                      bcm_log10Mc=14,
-                      bcm_etab=0.6,
-                      bcm_ks=50,
+                      baryonic_effects=bcm,
                       matter_power_spectrum='halofit')
 
 

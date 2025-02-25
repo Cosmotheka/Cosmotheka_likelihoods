@@ -176,7 +176,7 @@ class EPTCalculator(object):
             return pnl
 
         if kind == 'd1k2':
-            pk = np.array([pnl.eval(self.ks, a, cosmo)*self.ks**2
+            pk = np.array([pnl(self.ks, a, cosmo)*self.ks**2
                            for a in self.a_s])
             pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks),
                             pk_arr=pk, is_logp=False)
