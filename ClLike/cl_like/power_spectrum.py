@@ -58,6 +58,9 @@ class Pk(Theory):
     allow_bcm_emu_extrapolation_for_shear : bool = True
     allow_halofit_extrapolation_for_shear : bool = False
     allow_halofit_extrapolation_for_shear_on_k: bool = False
+    # Modified Gravity
+    mg_model: str = ''
+    mg_emulator_folder: str = ''
 
     def initialize(self):
         # Bias model
@@ -135,6 +138,12 @@ class Pk(Theory):
                 raise ValueError("baryon_model 'Bacco' can only be used with "
                                  "bias_model 'BaccoPT' at the moment.")
 
+        if self.mg_model == '':
+            pass
+        elif self.mg_model == 'BLCDM':
+            from .blcdm_boost import BLCDMCalculator
+            self.mg_boost = BLCDMCalculator(self.mg_emulator_folder)
+
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
             return {}
@@ -145,11 +154,12 @@ class Pk(Theory):
         # TODO: We should better use an input_params_prefix to avoid confusion
         # with CCL params and maybe split the baryons stuff
         return ["M_c", "eta", "beta", "M1_z0_cen", "theta_out", "theta_inn",
-                "M_inn", "A_AE"]
+                "M_inn", "A_AE", "mu0", "Sigma0"]
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
         bcmpar = None
+        mgpars = None
         if self.use_baryon_boost:
             if self.baryon_model == 'Bacco':
                 M_c = self.provider.get_param('M_c')
@@ -171,12 +181,19 @@ class Pk(Theory):
             elif self.baryon_model == 'Amon-Efstathiou':
                 bcmpar = {'A_AE': self.provider.get_param('A_AE')}
 
-        state['Pk'] = {'pk_data': self._get_pk_data(cosmo, bcmpar=bcmpar)}
+        if self.mg_model:
+            mgpars = {
+                'mu0': self.provider.get_param('mu0'),
+                'Sigma0': self.provider.get_param('Sigma0')
+            }
+
+        state['Pk'] = {'pk_data': self._get_pk_data(cosmo, bcmpar=bcmpar,
+                                                    mgpars=mgpars)}
 
     def get_Pk(self):
         return self._current_state['Pk']
 
-    def _get_pk_data(self, cosmo, bcmpar=None):
+    def _get_pk_data(self, cosmo, bcmpar=None, mgpars=None):
         # cosmo.compute_nonlin_power()
         # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
         pkmm = None
@@ -300,7 +317,21 @@ class Pk(Theory):
                 # TODO: Bacco returns a pk2d of 1's, maybe homogenize this
                 pkd['Sk'] = None
 
+            # Apply modified gravity boost
+            if self.mg_model:
+                self.apply_mg_boost(cosmo, mgpars, pkd)
+
         return pkd
+
+    def apply_mg_boost(self, cosmo, mgpars, pkd):
+        if self.bias_model != 'Linear':
+            raise NotImplementedError('MG Boost can only be applied to linear bias')
+
+        self.mg_boost.update_pk(cosmo, mgpars['mu0'], mgpars['Sigma0'])
+        for k, pk2d in pkd.items():
+            kind = k.split('_')[1].replace('d1', 'm')
+            # The Weyl boost is applied to the LCDM matter power spectrum
+            self.mg_boost.apply_boost(kind, pk2d)
 
     def get_can_provide(self):
         return ["is_PT_bias", "bias_model"]
