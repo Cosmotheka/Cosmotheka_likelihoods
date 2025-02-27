@@ -38,17 +38,12 @@ class BLCDMCalculator(object):
             if (xx < self.bounds[i, 0]) | (xx > self.bounds[i, 1]):
                 raise ValueError(f'parameter {self.parnames[i]} has value {xx}, out of bounds {self.bounds[i]}')
 
-    def get_mg_boost(self, Omega_m=None, lnE9As=None, h=None, mu0=None, a=None):
+    def get_mg_boost_pkmm(self, Omega_m=None, lnE9As=None, h=None, mu0=None, a=None):
         pars = np.array([Omega_m, lnE9As, h, mu0, a])
         self._check_pars(pars)
         return self.k, np.squeeze(np.exp(self.scaler.inverse_transform(self.model(np.array([self._transform_space(pars)])))))
 
-    def get_boost_factor(self, pars, k, a):
-        return self.get_mg_boost(Omega_m=pars['Omega_m'],
-                                 lnE9As=np.log(pars['As']*1e-9),
-                                 h=pars['h'], mu0=pars['mu0'], a=a)
-
-    def get_mg_boost_parallel(self, Omega_m=None, lnE9As=None, h=None, mu0=None, a_arr=None):
+    def get_mg_boost_pkmm_parallel(self, Omega_m=None, lnE9As=None, h=None, mu0=None, a_arr=None):
         pars = np.array([Omega_m, lnE9As, h, mu0, a_arr.min()])
         self._check_pars(pars)
 
@@ -87,19 +82,27 @@ class BLCDMCalculator(object):
             cosmo:
             mu0:
         """
+        if np.isnan(cosmo['A_s']):
+            raise ValueError('BLCDM must be sample using As. It is not '
+                             'possible at the moment to use sigma8 in a '
+                             'self-consistent way.')
+
+
         # Set params
         self.mu0 = mu0
         self.Sigma0 = Sigma0
         self.cosmo = cosmo
 
         # Matter power spectrum boost
-        # Emulator units: k [h/Mpc]; Qk [Mpc^3/h^3]
-        kh, Qkh3_arr = self.get_mg_boost_parallel(Omega_m=cosmo.Omega_m,
-                                           lnE9As=np.log(cosmo.As*1e-9),
-                                           h=cosmo.h, mu0=mu0,
-                                           a_arr=self.a_arr)
-        k = kh * cosmo.h
-        Qk_arr = Qkh3_arr / cosmo.h**3
+        # Emulator units: k [h/Mpc]; Qk [unitless]
+        kh, Qkh3_arr = \
+        self.get_mg_boost_pkmm_parallel(Omega_m=cosmo['Omega_m'],
+                                        lnE9As=np.log(cosmo['A_s']*1e9),
+                                        h=cosmo['h'], mu0=mu0,
+                                        a_arr=self.a_arr)
+
+        k = kh * cosmo['h']
+        Qk_arr = Qkh3_arr
 
         lk_arr = np.log(k)
         Qk = ccl.Pk2D(a_arr=self.a_arr, lk_arr=lk_arr, pk_arr=np.log(Qk_arr),
@@ -107,12 +110,12 @@ class BLCDMCalculator(object):
 
         # Weyl boost for mw
         Sigma_a = self.get_Sigma_a()
-        Wk_arr = Sigma_a[None, :] * Qk_arr
+        Wk_arr = Sigma_a[:, None] * Qk_arr
         Wk = ccl.Pk2D(a_arr=self.a_arr, lk_arr=lk_arr, pk_arr=np.log(Wk_arr),
                       is_logp=True, extrap_order_lok=0, extrap_order_hik=2)
 
         # Weyl boost for ww
-        Wk2_arr = Sigma_a[None, :]**2 * Qk_arr
+        Wk2_arr = Sigma_a[:, None]**2 * Qk_arr
         Wk2 = ccl.Pk2D(a_arr=self.a_arr, lk_arr=lk_arr, pk_arr=np.log(Wk2_arr),
                       is_logp=True, extrap_order_lok=0, extrap_order_hik=2)
 
@@ -124,10 +127,19 @@ class BLCDMCalculator(object):
     def get_boost(self, kind):
         return self.pk2d_computed[kind]
 
-    def get_mu_a(self, a):
+    def get_mu_a(self, cosmo=None, mu0=None, a_arr=None):
+        if cosmo is None:
+            cosmo = self.cosmo
+
+        if mu0 is None:
+            mu0 = self.mu0
+
+        if a_arr is None:
+            a_arr = self.a_arr
+
         if self.parametrizaton == '1_minus_mu0OmegaDE':
-            mu_a = 1 - self.cosmo.omega_x(a, 'dark_energy') / \
-                self.cosmo.omega_x(1, 'dark_energy')
+            mu_a = 1 + mu0 * cosmo.omega_x(a_arr, 'dark_energy') / \
+                cosmo.omega_x(1, 'dark_energy')
         else:
             raise NotImplementedError('Only 1_minus_mu0OmegaDE implemented')
 
@@ -144,7 +156,7 @@ class BLCDMCalculator(object):
             a_arr = self.a_arr
 
         if self.parametrizaton == '1_minus_mu0OmegaDE':
-            Sigma_a = 1 - cosmo.omega_x(a_arr, 'dark_energy') / \
+            Sigma_a = 1 + Sigma0 * cosmo.omega_x(a_arr, 'dark_energy') / \
                 cosmo.omega_x(1, 'dark_energy')
         else:
             raise NotImplementedError('Only 1_minus_mu0OmegaDE implemented')
