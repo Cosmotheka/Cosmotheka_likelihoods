@@ -61,6 +61,7 @@ class Pk(Theory):
     # Modified Gravity
     mg_model: str = ''
     mg_emulator_folder: str = ''
+    mg_parametrization: str = ''
 
     def initialize(self):
         # Bias model
@@ -142,7 +143,8 @@ class Pk(Theory):
             pass
         elif self.mg_model == 'BLCDM':
             from .blcdm_boost import BLCDMCalculator
-            self.mg_boost = BLCDMCalculator(self.mg_emulator_folder)
+            self.mg_boost = BLCDMCalculator(self.mg_emulator_folder,
+                                            parametrizaton=self.mg_parametrization)
 
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
