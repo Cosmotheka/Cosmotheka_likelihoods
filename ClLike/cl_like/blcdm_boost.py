@@ -63,17 +63,47 @@ class BLCDMCalculator(object):
 
         return self.k, results
 
-    def apply_boost(self, kind, pk2d):
+    def apply_boost(self, kind, pk2d, extrap_high_k=False, extrap_low_a=False):
         """
         Apply the boost to the matter power spectrum. It will reduce the output
-        power spectrum to the range of k's and a's in the emulator:
-        k < 3 h/Mpc and a > 0.25
+        power spectrum to the most conservative range of k's and a's, unless
+        otherwise specified.
 
         Args:
+            extrap_high_k: extrapolate Qk at high k
+            extrap_low_a: extrapolate Qk at low a
             pk2d: Pk2D object
         """
         Qk = self.get_boost(kind)
-        return Qk * pk2d
+
+        a_arr, lk_arr, pk_arr = pk2d.get_spline_arrays()
+        qa_arr, qlk_arr, qk_arr = Qk.get_spline_arrays()
+
+        # Restrict to the most conservative range of k's and a's.
+        # TODO: Consider extrapolating Qk at low k to combine it with pk. This
+        # could be better than extrapolating the combination from qk_arr.max()
+        mask_high_k = np.ones_like(lk_arr, dtype=bool)
+        mask_low_a = np.ones_like(a_arr, dtype=bool)
+
+        if not extrap_high_k:
+            mask_high_k = lk_arr < qlk_arr.max()
+
+        if not extrap_low_a:
+            mask_low_a = a_arr > np.min([qa_arr, a_arr])
+
+        a_arr = a_arr[mask_low_a]
+        lk_arr = lk_arr[mask_high_k]
+        k_arr = np.exp(lk_arr)
+        fka = Qk(k_arr, a_arr)
+        pk_arr = pk_arr[mask_low_a][:, mask_high_k] * fka
+
+        if pk2d.psp.is_log:
+            np.log(pk_arr, out=pk_arr)  # in-place log
+
+        return ccl.Pk2D(a_arr=a_arr, lk_arr=lk_arr, pk_arr=pk_arr,
+                        is_logp=pk2d.psp.is_log,
+                        extrap_order_lok=pk2d.extrap_order_lok,
+                        extrap_order_hik=pk2d.extrap_order_hik)
 
     def update_pk(self, cosmo, mu0, Sigma0, **kwargs):
         """ Update the internal pk arrays
@@ -95,14 +125,13 @@ class BLCDMCalculator(object):
 
         # Matter power spectrum boost
         # Emulator units: k [h/Mpc]; Qk [unitless]
-        kh, Qkh3_arr = \
+        kh, Qk_arr = \
         self.get_mg_boost_pkmm_parallel(Omega_m=cosmo['Omega_m'],
                                         lnE9As=np.log(cosmo['A_s']*1e9),
                                         h=cosmo['h'], mu0=mu0,
                                         a_arr=self.a_arr)
 
         k = kh * cosmo['h']
-        Qk_arr = Qkh3_arr
 
         lk_arr = np.log(k)
         Qk = ccl.Pk2D(a_arr=self.a_arr, lk_arr=lk_arr, pk_arr=np.log(Qk_arr),

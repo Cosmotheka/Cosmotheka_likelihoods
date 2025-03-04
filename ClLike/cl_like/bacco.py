@@ -245,7 +245,9 @@ class BaccoCalculator(object):
         Sk = self.mpk.get_baryonic_boost(k=k_arr, **cospar_for_bcm)[1]
         return Sk
 
-    def get_pk(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
+    def get_pk(self, kind, **kwargs):
+        # kwargs only for compatibility with the others calculator classes
+
         # Clarification:
         # We are expanding the galaxy overdensity as:
         #   1+ d_g = 1 + b1 d + b2 d2^2/2 + bs s^2/2 + bk k^2 d
