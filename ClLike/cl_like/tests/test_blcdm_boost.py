@@ -14,6 +14,10 @@ import pyccl as ccl
 
 EMU_FOLDER =  "../../../codes/mg_boost_emu_neurons_400_400_dropout_0.0_bn_False/"
 
+if os.getenv("GITHUB_ACTIONS") == "true":
+    pytest.skip("Skipping all tests in CI environment until the release of "
+                "the emulator", allow_module_level=True)
+
 # Cleaning the tmp dir before running and after running the tests
 @pytest.fixture(autouse=True)
 def run_clean_tmp():
