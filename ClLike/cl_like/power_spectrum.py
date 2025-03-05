@@ -54,6 +54,7 @@ class Pk(Theory):
     #for baccoemu
     nonlinear_emu_path = None
     nonlinear_emu_details = None
+    nonlinear_emu_model_name = None
     use_baryon_boost : bool = False
     baryon_model: str = ''
     allow_bcm_emu_extrapolation_for_shear : bool = True
@@ -148,6 +149,7 @@ class Pk(Theory):
         bacco_calc = BaccoCalculator(a_arr=self.a_s_pks,
                                      nonlinear_emu_path=self.nonlinear_emu_path,
                                      nonlinear_emu_details=self.nonlinear_emu_details,
+                                     nonlinear_emu_model_name=self.nonlinear_emu_model_name,
                                      use_baryon_boost=use_baryon_boost,
                                      ignore_lbias=ignore_lbias,
                                      allow_bcm_emu_extrapolation_for_shear=self.allow_bcm_emu_extrapolation_for_shear,
