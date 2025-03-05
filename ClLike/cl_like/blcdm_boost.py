@@ -22,6 +22,9 @@ class BLCDMCalculator(object):
 
         self.pk2d_computed = None
 
+        if parametrizaton not in ['1_minus_mu0OmegaDE']:
+            raise NotImplementedError('Only parametrizaton 1_minus_mu0OmegaDE implemented')
+
         self.parametrizaton = parametrizaton
 
         # Set params to None
@@ -156,7 +159,7 @@ class BLCDMCalculator(object):
     def get_boost(self, kind):
         return self.pk2d_computed[kind]
 
-    def get_mu_a(self, cosmo=None, mu0=None, a_arr=None):
+    def get_mu_a(self, *, cosmo=None, mu0=None, a_arr=None):
         if cosmo is None:
             cosmo = self.cosmo
 
@@ -167,14 +170,13 @@ class BLCDMCalculator(object):
             a_arr = self.a_arr
 
         if self.parametrizaton == '1_minus_mu0OmegaDE':
-            mu_a = 1 + mu0 * cosmo.omega_x(a_arr, 'dark_energy') / \
-                cosmo.omega_x(1, 'dark_energy')
+            mu_a = 1 + mu0 * cosmo.omega_x(a_arr, 'dark_energy')
         else:
             raise NotImplementedError('Only 1_minus_mu0OmegaDE implemented')
 
         return mu_a
 
-    def get_Sigma_a(self, cosmo=None, Sigma0=None, a_arr=None):
+    def get_Sigma_a(self, *, cosmo=None, Sigma0=None, a_arr=None):
         if cosmo is None:
             cosmo = self.cosmo
 
@@ -185,8 +187,7 @@ class BLCDMCalculator(object):
             a_arr = self.a_arr
 
         if self.parametrizaton == '1_minus_mu0OmegaDE':
-            Sigma_a = 1 + Sigma0 * cosmo.omega_x(a_arr, 'dark_energy') / \
-                cosmo.omega_x(1, 'dark_energy')
+            Sigma_a = 1 + Sigma0 * cosmo.omega_x(a_arr, 'dark_energy')
         else:
             raise NotImplementedError('Only 1_minus_mu0OmegaDE implemented')
 

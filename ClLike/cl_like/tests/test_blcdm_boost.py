@@ -26,6 +26,10 @@ def ptc():
                           parametrizaton='1_minus_mu0OmegaDE')
     return ptc
 
+def get_Omega_de(model):
+    cosmo = model.likelihood['ClLike'].provider.get_CCL()['cosmo']
+    return cosmo.omega_x(1, 'dark_energy')
+
 
 def get_info(baryons=False, A_sE9=True):
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
@@ -173,8 +177,9 @@ def get_info(baryons=False, A_sE9=True):
                                       "input_file": data,
                                       "bins": bins,
                                       "twopoints": twopoints,
-                                      "defaults": {"lmin": 0,
-                                                   "lmax": 8192},
+                                      "defaults": {"kmax": 0.15,
+                                                   "lmin": 0,
+                                                   "lmax": 1000},
                                       }
                            },
             "debug": False}
@@ -191,8 +196,20 @@ def test_dum(baryons):
 
     model = get_model(info)
     loglikes, derived = model.loglikes()
+    print(loglikes)
 
-    assert np.fabs(loglikes[0]) < 0.2
+    # lmax = 1000 and Delta chi2 < 1 because the kmax = 3 h/Mpc of the emulator
+    assert np.fabs(loglikes[0]) < 1
+
+    info['params']['mu0'] = 0.3
+    info['params']['Sigma0'] = 10
+
+
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    print(loglikes)
+    assert np.fabs(loglikes[0]) > 20
+
 
 def test_sigma8_error(ptc):
     # Test that one can only sample on A_s
@@ -202,7 +219,123 @@ def test_sigma8_error(ptc):
     loglikes, derived = model.loglikes()
     cosmo = lkl.provider.get_CCL()['cosmo']
 
-    print(model.log.log)
-
     with pytest.raises(ValueError):
         ptc.update_pk(cosmo, 0, 0)
+
+
+def test_pk_data():
+    info = get_info()
+    model_lcdm = get_model(info)
+    lkl_lcdm = model_lcdm.likelihood['ClLike']
+    loglikes, derived = model_lcdm.loglikes()
+
+    info['params']['mu0'] = 0.3
+    info['params']['Sigma0'] = 2
+    model_mg = get_model(info)
+    lkl_mg = model_mg.likelihood['ClLike']
+    loglikes, derived = model_mg.loglikes()
+
+    Omega_de = get_Omega_de(model_lcdm)
+
+    pkd_lcdm = lkl_lcdm.provider.get_Pk()['pk_data']
+    pkd_mg = lkl_mg.provider.get_Pk()['pk_data']
+
+    Qk = pkd_mg['pk_mm'](k=1, a=1) / pkd_lcdm['pk_mw'](k=1, a=1)
+    Sigma = pkd_mg['pk_wm'](k=1, a=1) / pkd_lcdm['pk_mw'](k=1, a=1)
+    Sigma2 = pkd_mg['pk_ww'](k=1, a=1) / pkd_lcdm['pk_ww'](k=1, a=1)
+
+    assert np.fabs(Qk - 1) > 1e-2
+    assert Sigma2/Qk == pytest.approx((Sigma/Qk)**2, rel=1e-5)
+    assert Sigma/Qk - 1 == pytest.approx(2 * Omega_de, rel=1e-5)
+
+    info['params']['mu0'] = 0.
+    model_mg = get_model(info)
+    lkl_mg = model_mg.likelihood['ClLike']
+    loglikes, derived = model_mg.loglikes()
+    pkd_mg = lkl_mg.provider.get_Pk()['pk_data']
+
+    Qk = pkd_mg['pk_mm'](k=1, a=1) / pkd_lcdm['pk_mm'](k=1, a=1)
+    assert Qk - 1 == pytest.approx(0., rel=1e-2)
+
+
+def test_Wk():
+    info = get_info()
+    info['params']['mu0'] = 0.3
+    info['params']['Sigma0'] = 2
+    model = get_model(info)
+    lkl = model.likelihood['ClLike']
+    loglikes, derived = model.loglikes()
+
+    pkd = lkl.provider.get_Pk()['pk_data']
+    Qk_mm = pkd['Qk_mm']
+    Qk_mw = pkd['Qk_mw']
+    Qk_wm = pkd['Qk_wm']
+    Qk_ww = pkd['Qk_ww']
+
+    a_arr, lk_arr, qkmm_arr = Qk_mm.get_spline_arrays()
+    _, _, qkmw_arr = Qk_mw.get_spline_arrays()
+    _, _, qkwm_arr = Qk_wm.get_spline_arrays()
+    _, _, qkww_arr = Qk_ww.get_spline_arrays()
+
+    # qk_arr shape [a_arr.size, lk_arr.size]. Note that a=1 is a[-1]
+
+    # For BLCDM: m -> w implies multiplying by Sigma
+    # 1. Check that Sigma only depends on time, not k
+    assert qkmm_arr[:, 0] / qkmw_arr[:, 0] == pytest.approx(qkmm_arr[:, -1] /
+                                                            qkmw_arr[:, -1],
+                                                            rel=1e-5)
+
+    # 2. Check that mm/ww = Sigma^2
+    Sigma_a = qkwm_arr[:, 0] / qkmm_arr[:, 0]
+
+    assert qkww_arr[:, 0] / qkmm_arr[:, 0] == pytest.approx(Sigma_a**2, rel=1e-5)
+
+    # 3. Check that wm == mw
+    assert np.all(qkwm_arr == qkmw_arr)
+
+    # 4. Check that Sigma0 -1 = 2 (input). Note that a=1 is the last array
+    # entry.
+    # This tests will need to be generalized if parametrization changes
+    Omega_de = get_Omega_de(model)
+    assert Sigma_a[-1] - 1 == pytest.approx(2 * Omega_de, rel=1e-5)
+
+
+def test_mu_Sigma_a():
+    info = get_info()
+    model = get_model(info)
+    lkl = model.likelihood['ClLike']
+    loglikes, derived = model.loglikes()
+    cosmo = lkl.provider.get_CCL()['cosmo']
+
+    # This tests will need to be generalized if parametrization changes
+    ptc = BLCDMCalculator(emu_folder=EMU_FOLDER,
+                          parametrizaton='1_minus_mu0OmegaDE')
+
+    ptc.update_pk(cosmo, 0, 0)
+    mu_a = ptc.get_mu_a()
+    Sigma_a = ptc.get_Sigma_a()
+
+    assert np.all(Sigma_a == 1)
+    assert np.all(Sigma_a == mu_a)
+
+    # Check that the internal values of Sigma0 and mu0 are correct
+    ptc.update_pk(cosmo, 0.3, 2)
+    mu_a = ptc.get_mu_a(a_arr=1)
+    Sigma_a = ptc.get_Sigma_a(a_arr=1)
+
+    Omega_de = get_Omega_de(model)
+
+    assert Sigma_a - 1 == pytest.approx(2 * Omega_de, rel=1e-5)
+    assert mu_a - 1 == pytest.approx(0.3 * Omega_de, rel=1e-5)
+
+    # Check that you can pass other values of mu0 and Sigma0
+    mu_a = ptc.get_mu_a(mu0=1)
+    Sigma_a = ptc.get_Sigma_a(Sigma0=2)
+
+    DE_factor = cosmo.omega_x(ptc.a_arr, 'dark_energy')
+    assert Sigma_a-1 == pytest.approx(2 * DE_factor, rel=1e-5)
+    assert (Sigma_a-1) / (mu_a-1) == pytest.approx(2, rel=1e-5)
+
+    with pytest.raises(NotImplementedError):
+        BLCDMCalculator(emu_folder=EMU_FOLDER, parametrizaton='tofail')
+

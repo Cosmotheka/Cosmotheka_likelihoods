@@ -223,7 +223,6 @@ class Pk(Theory):
                 else:
                     pkww = pkmm
             elif self.nonlinear_pk == 'Bacco':
-                print("############ HERE")
                 self.bacco_calc.update_pk(cosmo, bcmpar=bcmpar)
                 pkww = pkwm = pkmm = self.bacco_calc.get_pk('mm_sh_sh')
             else:
@@ -349,13 +348,19 @@ class Pk(Theory):
             raise NotImplementedError('MG Boost can only be applied to linear bias')
 
         self.mg_boost.update_pk(cosmo, mgpars['mu0'], mgpars['Sigma0'])
+        boosts = {}
         for k, pk2d in pkd.items():
             if 'pk' not in k:
                 continue
             kind = k.split('_')[1].replace('d1', 'm')
             # The Weyl boost is applied to the LCDM matter power spectrum
-            self.mg_boost.apply_boost(kind, pk2d, self.mg_boost_extrap_high_k,
-                                      self.mg_boost_extrap_low_a)
+            pkd[k] = self.mg_boost.apply_boost(kind, pk2d,
+                                               self.mg_boost_extrap_high_k,
+                                               self.mg_boost_extrap_low_a)
+            boosts_k = f'Qk_{kind}'
+            if boosts_k not in boosts:
+                boosts[boosts_k] = self.mg_boost.get_boost(kind)
+        pkd.update(boosts)
 
     def get_can_provide(self):
         return ["is_PT_bias", "bias_model"]
