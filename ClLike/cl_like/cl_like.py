@@ -223,7 +223,7 @@ class ClLike(Likelihood):
         state['logp'] = -0.5*(chi2+dchi2_jeffrey)
         state['derived'] = {'dchi2_jeffrey': dchi2_jeffrey}
 
-    def get_cl_theory_sacc(self):
+    def get_cl_theory_sacc(self, return_data_cov=False):
         # Create empty file
         s = sacc.Sacc()
 
@@ -252,6 +252,9 @@ class ClLike(Likelihood):
             bpw = sacc.BandpowerWindow(clm['l_bpw'], clm['w_bpw'].T)
             s.add_ell_cl(cltyp, clm['bin_1'], clm['bin_2'],
                          clm['l_eff'], cl[clm['inds']], window=bpw)
+
+        if return_data_cov:
+            s.add_covariance(self.cov)
 
         return s
 

@@ -270,6 +270,14 @@ def test_get_theory_cl_sacc():
         if tr.quantity == 'cmb_lensing':
             assert tr.spin == 0
 
+    # Check that the default is no covariance
+    assert s.covariance is None
+
+    s = lkl.get_cl_theory_sacc(return_data_cov=True)
+
+    assert s.covariance is not None
+    assert np.all(s.covariance.covmat == lkl.cov)
+
 
 def test_get_cl_data_sacc():
     info = get_info('Linear')
