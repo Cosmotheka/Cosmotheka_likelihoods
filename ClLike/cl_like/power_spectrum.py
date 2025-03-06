@@ -61,6 +61,7 @@ class Pk(Theory):
     allow_halofit_extrapolation_for_shear : bool = False
     allow_halofit_extrapolation_for_shear_on_k: bool = False
     # Modified Gravity
+    use_mg_boost: bool = False
     mg_model: str = ''
     mg_emulator_folder: str = ''
     mg_parametrization: str = ''
@@ -133,12 +134,15 @@ class Pk(Theory):
                                       self.nonlinear_pk]):
             self.bacco_calc = self.getBaccoCalculatorInstance()
 
-        if self.mg_model == '':
+        if not self.use_mg_boost:
             pass
         elif self.mg_model == 'BLCDM':
             from .blcdm_boost import BLCDMCalculator
             self.mg_boost = BLCDMCalculator(self.mg_emulator_folder,
                                             parametrizaton=self.mg_parametrization)
+        else:
+            raise NotImplementedError(f"MG boost model {self.mg_model} not implemented")
+
 
     def getBaccoCalculatorInstance(self):
         ignore_lbias = self.bias_model != 'BaccoPT'
@@ -195,7 +199,7 @@ class Pk(Theory):
             elif self.baryon_model == 'Amon-Efstathiou':
                 bcmpar = {'A_AE': self.provider.get_param('A_AE')}
 
-        if self.mg_model:
+        if self.use_mg_boost:
             mgpars = {
                 'mu0': self.provider.get_param('mu0'),
                 'Sigma0': self.provider.get_param('Sigma0')
@@ -294,7 +298,7 @@ class Pk(Theory):
             pkd['Sk'] = None
 
         # Apply modified gravity boost
-        if self.mg_model:
+        if self.use_mg_boost:
             self.apply_mg_boost(cosmo, mgpars, pkd)
 
         return pkd

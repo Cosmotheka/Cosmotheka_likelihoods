@@ -155,6 +155,7 @@ def get_info(baryons=False, A_sE9=True):
                "nonlinear_pk": 'Bacco',
                "bias_model": "Linear",
                "zmax_pks": 1.5,  # For baccoemu with baryons
+               "use_mg_boost": True,
                "mg_model": 'BLCDM',
                "mg_parametrization": "1_minus_mu0OmegaDE",
                "mg_emulator_folder": EMU_FOLDER,
@@ -213,6 +214,13 @@ def test_dum(baryons):
     loglikes, derived = model.loglikes()
     print(loglikes)
     assert np.fabs(loglikes[0]) > 20
+
+    # Check use_mg_boost = False means no MG i.e. default pk is used
+    info = get_info(baryons)
+    info['theory']['Pk']['use_mg_boost'] = False
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
+    assert np.fabs(loglikes[0]) < 0.2
 
 
 def test_sigma8_error(ptc):
