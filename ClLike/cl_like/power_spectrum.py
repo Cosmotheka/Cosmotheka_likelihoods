@@ -118,6 +118,12 @@ class Pk(Theory):
                              "non-linear power spectrum model. Available: "
                              "'CCL' or 'Bacco'")
 
+        # if ("galaxy_density" in self.tracer_qs) and not self.bias_model:
+        #     raise ValueError("You need to specify a bias model if there are "
+        #                      "galaxy density tracers. Available: 'Linear',"
+        #                      "'LagrangianPT', 'EulerianPT', 'BaccoPT'")
+
+
         if self.bias_model == 'LagrangianPT' and not HAVE_LPT:
             raise LPT_exception
         elif self.bias_model == 'EulerianPT' and not HAVE_EPT:
@@ -171,6 +177,13 @@ class Pk(Theory):
         if "Pk" not in requirements:
             return {}
 
+        options = requirements.get('bias_model') or {}
+        if ('bias_model' in requirements) and not self.bias_model:
+            raise ValueError("You need to specify a bias model if there are "
+                             "galaxy density tracers. Available: 'Linear',"
+                             "'LagrangianPT', 'EulerianPT', 'BaccoPT'")
+
+
         return {"CCL": None}
 
     def get_can_support_params(self):
@@ -217,29 +230,35 @@ class Pk(Theory):
         return self.current_state['Pk']
 
     def _get_pk_data(self, cosmo, bcmpar=None, mgpars=None):
-        # cosmo.compute_nonlin_power()
-        # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-        pkmm = None
         pkd = {}
-        if self.bias_model == 'Linear':
-            if self.nonlinear_pk == 'CCL':
-                cosmo.compute_nonlin_power()
-                pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-                if 'delta_matter:Weyl' in cosmo._pk_nl:
-                    pkwm = pkmw = cosmo.get_nonlin_power(name='delta_matter:Weyl')
-                else:
-                    pkwm = pkmw = pkmm
-                if 'Weyl:Weyl' in cosmo._pk_nl:
-                    pkww = cosmo.get_nonlin_power(name='Weyl:Weyl')
-                else:
-                    pkww = pkmm
-            elif self.nonlinear_pk == 'Bacco':
-                self.bacco_calc.update_pk(cosmo, bcmpar=bcmpar)
-                pkww = pkwm = pkmm = self.bacco_calc.get_pk('mm_sh_sh')
+        # Load DMO power spectrum
+        if self.nonlinear_pk == 'CCL':
+            cosmo.compute_nonlin_power()
+            pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+            if 'delta_matter:Weyl' in cosmo._pk_nl:
+                pkwm = pkmw = cosmo.get_nonlin_power(name='delta_matter:Weyl')
             else:
-                raise NotImplementedError("{self.nonlinear_pk} not "
-                                          "implemented. Only CCL and Bacco "
-                                          "implemented.")
+                pkwm = pkmw = pkmm
+            if 'Weyl:Weyl' in cosmo._pk_nl:
+                pkww = cosmo.get_nonlin_power(name='Weyl:Weyl')
+            else:
+                pkww = pkmm
+        elif self.nonlinear_pk == 'Bacco':
+            self.bacco_calc.update_pk(cosmo, bcmpar=bcmpar)
+            pkww = pkwm = pkmm = self.bacco_calc.get_pk('mm_sh_sh')
+        else:
+            raise NotImplementedError("{self.nonlinear_pk} not "
+                                      "implemented. Only CCL and Bacco "
+                                      "implemented.")
+        # Here we assume Pkmm can be used as Pkww (which is true in LCDM, in
+        # CCL). Any change respect to LCDM will be applied later in
+        # apply_mg_boost.
+        pkd['pk_mm'] = pkmm
+        pkd['pk_mw'] = pkd['pk_wm'] = pkwm
+        pkd['pk_ww'] = pkww
+
+        # Check if we need galaxy biases
+        if self.bias_model == 'Linear':
             pkd['pk_mm'] = pkmm
             pkd['pk_md1'] = pkmm
             pkd['pk_d1m'] = pkmm
@@ -258,8 +277,6 @@ class Pk(Theory):
                 k_filter = None
             if self.bias_model == 'EulerianPT':
                 from .ept import EPTCalculator
-                cosmo.compute_nonlin_power()
-                pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
                 ptc = EPTCalculator(with_NC=True, with_IA=False,
                                     log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
@@ -268,8 +285,6 @@ class Pk(Theory):
                                     k_filter=k_filter)
             elif self.bias_model == 'LagrangianPT':
                 from .lpt import LPTCalculator
-                cosmo.compute_nonlin_power()
-                pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
                 ptc = LPTCalculator(log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
                                     nk_per_decade=self.nk_per_dex_pks,
@@ -284,6 +299,7 @@ class Pk(Theory):
             for i1, op1 in enumerate(operators):
                 for op2 in operators[i1:]:
                     comb_12 = op1+op2
+                    print(comb_12)
                     # Since PT models are not meant to work with Weyl and we
                     # have already checked if Weyl is in cosmo._pk_nl, let's
                     # fill pkd weyl pk's with matter ones.
@@ -352,7 +368,6 @@ class Pk(Theory):
             Sk = pkb / pknonlin
             pkd['Sk'] = ccl.Pk2D(a_arr=a, lk_arr=lnk, pk_arr=np.log(Sk),
                                  is_logp=True)
-
 
     def apply_mg_boost(self, cosmo, mgpars, pkd):
         if self.bias_model != 'Linear':

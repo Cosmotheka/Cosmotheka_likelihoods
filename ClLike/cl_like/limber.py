@@ -43,11 +43,12 @@ class Limber(Theory):
         self.provider = provider
         self.l_sample = self._get_ell_sampling()
         self._add_pixbeam_to_cl_meta()
-        self.is_PT_bias = self.provider.get_is_PT_bias()
-        self.bias_model = self.provider.get_bias_model()
+        if self.need_gc_quantities:
+            self.is_PT_bias = self.provider.get_is_PT_bias()
+            self.bias_model = self.provider.get_bias_model()
 
     def get_requirements(self):
-        return {'bias_model': None, 'is_PT_bias': None}
+        return {'Pk': None}
 
     def must_provide(self, **requirements):
         if "Limber" not in requirements:
@@ -58,7 +59,11 @@ class Limber(Theory):
         self.tracer_qs = options.get("tracer_qs")
         self.bin_properties = options.get("bin_properties")
 
-        return {"CCL": None, "Pk": None}
+        self.need_gc_quantities = "gc_quantities" in options
+        if self.need_gc_quantities:
+            return options['gc_quantities']
+
+        return {}
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]

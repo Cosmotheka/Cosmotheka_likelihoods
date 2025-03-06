@@ -15,17 +15,34 @@ class ClFinal(Theory):
     def initialize_with_provider(self, provider):
         self.provider = provider
         # Additional information specific for this likelihood
-        ia_model = self.provider.get_ia_model()
-        bias_model = self.provider.get_bias_model()
-        is_PT_bias = self.provider.get_is_PT_bias()
+
+        if self.need_gc_quantities:
+            bias_model = self.provider.get_bias_model()
+            is_PT_bias = self.provider.get_is_PT_bias()
+        else:
+            bias_model = is_PT_bias = None
+
+        if self.need_shear_quantities:
+            ia_model = self.provider.get_ia_model()
+        else:
+            ia_model = None
 
         self.bias_names, self.bias_info = self._get_bias_info(ia_model,
                                                               bias_model,
                                                               is_PT_bias)
         self.ndata = np.sum([clm['l_eff'].size for clm in self.cl_meta])
 
-    def get_requirements(self):
-        return {"ia_model": None, "bias_model": None, "is_PT_bias": None}
+    # def get_requirements(self):
+    #     requirements = {}
+
+    #     if 'galaxy_density' in self.tracer_qs:
+    #         requirements['bias_model'] = None
+    #         requirements['is_PT_bias'] = None
+
+    #     if 'galaxy_shear' in self.tracer_qs:
+    #         requirements['ia_model'] = None
+
+    #     return requirements
 
     def must_provide(self, **requirements):
         if "cl_theory" not in requirements:
@@ -36,10 +53,24 @@ class ClFinal(Theory):
         self.tracer_qs = options.get("tracer_qs")
         self.bin_properties = options.get("bin_properties")
 
-        return {"Limber": {"cl_meta": self.cl_meta,
+        out = {"Limber": {"cl_meta": self.cl_meta,
                            "tracer_qs": self.tracer_qs,
                            "bin_properties": self.bin_properties}
                 }
+
+        self.need_gc_quantities = False
+        self.need_shear_quantities = False
+        if 'galaxy_density' in self.tracer_qs.values():
+            self.need_gc_quantities = True
+            gc = {'bias_model': None, 'is_PT_bias': None}
+            out["Limber"]['gc_quantities'] = gc
+            out.update(gc)
+
+        if 'galaxy_shear' in self.tracer_qs.values():
+            self.need_shear_quantities = True
+            out['ia_model'] = None
+
+        return out
 
     def calculate(self, state, want_derived=True, **pars):
         # First, gather all the necessary ingredients for the Cls without bias parameters

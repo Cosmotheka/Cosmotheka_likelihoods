@@ -74,7 +74,7 @@ def get_info(bias, A_sE9=True):
                                   "ia_model": "IADESY1"},
                        "Pk": {"external": Pk,
                              "bias_model": bias,
-                             "nonlinear_pk": "BaccoPT" if bias == 'BaccoPT' else "CCL",
+                             "nonlinear_pk": "Bacco" if bias == 'BaccoPT' else "CCL",
                               "zmax_pks": 1.5},  # For baccoemu
                        "clfinal": {"external": ClFinal,
                                    "input_params_prefix": "bias",
@@ -128,7 +128,7 @@ def get_info(bias, A_sE9=True):
                                                    },
                                       }
                            },
-            "debug": False}
+            "debug": True}
 
     if not A_sE9:
 
