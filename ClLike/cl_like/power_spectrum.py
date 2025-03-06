@@ -36,7 +36,7 @@ except ImportError as e:
 class Pk(Theory):
     """Computes the power spectrum"""
     # b(z) model name
-    bias_model: str = "BzNone"
+    bias_model: str = ""
     # k shot noise suppression scale
     k_SN_suppress: float = 0.01
     # min k 3D power spectra
@@ -173,18 +173,20 @@ class Pk(Theory):
 
         return bacco_calc
 
+    def get_requirements(self):
+        return {"CCL": None}
+
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
             return {}
 
-        options = requirements.get('bias_model') or {}
-        if ('bias_model' in requirements) and not self.bias_model:
+        if ('bias_model' in requirements['Pk']) and not self.bias_model:
             raise ValueError("You need to specify a bias model if there are "
                              "galaxy density tracers. Available: 'Linear',"
                              "'LagrangianPT', 'EulerianPT', 'BaccoPT'")
 
 
-        return {"CCL": None}
+        return
 
     def get_can_support_params(self):
         # TODO: We should better use an input_params_prefix to avoid confusion

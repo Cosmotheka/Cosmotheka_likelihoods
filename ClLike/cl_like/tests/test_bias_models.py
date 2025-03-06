@@ -448,3 +448,10 @@ def test_error_no_nonlinear_pk():
 
     with pytest.raises(ValueError):
         model = get_model(info)
+
+def test_error_no_bias_model():
+    info = get_info('Linear')
+    del info['theory']['Pk']['bias_model']
+
+    with pytest.raises(ValueError):
+        model = get_model(info)

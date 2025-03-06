@@ -47,9 +47,6 @@ class Limber(Theory):
             self.is_PT_bias = self.provider.get_is_PT_bias()
             self.bias_model = self.provider.get_bias_model()
 
-    def get_requirements(self):
-        return {'Pk': None}
-
     def must_provide(self, **requirements):
         if "Limber" not in requirements:
             return {}
@@ -60,10 +57,11 @@ class Limber(Theory):
         self.bin_properties = options.get("bin_properties")
 
         self.need_gc_quantities = "gc_quantities" in options
+        out = None
         if self.need_gc_quantities:
-            return options['gc_quantities']
+            out = options['gc_quantities']
 
-        return {}
+        return {'Pk': out}
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
