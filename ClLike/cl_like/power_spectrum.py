@@ -50,7 +50,7 @@ class Pk(Theory):
     # #k for 3D power spectra
     nk_per_dex_pks: int = 25
     # What non-linear power spectrum to use
-    nonlinear_pk: str = 'CCL'
+    nonlinear_pk: str = ''
     #for baccoemu
     nonlinear_emu_path = None
     nonlinear_emu_details = None
@@ -113,6 +113,11 @@ class Pk(Theory):
         #         self.hmcorr = HalomodCorrection()
         #     else:
         #         self.hmcorr = None
+        if self.nonlinear_pk == '':
+            raise ValueError("You need to specify a dark-matter only "
+                             "non-linear power spectrum model. Available: "
+                             "'CCL' or 'Bacco'")
+
         if self.bias_model == 'LagrangianPT' and not HAVE_LPT:
             raise LPT_exception
         elif self.bias_model == 'EulerianPT' and not HAVE_EPT:

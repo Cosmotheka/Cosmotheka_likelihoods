@@ -74,6 +74,7 @@ def get_info(bias, A_sE9=True):
                                   "ia_model": "IADESY1"},
                        "Pk": {"external": Pk,
                              "bias_model": bias,
+                             "nonlinear_pk": "BaccoPT" if bias == 'BaccoPT' else "CCL",
                               "zmax_pks": 1.5},  # For baccoemu
                        "clfinal": {"external": ClFinal,
                                    "input_params_prefix": "bias",
@@ -439,3 +440,11 @@ def test_camb_hmcode_dum(case):
 
 
     assert np.abs(loglikes[0] / loglikes2[0] - 1) < 1e-5
+
+
+def test_error_no_nonlinear_pk():
+    info = get_info('Linear')
+    del info['theory']['Pk']['nonlinear_pk']
+
+    with pytest.raises(ValueError):
+        model = get_model(info)
