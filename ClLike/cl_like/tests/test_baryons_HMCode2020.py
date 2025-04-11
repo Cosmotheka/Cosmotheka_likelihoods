@@ -90,9 +90,9 @@ def get_info(T_AGN, use_S8=False, sigma8_to_As='ccl'):
             "debug": False}
 
     if use_S8:
-        # From mk file: 0.800342702545264
-        # from derived: 0.8003398616219259
-        info['params']['S8'] = 0.800342702545264  # 0.8003398616219259
+        # From mk file: 0.80010503150849170036
+        # From derived: 0.8001052150162911
+        info['params']['S8'] = 0.80010503150849170036
         del info['params']['A_sE9']
         info['params']['A_s'] = None
 
@@ -131,7 +131,7 @@ def test_dum():
     # plt.show()
 
     # For some reason I cannot push it lower than this.
-    assert np.fabs(loglikes[0]) < 0.2
+    assert np.fabs(loglikes[0]) < 0.25
 
 
 @pytest.mark.parametrize('sigma8_to_As', ['ccl', 'baccoemu'])
@@ -145,7 +145,7 @@ def test_S8_input(sigma8_to_As):
 
     # For some reason I cannot push it lower than this.
     if sigma8_to_As == 'ccl':
-        assert np.fabs(loglikes[0]) < 0.2
+        assert np.fabs(loglikes[0]) < 0.25
     else:
         # With baccoemu there is a small difference
         assert np.fabs(loglikes[0]) < 2

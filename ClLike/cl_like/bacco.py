@@ -183,7 +183,7 @@ class BaccoCalculator(object):
         if (not within_bounds_mpk) & self.allow_halofit_extrapolation_for_shear:
             cosmo.compute_nonlin_power()
             pknl = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-            pk = np.array([pknl.eval(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco], a, cosmo) for a in self.a_s])
+            pk = np.array([pknl(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco], a, cosmo) for a in self.a_s])
         else:
             # TODO: This is going to be called even if no baryons are
             # requested. Shouldn't it have a flag?

@@ -16,12 +16,10 @@ cosmo = ccl.Cosmology(Omega_c=0.26,
                       A_s=2.1265e-9,
                       m_nu = 0.15,
                       matter_power_spectrum='camb',
-                      baryons_power_spectrum='nobaryons',  # included by CAMB
                       extra_parameters=extra_parameters)
 
 Omega_m = 0.26 + 0.05 + 0.15/(93.14 * 0.67**2)
-print("#######", cosmo.sigma8(), Omega_m)
-dkjd
+print("#######", cosmo.sigma8(), Omega_m, cosmo.sigma8()*np.sqrt(Omega_m/0.3))
 
 
 zs = np.linspace(0., 1.5, 1024)

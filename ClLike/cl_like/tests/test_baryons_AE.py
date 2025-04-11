@@ -140,7 +140,7 @@ def test_dum(bias):
     alin, lnklin, pklin = pk2d_lin.get_spline_arrays()
 
     for i, ai in enumerate(alin):
-        assert pklin[i] == pytest.approx(pkww.eval(np.exp(lnklin), ai),
+        assert pklin[i] == pytest.approx(pkww(np.exp(lnklin), ai),
                                          rel=1e-5)
 
 @pytest.mark.parametrize('bias', ['BaccoPT'])
@@ -157,7 +157,7 @@ def test_Sk(bias):
     k = np.exp(lnk)
 
     for i, ai in enumerate(a_arr):
-        assert pk2d_nlin[i] == pytest.approx(pk2d_lin.eval(k, ai), rel=1e-4)
+        assert pk2d_nlin[i] == pytest.approx(pk2d_lin(k, ai), rel=1e-4)
 
     info = get_info(bias, A_AE=1)
     model = get_model(info)

@@ -30,9 +30,9 @@ def get_info(bias, A_sE9=True):
         pk_dict = {"external": Pk,
                    "bias_model": "BaccoPT",
                    "zmax_pks": 1.5,  # For baccoemu with baryons
-                   "use_baryon_boost" : True,
+                   # "use_baryon_boost" : True,
                    "ignore_lbias": True,
-                   "baryon_model": 'CCL_BCM'}
+                   }
     else:
         raise ValueError(f'bias {bias} not implemented')
 
@@ -60,16 +60,16 @@ def get_info(bias, A_sE9=True):
                        "limber_sh2_eta_IA": 1,
                        "bias_sh2_A_IA": 0.1,
                        # Baryons
-                       "bcm_log10Mc": 14,
-                       "bcm_etab": 0.6,
-                       "bcm_ks": 50,
+                       "log10Mc": 14,
+                       "eta_b": 0.6,
+                       "k_s": 50,
                        # Derived
                        "sigma8": None,
                        },
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
                                "matter_pk": "halofit",
-                               "baryons_pk": "bcm"},
+                               "baryons_pk": "schneider15"},
                        "limber": {"external": Limber,
                                   "nz_model": "NzShift",
                                   "input_params_prefix": "limber",
@@ -152,16 +152,16 @@ def test_Sk(bias):
                           n_s=pars['n_s'],
                           A_s=pars['A_sE9']*1e-9,
                           m_nu=pars['m_nu'],
-                          bcm_log10Mc=pars['bcm_log10Mc'],
-                          bcm_etab=pars['bcm_etab'],
-                          bcm_ks=pars['bcm_ks'],
-                          baryons_power_spectrum='bcm'
                           )
+
+    bcm = ccl.baryons.BaryonsSchneider15(log10Mc=pars['log10Mc'],
+                                         eta_b=pars['eta_b'],
+                                         k_s=pars['k_s'])
 
     lkl = model.likelihood['ClLike']
     a_arr, lnk, Sk = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()
     k = np.exp(lnk)
 
     for i, ai in enumerate(a_arr):
-        assert Sk[i] == pytest.approx(ccl.bcm.bcm_model_fka(cosmo, k, ai),
+        assert Sk[i] == pytest.approx(bcm.boost_factor(cosmo, k, ai),
                                       rel=1e-3)
