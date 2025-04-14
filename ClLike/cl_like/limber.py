@@ -183,7 +183,7 @@ class Limber(Theory):
             # 00: unbiased x unbiased
             if t0_1 and t0_2:
                 pk = pkd[f'pk_{t0dn_1}{t0dn_2}']
-                cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
+                cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls, limber_integration_method='spline', p_of_k_a=pk) * clm['pixbeam']
                 cls_00.append(cl00)
             else:
                 cls_00.append(None)
@@ -193,7 +193,7 @@ class Limber(Theory):
                 for t12, dn in zip(t1_2, t1dn_2):
                     pk = pkd[f'pk_{t0dn_1}{dn}']
                     if pk is not None:
-                        cl = ccl.angular_cl(cosmo, t0_1, t12, ls, p_of_k_a=pk) * clm['pixbeam']
+                        cl = ccl.angular_cl(cosmo, t0_1, t12, ls, limber_integration_method='spline', p_of_k_a=pk) * clm['pixbeam']
                     else:
                         cl = np.zeros_like(ls)
                     cl01.append(cl)
@@ -210,7 +210,7 @@ class Limber(Theory):
                     for t11, dn in zip(t1_1, t1dn_1):
                         pk = pkd[f'pk_{t0dn_2}{dn}']
                         if pk is not None:
-                            cl = ccl.angular_cl(cosmo, t11, t0_2, ls, p_of_k_a=pk) * clm['pixbeam']
+                            cl = ccl.angular_cl(cosmo, t11, t0_2, ls, limber_integration_method='spline', p_of_k_a=pk) * clm['pixbeam']
                         else:
                             cl = np.zeros_like(ls)
                         cl10.append(cl)
@@ -229,7 +229,7 @@ class Limber(Theory):
                         else:
                             pk = pkd[f'pk_{dn1}{dn2}']
                             if pk is not None:
-                                cl = ccl.angular_cl(cosmo, t11, t12, ls, p_of_k_a=pk) * clm['pixbeam']
+                                cl = ccl.angular_cl(cosmo, t11, t12, ls, limber_integration_method='spline', p_of_k_a=pk) * clm['pixbeam']
                             else:
                                 cl = np.zeros_like(ls)
                             cl11[i1, i2, :] = cl

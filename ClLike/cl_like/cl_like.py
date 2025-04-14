@@ -30,6 +30,9 @@ class ClLike(Likelihood):
         # Read SACC file
         self._read_data()
 
+    def _get_bin_info_extra(self):
+        pass
+
     def _read_data(self):
         """
         Reads sacc file
@@ -106,7 +109,7 @@ class ClLike(Likelihood):
                     self.defaults[b['name']]['lmax'] = self.defaults['lmax']
 
         # Additional information specific for this likelihood
-        # self._get_bin_info_extra(s)
+        self._get_bin_info_extra()
 
         # 2. Iterate through two-point functions, apply scale cuts and collect
         # information about them (tracer names, bandpower windows etc.), and
@@ -276,118 +279,61 @@ class ClLike(Likelihood):
 
 
 class ClLikeFastBias(ClLike):
-    # Bias parameters
     bias_params: dict = {}
-    # 2nd order term in bias marginalization?
-    bias_fisher: bool = True
-    # 2nd derivative in Fisher term?
+    # 2nd-order term in bias marginalization?
+    bias_laplace: bool = True
+    # 2nd-derivative in Fisher term?
     bias_fisher_deriv2: bool = False
     # Update start point every time?
     bias_update_every: bool = False
 
-    def _get_bin_info_extra(self, s):
-        # Extract additional per-sample information from the sacc
-        # file needed for this likelihood.
-        ind_bias = 0
-        ind_IA = None
-        self.bias0 = []
-        self.bias_names = []
-        self.bias_pr_mean = []
-        self.bias_pr_isigma2 = []
-        for b in self.bins:
-            if b['name'] not in s.tracers:
-                raise LoggedError(self.log, "Unknown tracer %s" % b['name'])
-            t = s.tracers[b['name']]
-
-            self.bin_properties[b['name']]['bias_ind'] = None # No biases by default
-            if t.quantity == 'galaxy_density':
-                inds = []
-                if self.is_PT_bias:
-                    bnames = ['b1', 'b2', 'bs', 'bk2']
-                else:
-                    bnames = ['b1']
-                for bn in bnames:
-                    bname = self.input_params_prefix + '_' + b['name'] + '_' + bn
-                    self.bias0.append(self.bias_params[bname]['value'])
-                    self.bias_names.append(bname)
-                    pr = self.bias_params[bname].get('prior', None)
-                    if pr is not None:
-                        self.bias_pr_mean.append(pr['mean'])
-                        self.bias_pr_isigma2.append(1./pr['sigma']**2)
-                    else:
-                        self.bias_pr_mean.append(self.bias_params[bname]['value'])
-                        self.bias_pr_isigma2.append(0.0)
-                    inds.append(ind_bias)
-                    ind_bias += 1
-                self.bin_properties[b['name']]['bias_ind'] = inds
-                # No magnification bias yet
-                self.bin_properties[b['name']]['eps'] = False
-            if t.quantity == 'galaxy_shear':
-                if self.ia_model != 'IANone':
-                    if ind_IA is None:
-                        ind_IA = ind_bias
-                        pname = self.input_params_prefix + '_A_IA'
-                        self.bias0.append(self.bias_params[pname]['value'])
-                        self.bias_names.append(pname)
-                        pr = self.bias_params[pname].get('prior', None)
-                        if pr is not None:
-                            self.bias_pr_mean.append(pr['mean'])
-                            self.bias_pr_isigma2.append(1./pr['sigma']**2)
-                        else:
-                            self.bias_pr_mean.append(self.bias_params[pname]['value'])
-                            self.bias_pr_isigma2.append(0.0)
-                        ind_bias += 1
-                    self.bin_properties[b['name']]['bias_ind'] = [ind_IA]
-                self.bin_properties[b['name']]['eps'] = True
-        self.bias0 = np.array(self.bias0)
-        self.bias_pr_mean = np.array(self.bias_pr_mean)
-        self.bias_pr_isigma2 = np.array(self.bias_pr_isigma2)
+    def _get_bin_info_extra(self):
+        self.bias_names = list(self.bias_params.keys())
+        self.bias0 = np.array([v['value'] for k, v in self.bias_params.items()])
+        self.bias_pr_mean = np.array([v['prior']['mean'] for k, v in self.bias_params.items()])
+        self.bias_pr_isigma2 = np.array([1/v['prior']['sigma']**2 for k, v in self.bias_params.items()])
         self.updated_bias0 = False
 
-    def _model_dderiv(self, cld, bias_vec):
-        nbias = len(bias_vec)
-        cls_dderiv = np.zeros((self.ndata, nbias, nbias))
+    def get_requirements(self):
+        return {"bias_info": {},
+                "cl_with_bias": {"cl_meta": self.cl_meta,
+                                 "tracer_qs": self.tracer_qs,
+                                 "bin_properties": self.bin_properties,
+                             },
+                "cl_theory_dderiv": {},
+                }
+    
+    def calculate(self, state, want_derived=True, **pars):
+        # Calculate chi2
+        chi2, dchi2, p = self._get_chi2(**pars)
 
-        for icl, clm in enumerate(self.cl_meta):
-            n1 = clm['bin_1']
-            n2 = clm['bin_2']
-            ind1 = self.bin_properties[n1]['bias_ind']
-            ind2 = self.bin_properties[n2]['bias_ind']
-            inds = clm['inds']
+        if self.bias_update_every or (not self.updated_bias0):
+            self.bias0 = p.x.copy()
+            self.updated_bias0 = True
 
-            if (ind1 is not None) and (ind2 is not None):
-                cls_hess = np.zeros([nbias, nbias, len(clm['l_eff'])])
-                cls_hess[np.ix_(ind1, ind2)] += cld['cl11'][icl]
-                cls_hess[np.ix_(ind2, ind1)] += np.transpose(cld['cl11'][icl], axes=(1, 0, 2))
-                cls_dderiv[inds] = np.transpose(cls_hess, axes=(2, 0, 1))
-        return cls_dderiv # (ndata, nbias)
+        if self.bias_laplace:
+            state['logp'] = -0.5*(chi2+dchi2)
+        else:
+            state['logp'] = -0.5*chi2
 
-    def hessian_chi2(self, bias, cld, include_DF=False):
-        g = self._model_deriv(cld, bias)
-        ic_g = np.dot(self.inv_cov, g) # (ndata, ndata) , (ndata, nbias)
-        ddchi2 = 2*np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
-        # Bias prior
-        ddchi2 += 2*np.diag(self.bias_pr_isigma2)
-        # Second derivative term
-        if include_DF:
-            t = self._model(cld, bias)
-            ddt = self._model_dderiv(cld, bias)
-            r = t - self.data_vec
-            ic_r = np.dot(self.inv_cov, r)
-            ddchi2 += 2*np.sum(ic_r[:, None, None]*ddt, axis=0) # (ndata), (ndata, nbias, nbias)
-        return ddchi2
+        # - Best-fit biases
+        state['derived'] = dict(zip(self.bias_names, p.x))
+        # - Contribution from Laplace marginalization
+        state['derived']['dchi2_marg'] = dchi2
+        # - Number of function evaluations
+        state['derived']['nfev'] = p.nfev
 
-    def _get_BF_chi2_and_F(self, **pars):
-        # First, gather all the necessary ingredients for the Cls without bias parameters
-        res = self.provider.get_CCL()
-        cld = res['cl_data']
+    def _get_chi2(self, **pars):
+        bias_names, bias_info = self.provider.get_bias_info()
+        assert bias_names == self.bias_names
+        global_bias = {name: 1 for name in self.bin_properties.keys()}
 
-        def chi2(bias):
-            t = self._model(cld, bias)
+        def chi2_f(bias):
+            t, g = self.provider.get_cl_with_bias(bias, global_bias)
             r = t - self.data_vec
             ic_r = np.dot(self.inv_cov, r)
             chi2 = np.dot(r, ic_r) # (ndata) , (ndata, ndata) , (ndata)
-            g = self._model_deriv(cld, bias)
+
             dchi2 = 2*np.dot(ic_r, g) # (ndata, ndata) , (ndata) , (ndata, nbias)
             # Bias prior
             rb = bias - self.bias_pr_mean
@@ -395,103 +341,64 @@ class ClLikeFastBias(ClLike):
             dchi2 += 2*rb*self.bias_pr_isigma2
             return chi2, dchi2
 
-        p = minimize(chi2, self.bias0, method='Newton-CG', jac=True,
-                     hess=lambda b: self.hessian_chi2(b, cld))
-        H = self.hessian_chi2(p.x, cld,
-                              include_DF=self.bias_fisher_deriv2)
+        def hessian_chi2_f(bias, include_DF=False):
+            t, g = self.provider.get_cl_with_bias(bias, global_bias)
+            ic_g = np.dot(self.inv_cov, g) # (ndata, ndata) , (ndata, nbias)
+            ddchi2 = 2*np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
+            # Bias prior
+            ddchi2 += 2*np.diag(self.bias_pr_isigma2)
+            if include_DF:
+                ddt = self.provider.get_cl_theory_dderiv(bias, global_bias)
+                r = t-self.data_vec
+                ic_r = np.dot(self.inv_cov, r)
+                ddchi2 += 2*np.sum(ic_r[:, None, None]*ddt, axis=0) # (ndata), (ndata, nbias, nbias)
+            return ddchi2
 
-        return p.fun, 0.5*H, p
+        p = minimize(chi2_f, self.bias0, method='Newton-CG', jac=True,
+                     hess=lambda b: hessian_chi2_f(b))
+        chi2 = p.fun
 
-    def get_can_provide_params(self):
-        return self.bias_names + ['nfev', 'dchi2_marg']
+        H = hessian_chi2_f(p.x, include_DF=self.bias_fisher_deriv2)
+        ev = np.linalg.eigvals(0.5*H)
+        if np.any(ev <= 0):  # Use positive-definite version if needed
+            H = hessian_chi2_f(p.x, include_DF=False)
+            ev = np.linalg.eigvals(0.5*H)
+        dchi2 = np.sum(np.log(ev))
+        if np.isnan(dchi2):
+            print(dchi2)
+            print(ev)
+            print(H)
+            exit(1)
 
-    def calculate(self, state, want_derived=True, **pars):
-        # Calculate chi2
-        chi2, F, p = self._get_BF_chi2_and_F(**pars)
+        return chi2, dchi2, p
 
-        # Update starting point
-        if self.bias_update_every or (not self.updated_bias0):
-            self.bias0 = p.x.copy()
+    def get_cl_theory_sacc(self,bias,global_bias):
+        # Create empty file
+        s = sacc.Sacc()
 
-        # Plotting test
-        #import matplotlib.pyplot as plt
-        #res = self.provider.get_CCL()
-        #cld = res['cl_data']
-        #
-        ## Theory
-        #t = self._model(cld, self.bias0)
-        #plt.figure()
-        #plt.plot(t)
-        #
-        ## Derivative
-        #dt = self._model_deriv(cld, self.bias0)
-        #for ind_b in range(4):
-        #    plt.figure()
-        #    plt.title(f'{ind_b}')
-        #    colors = ['r', 'g', 'b', 'y', 'k']
-        #    for i, c in enumerate(colors):
-        #        ibias = ind_b+i*4
-        #        db = 0.01
-        #        b = self.bias0.copy()
-        #        b[ibias] += db
-        #        tp = self._model(cld, b)
-        #        b = self.bias0.copy()
-        #        b[ibias] -= db
-        #        tm = self._model(cld, b)
-        #        dtb = (tp-tm)/(2*db)
-        #
-        #        plt.plot(np.fabs(dt[:, ibias]), c=c, label=f'{i}')
-        #        plt.plot(np.fabs(dtb), '.', c=c)
-        #    plt.legend()
-        #
-        ## Second derivative
-        #ddt = self._model_dderiv(cld, self.bias0)
-        #print(ddt.shape)
-        #for ind_b1 in range(4):
-        #    for ind_b2 in range(ind_b1, 4):
-        #        plt.figure()
-        #        plt.title(f'{ind_b1}-{ind_b2}')
-        #        colors = ['r', 'g', 'b', 'y', 'k']
-        #        for i, c in enumerate(colors):
-        #            ibias1 = ind_b1+i*4
-        #            ibias2 = ind_b2+i*4
-        #            db = 0.01
-        #            bpp = self.bias0.copy()
-        #            bpp[ibias1] += db
-        #            bpp[ibias2] += db
-        #            tpp = self._model(cld, bpp)
-        #            bpm = self.bias0.copy()
-        #            bpm[ibias1] += db
-        #            bpm[ibias2] -= db
-        #            tpm = self._model(cld, bpm)
-        #            bmp = self.bias0.copy()
-        #            bmp[ibias1] -= db
-        #            bmp[ibias2] += db
-        #            tmp = self._model(cld, bmp)
-        #            bmm = self.bias0.copy()
-        #            bmm[ibias1] -= db
-        #            bmm[ibias2] -= db
-        #            tmm = self._model(cld, bmm)
-        #            ddtb = (tpp-tpm-tmp+tmm)/(4*db**2)
-        #
-        #            print(ind_b1, ind_b2, i, ddt[:, ibias1, ibias2])
-        #            plt.plot(np.fabs(ddt[:, ibias1, ibias2]), c=c, label=f'{i}')
-        #            plt.plot(np.fabs(ddtb), '.', c=c)
-        #        plt.legend()
-        #plt.show()
-        #exit(1)
+        # Add tracers
+        for n, p in self.bin_properties.items():
+            if n not in self.tracer_qs:
+                continue
+            q = self.tracer_qs[n]
+            spin = 2 if q == 'galaxy_shear' else 0
+            if q in ['galaxy_density', 'galaxy_shear']:
+                # TODO: These would better be the shifted Nz
+                s.add_tracer('NZ', n, quantity=q, spin=spin,
+                             z=p['z_fid'], nz=p['nz_fid'])
+            else:
+                s.add_tracer('Map', n, quantity=q, spin=spin,
+                             ell=np.arange(10), beam=np.ones(10))
 
-        # Compute log_like
-        if self.bias_fisher:
-            dchi2 = np.log(np.linalg.det(F))
-        else:
-            dchi2 = 0.0
-        state['logp'] = -0.5*(chi2 + dchi2)
-
-        # Add derived parameters
-        # - Best-fit biases
-        state['derived'] = dict(zip(self.bias_names, p.x))
-        # - Number of function evaluations
-        state['derived']['nfev'] = p.nfev
-        # - Contribution from Laplace marginalization
-        state['derived']['dchi2_marg'] = dchi2
+        # Calculate power spectra
+        cl, dcl = self.provider.get_cl_with_bias(bias, global_bias)#self.provider.get_cl_theory()
+        for clm in self.cl_meta:
+            p1 = 'e' if self.tracer_qs[clm['bin_1']] == 'galaxy_shear' else '0'
+            p2 = 'e' if self.tracer_qs[clm['bin_2']] == 'galaxy_shear' else '0'
+            cltyp = f'cl_{p1}{p2}'
+            if cltyp == 'cl_e0':
+                cltyp = 'cl_0e'
+            bpw = sacc.BandpowerWindow(clm['l_bpw'], clm['w_bpw'].T)
+            s.add_ell_cl(cltyp, clm['bin_1'], clm['bin_2'],
+                         clm['l_eff'], cl[clm['inds']], window=bpw)
+        return s
