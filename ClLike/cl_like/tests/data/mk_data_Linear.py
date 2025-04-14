@@ -7,7 +7,7 @@ import os
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("non_linear", type=str, help='halofit or baccopt')
+parser.add_argument("non_linear", type=str, help='halofit, baccopkmm or baccopt')
 args = parser.parse_args()
 args.non_linear
 
@@ -32,7 +32,7 @@ if args.non_linear == 'baccopt':
     lbias = baccoemu.Lbias_expansion()
 
     # Scale factor
-    a = np.linspace(mpk.emulator['baryon']['bounds'][-1][0], 1, 100)
+    a = np.linspace(lbias.emulator['nonlinear']['bounds'][-1][0], 1, 100)
 
     # Hubble
     h = cosmopars['hubble']
@@ -46,7 +46,7 @@ if args.non_linear == 'baccopt':
     k_emu = ks = np.logspace(log10k_min, log10k_max, nk_total)
     k_for_bacco = ks/h
 
-    mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= mpk.emulator['baryon']['k'].max()))
+    mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= lbias.emulator['baryon']['k'].max()))
 
     k_emu = k_emu[mask_ks_for_bacco]
     k_for_bacco = k_for_bacco[mask_ks_for_bacco]
@@ -58,10 +58,6 @@ if args.non_linear == 'baccopt':
     combined_pars['expfactor'] = a
 
     pklin_emu = None
-    # NOTE: get_nonlinear_pk is used only for baryons & shear. I get about 1-2%
-    # difference with the
-    # pk_emu = mpk.get_nonlinear_pk(baryonic_boost=False, cold=False,
-    #                               k=k_for_bacco, **combined_pars)[1] / h**3
     pk_emu = np.array([lbias.get_nonlinear_pnn(k=k_for_bacco, expfactor=ai,
                                                **cosmopars)[1]/h**3 for ai in
                        a])
@@ -69,10 +65,7 @@ if args.non_linear == 'baccopt':
     # get_sigma8 always returns sigma8 at z=0
     print('sigma8 =', mpk.get_sigma8(**combined_pars, cold=False)[0])
 
-    # pk_linear = {'a': a, 'k': k_emu, 'delta_matter:delta_matter': pklin_emu}
     pk_linear = None
-    # pk_nonlinear = {'a': a, 'k': k_emu,
-    #                 'delta_matter:delta_matter': pk_emu[:, 0, :]}
     pk_nonlinear = {'a': a, 'k': k_emu, 'pk_mm': pk_emu[:, 0, :],
                     'pk_md1': pk_emu[:, 1, :], 'pk_d1d1': pk_emu[:, 5, :]}
 
@@ -91,6 +84,68 @@ if args.non_linear == 'baccopt':
                                     pk_nonlin=None, # pk_nonlinear,
                                     T_CMB=2.7255)
     fname = "linear_baccopt_5x2pt.fits"
+elif args.non_linear == 'baccopkmm':
+    import baccoemu
+
+    nonlinear_emu_path =  None
+    nonlinear_emu_details = None
+    mpk = baccoemu.Matter_powerspectrum(nonlinear_emu_path=nonlinear_emu_path,
+                                        nonlinear_emu_details=nonlinear_emu_details) # this generates many warnings from tensorflow, it's normal
+
+    # Scale factor
+    a = np.linspace(mpk.emulator['nonlinear']['bounds'][-1][0], 1, 100)
+
+    # Hubble
+    h = cosmopars['hubble']
+
+    # Array of k's as in bacco.py to avoid interpolation issues that prevent us
+    # from getting chi2 < 1e-3
+    log10k_min=np.log10(0.0001)
+    log10k_max=np.log10(50)
+    nk_per_decade=20
+    nk_total = int((log10k_max - log10k_min) * nk_per_decade)
+    k_emu = np.logspace(log10k_min, log10k_max, nk_total)
+    k_for_bacco = k_emu/h
+
+    mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= mpk.emulator['nonlinear']['k'].max()))
+
+    k_emu = k_emu[mask_ks_for_bacco]
+    k_for_bacco = k_for_bacco[mask_ks_for_bacco]
+
+    combined_pars = {}
+    for key in cosmopars.keys():
+        combined_pars[key] = np.full((len(a)), cosmopars[key])
+
+    combined_pars['expfactor'] = a
+
+    pklin_emu = None
+    # NOTE: get_nonlinear_pk is used only for baryons & shear. I get about 1-2%
+    # difference with the
+    pk_emu = mpk.get_nonlinear_pk(baryonic_boost=False, cold=False,
+                                  k=k_for_bacco, **combined_pars)[1] / h**3
+
+    # get_sigma8 always returns sigma8 at z=0
+    print('sigma8 =', mpk.get_sigma8(**combined_pars, cold=False)[0])
+
+    pk_linear = None
+    pk_nonlinear = {'a': a, 'k': k_emu,
+                    'delta_matter:delta_matter': pk_emu}
+
+    # np.savez_compressed('pk_nonlinear_baccopt.npz', **pk_nonlinear)
+
+    cosmo = ccl.CosmologyCalculator(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
+                                    Omega_b=cosmopars['omega_baryon'],
+                                    h=cosmopars['hubble'],
+                                    n_s=cosmopars['ns'],
+                                    A_s=cosmopars['A_s'],
+                                    m_nu = cosmopars['neutrino_mass'],
+                                    w0=cosmopars['w0'],
+                                    wa=cosmopars['wa'],
+                                    pk_linear=None, # pk_linear,
+                                    pk_nonlin=pk_nonlinear,
+                                    T_CMB=2.7255)
+    fname = "linear_baccopkmm_5x2pt.fits"
+
 elif args.non_linear == 'halofit':
     cosmo = ccl.Cosmology(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
                           Omega_b=cosmopars['omega_baryon'],
@@ -281,15 +336,15 @@ for i1, i2, ix, typ in get_pairs():
                  lbpw, sls[i1, i2], window=wins)
 s.add_covariance(cov)
 
-for i1, i2, ix, typ in get_pairs():
-    l, cl, cov = s.get_ell_cl(typ, tracer_names[i1],
-                              tracer_names[i2], return_cov=True)
-    plt.figure()
-    plt.errorbar(l, cl, yerr=np.sqrt(np.diag(cov)))
-    plt.plot(l, nls[i1, i2], 'k--')
-    plt.loglog()
-    plt.title(f"{tracer_names[i1]}, {tracer_names[i2]}")
-plt.show()
+# for i1, i2, ix, typ in get_pairs():
+#     l, cl, cov = s.get_ell_cl(typ, tracer_names[i1],
+#                               tracer_names[i2], return_cov=True)
+#     plt.figure()
+#     plt.errorbar(l, cl, yerr=np.sqrt(np.diag(cov)))
+#     plt.plot(l, nls[i1, i2], 'k--')
+#     plt.loglog()
+#     plt.title(f"{tracer_names[i1]}, {tracer_names[i2]}")
+# plt.show()
 
 s.save_fits(fname, overwrite=True)
 os.system(f'gzip {fname}')

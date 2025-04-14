@@ -36,7 +36,7 @@ except ImportError as e:
 class Pk(Theory):
     """Computes the power spectrum"""
     # b(z) model name
-    bias_model: str = "BzNone"
+    bias_model: str = ""
     # k shot noise suppression scale
     k_SN_suppress: float = 0.01
     # min k 3D power spectra
@@ -49,15 +49,24 @@ class Pk(Theory):
     nz_pks: int = 30
     # #k for 3D power spectra
     nk_per_dex_pks: int = 25
+    # What non-linear power spectrum to use
+    nonlinear_pk: str = ''
     #for baccoemu
     nonlinear_emu_path = None
     nonlinear_emu_details = None
+    nonlinear_emu_model_name = None
     use_baryon_boost : bool = False
     baryon_model: str = ''
-    ignore_lbias : bool = False
     allow_bcm_emu_extrapolation_for_shear : bool = True
     allow_halofit_extrapolation_for_shear : bool = False
     allow_halofit_extrapolation_for_shear_on_k: bool = False
+    # Modified Gravity
+    use_mg_boost: bool = False
+    mg_model: str = ''
+    mg_emulator_folder: str = ''
+    mg_parametrization: str = ''
+    mg_boost_extrap_high_k: bool = False
+    mg_boost_extrap_low_a: bool = False
 
     def initialize(self):
         # Bias model
@@ -104,52 +113,91 @@ class Pk(Theory):
         #         self.hmcorr = HalomodCorrection()
         #     else:
         #         self.hmcorr = None
+        if self.nonlinear_pk == '':
+            raise ValueError("You need to specify a dark-matter only "
+                             "non-linear power spectrum model. Available: "
+                             "'CCL' or 'Bacco'")
+
+        # if ("galaxy_density" in self.tracer_qs) and not self.bias_model:
+        #     raise ValueError("You need to specify a bias model if there are "
+        #                      "galaxy density tracers. Available: 'Linear',"
+        #                      "'LagrangianPT', 'EulerianPT', 'BaccoPT'")
+
+
         if self.bias_model == 'LagrangianPT' and not HAVE_LPT:
             raise LPT_exception
         elif self.bias_model == 'EulerianPT' and not HAVE_EPT:
             raise EPT_exception
-        elif self.bias_model == 'BaccoPT' and not HAVE_BACCO:
+        elif (self.bias_model == 'BaccoPT' or self.baryon_model == 'Bacco' or \
+              self.nonlinear_pk == 'Bacco') and not HAVE_BACCO:
             raise BACCO_exception
 
-        if self.baryon_model not in ['', 'Bacco', 'CCL_BCM', 'Amon-Efstathiou']:
-            raise ValueError("baryon_model must be one of '', 'Bacco' or "
-                             "'CCL_BCM', 'Amon-Efstathiou'")
+        if self.use_baryon_boost:
+            if self.baryon_model == '':
+                raise ValueError("baryon boost requested but baryon_model is empty")
+            elif self.baryon_model not in ['Bacco', 'CCL_BCM',
+                                           'Amon-Efstathiou']:
+                raise ValueError("baryon_model must be one of 'Bacco', "
+                                 "'CCL_BCM' or 'Amon-Efstathiou'")
 
-        if self.bias_model == 'BaccoPT':
-            if self.use_baryon_boost and self.baryon_model == '':
-                    self.baryon_model = 'Bacco'
+        # Instantiate bacco calculator
+        if any('Bacco' in k for k in [self.bias_model, self.baryon_model,
+                                      self.nonlinear_pk]):
+            self.bacco_calc = self.getBaccoCalculatorInstance()
 
-            use_baryon_boost = self.use_baryon_boost and \
-                               self.baryon_model == 'Bacco'
-            self.bacco_calc = BaccoCalculator(a_arr=self.a_s_pks,
-                                              nonlinear_emu_path=self.nonlinear_emu_path,
-                                              nonlinear_emu_details=self.nonlinear_emu_details,
-                                              use_baryon_boost=use_baryon_boost,
-                                              ignore_lbias=self.ignore_lbias,
-                                              allow_bcm_emu_extrapolation_for_shear=self.allow_bcm_emu_extrapolation_for_shear,
-                                              allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear,
-                                              allow_halofit_extrapolation_for_shear_on_k=self.allow_halofit_extrapolation_for_shear_on_k
-                                             )
+        if not self.use_mg_boost:
+            pass
+        elif self.mg_model == 'BLCDM':
+            from .blcdm_boost import BLCDMCalculator
+            self.mg_boost = BLCDMCalculator(self.mg_emulator_folder,
+                                            parametrizaton=self.mg_parametrization)
         else:
-            if self.baryon_model == 'Bacco':
-                raise ValueError("baryon_model 'Bacco' can only be used with "
-                                 "bias_model 'BaccoPT' at the moment.")
+            raise NotImplementedError(f"MG boost model {self.mg_model} not implemented")
+
+
+    def getBaccoCalculatorInstance(self):
+        ignore_lbias = self.bias_model != 'BaccoPT'
+
+        use_baryon_boost = self.use_baryon_boost and \
+                           self.baryon_model == 'Bacco'
+
+        bacco_calc = BaccoCalculator(a_arr=self.a_s_pks,
+                                     nonlinear_emu_path=self.nonlinear_emu_path,
+                                     nonlinear_emu_details=self.nonlinear_emu_details,
+                                     nonlinear_emu_model_name=self.nonlinear_emu_model_name,
+                                     use_baryon_boost=use_baryon_boost,
+                                     ignore_lbias=ignore_lbias,
+                                     allow_bcm_emu_extrapolation_for_shear=self.allow_bcm_emu_extrapolation_for_shear,
+                                     allow_halofit_extrapolation_for_shear=self.allow_halofit_extrapolation_for_shear,
+                                     allow_halofit_extrapolation_for_shear_on_k=self.allow_halofit_extrapolation_for_shear_on_k)
+
+        return bacco_calc
+
+    def get_requirements(self):
+        return {"CCL": None}
 
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
             return {}
 
-        return {"CCL": None}
+        if ('bias_model' in requirements['Pk']) and not self.bias_model:
+            raise ValueError("You need to specify a bias model if there are "
+                             "galaxy density tracers. Available: 'Linear',"
+                             "'LagrangianPT', 'EulerianPT', 'BaccoPT'")
+
+
+        return
 
     def get_can_support_params(self):
         # TODO: We should better use an input_params_prefix to avoid confusion
         # with CCL params and maybe split the baryons stuff
         return ["M_c", "eta", "beta", "M1_z0_cen", "theta_out", "theta_inn",
-                "M_inn", "A_AE"]
+                "M_inn", "A_AE", "mu0", "Sigma0"]
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         cosmo = self.provider.get_CCL()["cosmo"]
         bcmpar = None
+        mgpars = None
         if self.use_baryon_boost:
             if self.baryon_model == 'Bacco':
                 M_c = self.provider.get_param('M_c')
@@ -171,16 +219,22 @@ class Pk(Theory):
             elif self.baryon_model == 'Amon-Efstathiou':
                 bcmpar = {'A_AE': self.provider.get_param('A_AE')}
 
-        state['Pk'] = {'pk_data': self._get_pk_data(cosmo, bcmpar=bcmpar)}
+        if self.use_mg_boost:
+            mgpars = {
+                'mu0': self.provider.get_param('mu0'),
+                'Sigma0': self.provider.get_param('Sigma0')
+            }
+
+        state['Pk'] = {'pk_data': self._get_pk_data(cosmo, bcmpar=bcmpar,
+                                                    mgpars=mgpars)}
 
     def get_Pk(self):
-        return self._current_state['Pk']
+        return self.current_state['Pk']
 
-    def _get_pk_data(self, cosmo, bcmpar=None):
-        # cosmo.compute_nonlin_power()
-        # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
-        pkmm = None
-        if self.bias_model == 'Linear':
+    def _get_pk_data(self, cosmo, bcmpar=None, mgpars=None):
+        pkd = {}
+        # Load DMO power spectrum
+        if self.nonlinear_pk == 'CCL':
             cosmo.compute_nonlin_power()
             pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
             if 'delta_matter:Weyl' in cosmo._pk_nl:
@@ -191,7 +245,22 @@ class Pk(Theory):
                 pkww = cosmo.get_nonlin_power(name='Weyl:Weyl')
             else:
                 pkww = pkmm
-            pkd = {}
+        elif self.nonlinear_pk == 'Bacco':
+            self.bacco_calc.update_pk(cosmo, bcmpar=bcmpar)
+            pkww = pkwm = pkmm = self.bacco_calc.get_pk('mm_sh_sh')
+        else:
+            raise NotImplementedError("{self.nonlinear_pk} not "
+                                      "implemented. Only CCL and Bacco "
+                                      "implemented.")
+        # Here we assume Pkmm can be used as Pkww (which is true in LCDM, in
+        # CCL). Any change respect to LCDM will be applied later in
+        # apply_mg_boost.
+        pkd['pk_mm'] = pkmm
+        pkd['pk_mw'] = pkd['pk_wm'] = pkwm
+        pkd['pk_ww'] = pkww
+
+        # Check if we need galaxy biases
+        if self.bias_model == 'Linear':
             pkd['pk_mm'] = pkmm
             pkd['pk_md1'] = pkmm
             pkd['pk_d1m'] = pkmm
@@ -210,8 +279,6 @@ class Pk(Theory):
                 k_filter = None
             if self.bias_model == 'EulerianPT':
                 from .ept import EPTCalculator
-                cosmo.compute_nonlin_power()
-                pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
                 ptc = EPTCalculator(with_NC=True, with_IA=False,
                                     log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
@@ -220,8 +287,6 @@ class Pk(Theory):
                                     k_filter=k_filter)
             elif self.bias_model == 'LagrangianPT':
                 from .lpt import LPTCalculator
-                cosmo.compute_nonlin_power()
-                pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
                 ptc = LPTCalculator(log10k_min=self.l10k_min_pks,
                                     log10k_max=self.l10k_max_pks,
                                     nk_per_decade=self.nk_per_dex_pks,
@@ -232,11 +297,11 @@ class Pk(Theory):
             else:
                 raise NotImplementedError("Not yet: " + self.bias_model)
             ptc.update_pk(cosmo, bcmpar=bcmpar)
-            pkd = {}
             operators = ['m', 'w', 'd1', 'd2', 's2', 'k2']
             for i1, op1 in enumerate(operators):
                 for op2 in operators[i1:]:
                     comb_12 = op1+op2
+                    print(comb_12)
                     # Since PT models are not meant to work with Weyl and we
                     # have already checked if Weyl is in cosmo._pk_nl, let's
                     # fill pkd weyl pk's with matter ones.
@@ -247,60 +312,83 @@ class Pk(Theory):
                     if op1 != op2:
                         comb_21 = op2+op1
                         pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
-            if (self.bias_model == 'BaccoPT') and self.ignore_lbias:
-                # TODO: Move this to bacco.py
-                # In case we don't request the bias expansion, use the pk from
-                # the matter pk emulator
-                pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
 
         # Add baryon correction
         baryons_in_cosmo = cosmo._config_init_kwargs['baryonic_effects']
         if self.use_baryon_boost or (baryons_in_cosmo is not None):
-            if self.is_PT_bias and (self.bias_model == 'BaccoPT') and \
-                (self.baryon_model == 'Bacco'):
-                # TODO: This assumes LCDM, but as above. BACCOemu is
-                # trained only in LCDM, anyway. What to do with the cross
-                # pk's? At the moment they don't have the correction.
-                pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
-                pkd['Sk'] = ptc.get_pk('Sk')
-            elif isinstance(baryons_in_cosmo,
-                            ccl.baryons.baryons_base.Baryons):
-                print("################", baryons_in_cosmo)
-                # This can be optimized using BaryonsClass.update_params()
-                if self.is_PT_bias:
-                    # The correction happens in place
-                    # If bias is Linear, then the pk already has the baryon
-                    # boost applied.
-                    pkd['pk_ww'] = cosmo.baryons.include_baryonic_effects(cosmo, pkd['pk_ww'])
-                a_arr, lnk, pkww = pkd['pk_ww'].get_spline_arrays()
-                k = np.exp(lnk)
-                Sk = np.zeros_like(pkww)
-                for i, ai in enumerate(a_arr):
-                    Sk[i] = cosmo.baryons.boost_factor(cosmo, k, ai)
-                pkd['Sk'] = ccl.Pk2D(a_arr=a_arr, lk_arr=lnk,
-                                     pk_arr=np.log(Sk), is_logp=True)
-            elif self.baryon_model == 'Amon-Efstathiou':
-                pklin = cosmo.get_linear_power()
-                a, lnk, pklin = pklin.get_spline_arrays()
-                k = np.exp(lnk)
-                boost = np.zeros_like(pklin)
-                pknonlin = np.zeros_like(pklin)
-                for i, ai in enumerate(a):
-                    pknonlin[i] = pkd['pk_ww'](k, ai, cosmo)
-                    boost[i] = pknonlin[i] - pklin[i]
+            self.apply_baryons_boost(cosmo, bcmpar, pkd)
+        else:
+            pkd['Sk'] = None
 
-                pkb = pklin + bcmpar['A_AE']*boost
-                pkd['pk_ww'] = ccl.Pk2D(a_arr=a, lk_arr=lnk,
-                                        pk_arr=np.log(pkb),
-                                        is_logp=True)
-                Sk = pkb / pknonlin
-                pkd['Sk'] = ccl.Pk2D(a_arr=a, lk_arr=lnk, pk_arr=np.log(Sk),
-                                     is_logp=True)
-            else:
-                # TODO: Bacco returns a pk2d of 1's, maybe homogenize this
-                pkd['Sk'] = None
+        # Apply modified gravity boost
+        if self.use_mg_boost:
+            self.apply_mg_boost(cosmo, mgpars, pkd)
 
         return pkd
+
+    def apply_baryons_boost(self, cosmo, bcmpar, pkd):
+        if self.bias_model != 'Linear':
+            # TODO: Implement Zennaro+2024 for the LPT terms
+            raise NotImplementedError('Baryon Boost can only be applied to linear bias')
+
+        if self.baryon_model == 'Bacco':
+            # For now we can put the update_pk here since the PTbias part will
+            # not be called. This will need to be modified when implementing
+            # the LPT terms.
+            # Already computed in "Linear"
+            # self.bacco_calc.update_pk(cosmo, bcmpar=bcmpar)
+            # pkd['pk_ww'] = self.bacco_calc.get_pk('mm_sh_sh')
+            pkd['Sk'] = self.bacco_calc.get_pk('Sk')
+        elif isinstance(cosmo._config_init_kwargs['baryonic_effects'],
+                        ccl.baryons.baryons_base.Baryons):
+            # This can be optimized using BaryonsClass.update_params()
+            if self.nonlinear_pk != 'CCL':
+                pkd['pk_ww'] = cosmo.baryons.include_baryonic_effects(cosmo, pkd['pk_ww'])
+
+            a_arr, lnk, pkww = pkd['pk_ww'].get_spline_arrays()
+            k = np.exp(lnk)
+            Sk = np.zeros_like(pkww)
+            for i, ai in enumerate(a_arr):
+                Sk[i] = cosmo.baryons.boost_factor(cosmo, k, ai)
+            pkd['Sk'] = ccl.Pk2D(a_arr=a_arr, lk_arr=lnk,
+                                 pk_arr=np.log(Sk), is_logp=True)
+
+        elif self.baryon_model == 'Amon-Efstathiou':
+            pklin = cosmo.get_linear_power()
+            a, lnk, pklin = pklin.get_spline_arrays()
+            k = np.exp(lnk)
+            boost = np.zeros_like(pklin)
+            pknonlin = np.zeros_like(pklin)
+            for i, ai in enumerate(a):
+                pknonlin[i] = pkd['pk_ww'](k, ai, cosmo)
+                boost[i] = pknonlin[i] - pklin[i]
+
+            pkb = pklin + bcmpar['A_AE']*boost
+            pkd['pk_ww'] = ccl.Pk2D(a_arr=a, lk_arr=lnk,
+                                    pk_arr=np.log(pkb),
+                                    is_logp=True)
+            Sk = pkb / pknonlin
+            pkd['Sk'] = ccl.Pk2D(a_arr=a, lk_arr=lnk, pk_arr=np.log(Sk),
+                                 is_logp=True)
+
+    def apply_mg_boost(self, cosmo, mgpars, pkd):
+        if self.bias_model != 'Linear':
+            raise NotImplementedError('MG Boost can only be applied to linear bias')
+
+        self.mg_boost.update_pk(cosmo, mgpars['mu0'], mgpars['Sigma0'])
+        boosts = {}
+        for k, pk2d in pkd.items():
+            if 'pk' not in k:
+                continue
+            kind = k.split('_')[1].replace('d1', 'm')
+            # The Weyl boost is applied to the LCDM matter power spectrum
+            pkd[k] = self.mg_boost.apply_boost(kind, pk2d,
+                                               self.mg_boost_extrap_high_k,
+                                               self.mg_boost_extrap_low_a)
+            boosts_k = f'Qk_{kind}'
+            if boosts_k not in boosts:
+                boosts[boosts_k] = self.mg_boost.get_boost(kind)
+        pkd.update(boosts)
 
     def get_can_provide(self):
         return ["is_PT_bias", "bias_model"]

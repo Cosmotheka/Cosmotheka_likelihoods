@@ -18,7 +18,8 @@ class BaccoCalculator(object):
     """
     def __init__(self, log10k_min=np.log10(0.008), log10k_max=np.log10(0.5), nk_per_decade=20,
                  log10k_sh_sh_min=np.log10(0.0001), log10k_sh_sh_max=np.log10(50), nk_sh_sh_per_decade=20,
-                 a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None, use_baryon_boost=False,
+                 a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None,
+                 nonlinear_emu_model_name=None, use_baryon_boost=False,
                  ignore_lbias=False, allow_bcm_emu_extrapolation_for_shear=True,
                  allow_halofit_extrapolation_for_shear=False,
                  allow_halofit_extrapolation_for_shear_on_k=False):
@@ -36,7 +37,8 @@ class BaccoCalculator(object):
             warnings.filterwarnings('ignore', category=UserWarning)
             self.lbias = baccoemu.Lbias_expansion()
             self.mpk = baccoemu.Matter_powerspectrum(nonlinear_emu_path=nonlinear_emu_path,
-                                                     nonlinear_emu_details=nonlinear_emu_details)
+                                                     nonlinear_emu_details=nonlinear_emu_details,
+                                                     model_name=nonlinear_emu_model_name)
 
         # check with the currently loaded version of baccoemu if the a array is
         # all within the allowed ranges
@@ -245,7 +247,9 @@ class BaccoCalculator(object):
         Sk = self.mpk.get_baryonic_boost(k=k_arr, **cospar_for_bcm)[1]
         return Sk
 
-    def get_pk(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
+    def get_pk(self, kind, **kwargs):
+        # kwargs only for compatibility with the others calculator classes
+
         # Clarification:
         # We are expanding the galaxy overdensity as:
         #   1+ d_g = 1 + b1 d + b2 d2^2/2 + bs s^2/2 + bk k^2 d

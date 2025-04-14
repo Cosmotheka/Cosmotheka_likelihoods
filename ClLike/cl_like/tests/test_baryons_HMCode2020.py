@@ -66,7 +66,8 @@ def get_info(T_AGN, use_S8=False, sigma8_to_As='ccl'):
                                   "nz_model": "NzShift",
                                   "input_params_prefix": "limber",
                                   "ia_model": "IADESY1_PerSurvey"},
-                       "Pk": {"external": Pk, "bias_model": "Linear"},
+                       "Pk": {"external": Pk, "bias_model": "Linear",
+                              "nonlinear_pk": "CCL"},
                        "clfinal": {"external": ClFinal,
                                    "input_params_prefix": "bias",
                                    "shape_model": "ShapeMultiplicative"}
