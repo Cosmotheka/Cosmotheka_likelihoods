@@ -268,7 +268,7 @@ class BaccoCalculatorHEFT(object):
 
         pk_mm = self._get_lbias_pks_exact(cospar, mm_only=True)
         pks = pk_mm * (sign*np.exp(lx)*self.log_der[:, None, None] +
-                       x * self.lin_dr[:, None, None])
+                       x * self.lin_der[:, None, None])
 
         return self._get_ccl_pks_from_bacco_pks(cosmo, pks)
 
