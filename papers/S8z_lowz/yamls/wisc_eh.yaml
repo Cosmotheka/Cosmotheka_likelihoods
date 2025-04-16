@@ -69,7 +69,7 @@ theory:
   cl_like.CCL_custom:
     baryons_pk: nobaryons
     matter_pk: halofit
-    transfer_function: boltzmann_camb
+    transfer_function: eisenstein_hu
   cl_like.Pk:
     #bias_model: "EulerianPT"
     bias_model: "BaccoHEFT"
@@ -199,4 +199,4 @@ likelihood:
         lmin: 20
 
 debug: False
-output: ../papers/S8z_lowz/chains/wisc_all
+output: ../papers/S8z_lowz/chains/wisc_eh

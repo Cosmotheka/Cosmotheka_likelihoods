@@ -4,8 +4,8 @@ force: True
 sampler:
   mcmc:
     max_tries: 1000
-    max_samples: 10000
     Rminus1_stop: 0.01
+#    max_samples: 10000
 
 params:
   sigma8:

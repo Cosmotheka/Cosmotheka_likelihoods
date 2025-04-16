@@ -234,8 +234,8 @@ class CCL(Theory):
             del params['sigma8']
 
         cosmo = ccl.Cosmology(**params,
-                              #transfer_function=self.transfer_function,
-                              #matter_power_spectrum=self.matter_pk,
+                              transfer_function=self.transfer_function,
+                              matter_power_spectrum=self.matter_pk,
                               #baryons_power_spectrum=self.baryons_pk,
                               **ccl_arguments)
 

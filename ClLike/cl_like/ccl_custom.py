@@ -166,6 +166,9 @@ class CCL_custom(Theory):
         for p in input_params:
             params[p] = self.provider.get_param(p)
 
+        params['transfer_function'] = self.transfer_function
+        params['matter_power_spectrum'] = self.matter_pk
+
         # Read HMCode CAMB params
         ccl_arguments = self.ccl_arguments.copy()
         hmcode_camb = ["HMCode_logT_AGN", "HMCode_A_baryon",

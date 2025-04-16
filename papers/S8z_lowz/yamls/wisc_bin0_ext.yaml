@@ -11,7 +11,7 @@ params:
   sigma8:
     prior:
       min: 0.4
-      max: 1.2
+      max: 2.0
     ref:
       dist: norm
       loc: 0.81
@@ -49,10 +49,10 @@ params:
   Omega_c:
   h:
 
-  cll_LOWZ__2_b1:
-  cll_LOWZ__2_b2:
-  cll_LOWZ__2_bs:
-  cll_LOWZ__2_bk2:
+  cll_LOWZ__0_b1:
+  cll_LOWZ__0_b2:
+  cll_LOWZ__0_bs:
+  cll_LOWZ__0_bk2:
   nfev:
 
 # CCL settings    
@@ -80,7 +80,7 @@ likelihood:
     input_file: ../../saccs/cls_ws8_3bin_covNG.fits
     bins:
       - name: CMBK
-      - name: LOWZ__2
+      - name: LOWZ__0
 
     # Include Laplace term?
     bias_laplace: False
@@ -99,31 +99,31 @@ likelihood:
     # galaxy-galaxy auto-correlations, but all
     # galaxy-shear and shear-shear correlations.
     bias_params:
-      cll_LOWZ__2_b1:
+      cll_LOWZ__0_b1:
         prior:
           mean: 0.0
           sigma: 100
         value: 0.2
-      cll_LOWZ__2_b2:
+      cll_LOWZ__0_b2:
         prior:
           mean: 0.0
           sigma: 100
         value: 0.0
-      cll_LOWZ__2_bs:
+      cll_LOWZ__0_bs:
         prior:
           mean: 0.0
           sigma: 100
         value: 0.0
-      cll_LOWZ__2_bk2:
+      cll_LOWZ__0_bk2:
         prior:
           mean: 0.0
           sigma: 100
         value: 0.0
 
     twopoints:
-      - bins: [LOWZ__2, CMBK]  # cross-correlazione 
+      - bins: [LOWZ__0, CMBK]  # cross-correlazione 
         lmin: 20
-      - bins: [LOWZ__2, LOWZ__2] 
+      - bins: [LOWZ__0, LOWZ__0] 
         lmin: 20
         
     defaults:
@@ -140,4 +140,4 @@ likelihood:
         lmin: 20
 
 debug: False
-output: ../papers/S8z_lowz/chains/wisc_bin2
+output: ../papers/S8z_lowz/chains/wisc_bin0_ext

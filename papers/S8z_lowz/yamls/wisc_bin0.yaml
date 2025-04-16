@@ -91,6 +91,9 @@ likelihood:
     # Update start point of minimiser every time?
     bias_update_every: False
 
+    # Number of mininiser starting points
+    n_minim: 10
+
     # List all 2-points that should go into the
     # data vector. For now we only include
     # galaxy-galaxy auto-correlations, but all
