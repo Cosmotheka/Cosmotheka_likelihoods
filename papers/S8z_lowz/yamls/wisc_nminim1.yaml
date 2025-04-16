@@ -1,8 +1,8 @@
 force: True
 # resume: True
-
 sampler:
   mcmc:
+    max_tries: 1000
     max_samples: 10000
     Rminus1_stop: 0.01
 
@@ -10,7 +10,7 @@ params:
   sigma8:
     prior:
       min: 0.4
-      max: 0.9
+      max: 1.2
     ref:
       dist: norm
       loc: 0.81
@@ -43,6 +43,7 @@ params:
   # assigned to your likelihood.
   # First-order bias
 
+  dchi2_marg:
   S8:
   Omega_c:
   h:
@@ -93,13 +94,16 @@ likelihood:
       - name: LOWZ__2
 
     # Include Laplace term?
-    bias_laplace: True
+    bias_laplace: False
 
     # Include second derivatives in Laplace term?
     bias_fisher_deriv2: False
 
     # Update start point of minimiser every time?
     bias_update_every: False
+
+    # Number of mininiser starting points
+    n_minim: 1
 
     # List all 2-points that should go into the
     # data vector. For now we only include
@@ -195,4 +199,4 @@ likelihood:
         lmin: 20
 
 debug: False
-output: ../chains/test
+output: ../papers/S8z_lowz/chains/wisc_nminim1

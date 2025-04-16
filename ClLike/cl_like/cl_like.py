@@ -286,6 +286,8 @@ class ClLikeFastBias(ClLike):
     bias_fisher_deriv2: bool = False
     # Update start point every time?
     bias_update_every: bool = False
+    # Number of minimiser starting points
+    n_minim: int = 1
 
     def _get_bin_info_extra(self):
         self.bias_names = list(self.bias_params.keys())
@@ -305,10 +307,10 @@ class ClLikeFastBias(ClLike):
     
     def calculate(self, state, want_derived=True, **pars):
         # Calculate chi2
-        chi2, dchi2, p = self._get_chi2(**pars)
+        chi2, dchi2, biases, nfev = self._get_chi2(**pars)
 
         if self.bias_update_every or (not self.updated_bias0):
-            self.bias0 = p.x.copy()
+            self.bias0 = biases.copy()
             self.updated_bias0 = True
 
         if self.bias_laplace:
@@ -317,11 +319,11 @@ class ClLikeFastBias(ClLike):
             state['logp'] = -0.5*chi2
 
         # - Best-fit biases
-        state['derived'] = dict(zip(self.bias_names, p.x))
+        state['derived'] = dict(zip(self.bias_names, biases))
         # - Contribution from Laplace marginalization
         state['derived']['dchi2_marg'] = dchi2
         # - Number of function evaluations
-        state['derived']['nfev'] = p.nfev
+        state['derived']['nfev'] = nfev
 
     def _get_chi2(self, **pars):
         bias_names, bias_info = self.provider.get_bias_info()
@@ -354,14 +356,38 @@ class ClLikeFastBias(ClLike):
                 ddchi2 += 2*np.sum(ic_r[:, None, None]*ddt, axis=0) # (ndata), (ndata, nbias, nbias)
             return ddchi2
 
-        p = minimize(chi2_f, self.bias0, method='Newton-CG', jac=True,
-                     hess=lambda b: hessian_chi2_f(b))
-        chi2 = p.fun
+        if self.n_minim == 1:
+            b0s = np.array([self.bias0])
+        else:  # Generate starting point ~5% around bias0
+            b0s = self.bias0[None, :]*(1+np.random.randn(self.n_minim, len(self.bias0))*0.05)
 
-        H = hessian_chi2_f(p.x, include_DF=self.bias_fisher_deriv2)
+        b_bfs = []
+        chi2_bfs = []
+        nfevs = []
+        for b0 in b0s:
+            p = minimize(chi2_f, b0, method='Newton-CG', jac=True,
+                         hess=lambda b: hessian_chi2_f(b))
+            chi2 = p.fun
+            b_bfs.append(p.x)
+            chi2_bfs.append(p.fun)
+            nfevs.append(p.nfev)
+        b_bfs = np.array(b_bfs)
+        chi2_bfs = np.array(chi2_bfs)
+        nfevs = np.array(nfevs)
+        i_best = np.argmin(chi2_bfs)
+        # Choose best minimum
+        b_bf = b_bfs[i_best]
+        chi2 = chi2_bfs[i_best]
+        nfev = np.sum(nfevs)
+        #print(f"Best-fit {b_bf}")
+        #print(chi2_bfs)
+        #for i in range(len(b_bf)):
+        #    print(b_bf[i], b_bfs[:, i])
+
+        H = hessian_chi2_f(b_bf, include_DF=self.bias_fisher_deriv2)
         ev = np.linalg.eigvals(0.5*H)
         if np.any(ev <= 0):  # Use positive-definite version if needed
-            H = hessian_chi2_f(p.x, include_DF=False)
+            H = hessian_chi2_f(b_bf, include_DF=False)
             ev = np.linalg.eigvals(0.5*H)
         dchi2 = np.sum(np.log(ev))
         if np.isnan(dchi2):
@@ -370,7 +396,7 @@ class ClLikeFastBias(ClLike):
             print(H)
             exit(1)
 
-        return chi2, dchi2, p
+        return chi2, dchi2, b_bf, nfev
 
     def get_cl_theory_sacc(self,bias,global_bias):
         # Create empty file

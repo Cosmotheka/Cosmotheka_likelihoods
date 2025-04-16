@@ -10,7 +10,7 @@ import pyccl as ccl
 
 
 # Read in the yaml file
-config_fn = 'wisc.yaml'
+config_fn = '../papers/S8z_lowz/yamls/wisc_noprof.yaml'
 with open(config_fn, "r") as fin:
     info = yaml.load(fin, Loader=yaml.FullLoader)
 model = get_model(info)

@@ -1,0 +1,140 @@
+force: True
+# resume: True
+
+sampler:
+  mcmc:
+    max_tries: 1000
+    max_samples: 10000
+    Rminus1_stop: 0.01
+
+params:
+  sigma8:
+    prior:
+      min: 0.4
+      max: 1.2
+    ref:
+      dist: norm
+      loc: 0.81
+      scale: 0.01
+    latex: \sigma_8
+    proposal: 0.01
+
+  Omega_m:
+    prior:
+      min: 0.1
+      max: 0.5
+    ref:
+      dist: norm
+      loc: 0.31
+      scale: 0.01
+    latex: \Omega_m
+    proposal: 0.01
+
+  omega_b: 0.02236
+  omh3: 0.09633
+  n_s: 0.9649
+  m_nu: 0.
+
+  # Bias parameters. Note that you can declare
+  # all nuisance parameters as
+  # `<prefix>_param_name` where `<prefix>` is
+  # whatever you've chosen as `input_params_prefix`
+  # further down. All such parameters will
+  # automatically be understood by cobaya and
+  # assigned to your likelihood.
+  # First-order bias
+
+  dchi2_marg:
+  S8:
+  Omega_c:
+  h:
+
+  cll_LOWZ__1_b1:
+  cll_LOWZ__1_b2:
+  cll_LOWZ__1_bs:
+  cll_LOWZ__1_bk2:
+  nfev:
+
+# CCL settings    
+theory:
+  cl_like.CCL_custom:
+    baryons_pk: nobaryons
+    matter_pk: halofit
+    transfer_function: boltzmann_camb
+  cl_like.Pk:
+    #bias_model: "EulerianPT"
+    bias_model: "BaccoHEFT"
+    zmax_pks: 1.5
+  cl_like.Limber:
+    nz_model: "NzShift"
+    ia_model: "IADESY1"
+    input_params_prefix: "limber"
+    sample_type: center
+  cl_like.ClFinal:   
+    input_params_prefix: cll
+    shape_model: ShapeMultiplicative
+
+# Likelihood settings
+likelihood:
+  cl_like.ClLikeFastBias:
+    input_file: ../../saccs/cls_ws8_3bin_covNG.fits
+    bins:
+      - name: CMBK
+      - name: LOWZ__1
+
+    # Include Laplace term?
+    bias_laplace: False
+
+    # Include second derivatives in Laplace term?
+    bias_fisher_deriv2: False
+
+    # Update start point of minimiser every time?
+    bias_update_every: False
+
+    # List all 2-points that should go into the
+    # data vector. For now we only include
+    # galaxy-galaxy auto-correlations, but all
+    # galaxy-shear and shear-shear correlations.
+    bias_params:
+      cll_LOWZ__1_b1:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.2
+      cll_LOWZ__1_b2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      cll_LOWZ__1_bs:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+      cll_LOWZ__1_bk2:
+        prior:
+          mean: 0.0
+          sigma: 100
+        value: 0.0
+
+    twopoints:
+      - bins: [LOWZ__1, CMBK]  # cross-correlazione 
+        lmin: 20
+      - bins: [LOWZ__1, LOWZ__1] 
+        lmin: 20
+        
+    defaults:
+      # Scale cut for galaxy clustering
+      # (ignored for shear-shear)
+      kmax: 0.42 # Mpc^{-1}
+      # These one will apply to all power
+      # spectra (unless the lmax corresponding
+      # to the chosen kmax is smaller).
+      lmin: 0
+      lmax: 2000
+      
+      cl_00:
+        lmin: 20
+
+debug: False
+output: ../papers/S8z_lowz/chains/wisc_bin1
