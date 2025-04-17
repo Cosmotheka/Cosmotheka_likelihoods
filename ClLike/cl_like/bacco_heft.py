@@ -94,7 +94,7 @@ class BaccoCalculatorHEFT(object):
             'wa': cosmo['wa']}
 
         if np.isnan(cosmo['A_s']):
-            s8tot = cosmo.sigma8()
+            s8tot = cosmo['sigma8']
             A_s_fid = 2.1E-9
             s8tot_fid = self.mpk.get_sigma8(cold=False, A_s=A_s_fid, **cospar)
             A_s = (s8tot / s8tot_fid)**2 * A_s_fid
@@ -154,19 +154,24 @@ class BaccoCalculatorHEFT(object):
                 par_0[par] = val
         return in_bounds, par_0
 
-    def _get_lbias_pks_exact(self, cospar, mm_only=False):
-        cosmo = self._bacco2ccl(cospar, tf='eisenstein_hu')
-        h = cosmo['h']
+    def _get_lbias_pks_exact(self, cospar, mm_only=False, lpt_only=False):
+        # Get HALOFIT Pk if needed
+        if not lpt_only:
+            cosmo = self._bacco2ccl(cospar, tf='eisenstein_hu')
+            h = cosmo['h']
+            k_ccl_here = self.kh_bacco * h
+            pk_mm = np.array([ccl.nonlin_matter_power(cosmo, k_ccl_here, a)
+                              for a in self.a_s])*h**3
 
-        k_ccl_here = self.kh_bacco * h
-        pk_mm = np.array([ccl.nonlin_matter_power(cosmo, k_ccl_here, a)
-                          for a in self.a_s])*h**3
+        # Get HEFT Pks if needed
+        if not mm_only:
+            cospar_and_a = self._bacco_pars_a(cospar, self.a_s)
+            pks = np.array(self.lbias.get_nonlinear_pnn(**cospar_and_a)[1])
+
         if mm_only:
             return pk_mm
-
-        cospar_and_a = self._bacco_pars_a(cospar, self.a_s)
-        pks = np.array(self.lbias.get_nonlinear_pnn(**cospar_and_a)[1])
-
+        if lpt_only:
+            return pks
         return pk_mm, pks
 
     def _get_ccl_pks_from_bacco_pks(self, cosmo, pks):
@@ -231,12 +236,13 @@ class BaccoCalculatorHEFT(object):
         cospar = self._ccl2bacco(cosmo)
         in_bounds, cospar_0 = self._get_out_of_bounds(cospar)
 
-        pk_mm_0, pks_0 = self._get_lbias_pks_exact(cospar_0)
+        pks_0 = self._get_lbias_pks_exact(cospar_0, lpt_only=True)
 
         # Within bounds, no parameter extrapolation
         if np.all(list(in_bounds.values())):
             return self._get_ccl_pks_from_bacco_pks(cosmo, pks_0)
 
+        pk_mm_0 = self._get_lbias_pks_exact(cospar_0, mm_only=True)
         # Sign
         sign = np.sign(pks_0)
         lx = np.log(np.fabs(pks_0)/pk_mm_0)
