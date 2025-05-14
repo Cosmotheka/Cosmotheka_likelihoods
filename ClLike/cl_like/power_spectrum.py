@@ -269,9 +269,8 @@ class Pk(Theory):
                 pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
 
         # Add baryon correction
-        baryons_in_cosmo = 'nobaryons'
-        #cosmo._config_init_kwargs['baryons_power_spectrum']
-        if self.use_baryon_boost or (baryons_in_cosmo != 'nobaryons'):
+        baryons_in_cosmo = cosmo._config_init_kwargs['baryonic_effects']
+        if self.use_baryon_boost or (baryons_in_cosmo is not None):
             if self.is_PT_bias and (self.bias_model == 'BaccoPT') and \
                 (self.baryon_model == 'Bacco'):
                 # TODO: This assumes LCDM, but as above. BACCOemu is
@@ -279,18 +278,20 @@ class Pk(Theory):
                 # pk's? At the moment they don't have the correction.
                 pkd['pk_ww'] = ptc.get_pk('mm_sh_sh', pnl=pkmm, cosmo=cosmo)
                 pkd['Sk'] = ptc.get_pk('Sk')
-            elif (self.baryon_model == 'CCL_BCM') or \
-                (baryons_in_cosmo == 'bcm'):
+            elif isinstance(baryons_in_cosmo,
+                            ccl.baryons.baryons_base.Baryons):
+                print("################", baryons_in_cosmo)
+                # This can be optimized using BaryonsClass.update_params()
                 if self.is_PT_bias:
                     # The correction happens in place
                     # If bias is Linear, then the pk already has the baryon
                     # boost applied.
-                    ccl.bcm.bcm_correct_pk2d(cosmo, pkd['pk_ww'])
+                    pkd['pk_ww'] = cosmo.baryons.include_baryonic_effects(cosmo, pkd['pk_ww'])
                 a_arr, lnk, pkww = pkd['pk_ww'].get_spline_arrays()
                 k = np.exp(lnk)
                 Sk = np.zeros_like(pkww)
                 for i, ai in enumerate(a_arr):
-                    Sk[i] = ccl.bcm.bcm_model_fka(cosmo, k, ai)
+                    Sk[i] = cosmo.baryons.boost_factor(cosmo, k, ai)
                 pkd['Sk'] = ccl.Pk2D(a_arr=a_arr, lk_arr=lnk,
                                      pk_arr=np.log(Sk), is_logp=True)
             elif self.baryon_model == 'Amon-Efstathiou':
@@ -300,7 +301,7 @@ class Pk(Theory):
                 boost = np.zeros_like(pklin)
                 pknonlin = np.zeros_like(pklin)
                 for i, ai in enumerate(a):
-                    pknonlin[i] = pkd['pk_ww'].eval(k, ai, cosmo)
+                    pknonlin[i] = pkd['pk_ww'](k, ai, cosmo)
                     boost[i] = pknonlin[i] - pklin[i]
 
                 pkb = pklin + bcmpar['A_AE']*boost

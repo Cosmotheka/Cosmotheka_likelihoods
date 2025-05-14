@@ -260,7 +260,7 @@ def test_get_pks_muSigma(non_linear, pars_smg):
         k, pk_mm = get_pk_lin(cosmo, ["delta_matter", "delta_matter"], z)
         pk_mm = pk_mm[k < kmax]
         k = k[k < kmax]
-        pk_mm2 = pk_data["pk_mm"].eval(k, 1/(1+z))
+        pk_mm2 = pk_data["pk_mm"](k, 1/(1+z))
 
         # from matplotlib import pyplot as plt
         # plt.loglog(k, pk_mm/pk_mm2)
@@ -274,14 +274,14 @@ def test_get_pks_muSigma(non_linear, pars_smg):
         k, pk_mw = get_pk_lin(cosmo, ["delta_matter", "weyl"], z)
         pk_mw = pk_mw[k < kmax]
         k = k[k < kmax]
-        pk_mw2 = pk_data["pk_mw"].eval(k, 1/(1+z))
+        pk_mw2 = pk_data["pk_mw"](k, 1/(1+z))
         assert pk_mw == pytest.approx(pk_mw2, 1e-2)
 
         # Not sure why the precission for Pk_ww is only 1%
         k, pk_ww = get_pk_lin(cosmo, ["weyl", "weyl"], z)
         pk_ww = pk_ww[k < kmax]
         k = k[k < kmax]
-        pk_ww2 = pk_data["pk_ww"].eval(k, 1/(1+z))
+        pk_ww2 = pk_data["pk_ww"](k, 1/(1+z))
         assert pk_ww == pytest.approx(pk_ww2, 1e-2)
 
     cosmo.struct_cleanup()

@@ -5,7 +5,9 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import os
 
-bcm = ccl.baryons.BaryonsSchneider15(log10Mc=14, eta_b=0.6, k_s=50,)
+
+extra_parameters = {"camb": {"halofit_version": "mead2020_feedback",
+                             "HMCode_logT_AGN": 7.8}}
 
 cosmo = ccl.Cosmology(Omega_c=0.26,
                       Omega_b=0.05,
@@ -13,8 +15,11 @@ cosmo = ccl.Cosmology(Omega_c=0.26,
                       n_s=0.96,
                       A_s=2.1265e-9,
                       m_nu = 0.15,
-                      baryonic_effects=bcm,
-                      matter_power_spectrum='halofit')
+                      matter_power_spectrum='camb',
+                      extra_parameters=extra_parameters)
+
+Omega_m = 0.26 + 0.05 + 0.15/(93.14 * 0.67**2)
+print("#######", cosmo.sigma8(), Omega_m, cosmo.sigma8()*np.sqrt(Omega_m/0.3))
 
 
 zs = np.linspace(0., 1.5, 1024)
@@ -123,5 +128,5 @@ for i1, i2, ix, typ in get_pairs():
     plt.loglog()
     plt.title(f"{tracer_names[i1]}, {tracer_names[i2]}")
 plt.show()
-s.save_fits("sh_bcm_baryons.fits", overwrite=True)
-os.system('gzip sh_bcm_baryons.fits')
+s.save_fits("sh_baryons_hmcode2020_TAGN.fits", overwrite=True)
+os.system('gzip sh_baryons_hmcode2020_TAGN.fits')

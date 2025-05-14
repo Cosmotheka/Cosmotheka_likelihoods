@@ -197,7 +197,7 @@ def test_baryons_Sk(ptc):
     a_arr, lnk, Sk2 = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()
     k = np.exp(lnk)
     for i, ai in enumerate(a_arr):
-        assert ptc.get_pk('Sk').eval(k, ai) == pytest.approx(Sk2[i], rel=1e-3)
+        assert ptc.get_pk('Sk')(k, ai) == pytest.approx(Sk2[i], rel=1e-3)
 
 
 def test_get_pars_and_a_for_bacco(ptc):

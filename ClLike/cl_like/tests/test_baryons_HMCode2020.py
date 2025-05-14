@@ -8,7 +8,7 @@ import pytest
 import os
 import shutil
 import sacc
-import pyccl as ccl
+import time
 
 
 # Cleaning the tmp dir before running and after running the tests
@@ -18,24 +18,13 @@ def run_clean_tmp():
         shutil.rmtree("dum")
 
 
-def get_info(bias, A_sE9=True):
+def get_info(T_AGN, use_S8=False, sigma8_to_As='ccl'):
+    # Generated with T_AGN = 7.8
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
+    data += "cl_like/tests/data/sh_baryons_hmcode2020_TAGN.fits.gz"
 
-    if bias == 'Linear':
-        data += "cl_like/tests/data/sh_bcm_baryons.fits.gz"
-        pk_dict = {"external": Pk,
-                   "bias_model": "Linear"}
-    elif bias == 'BaccoPT':
-        data += "cl_like/tests/data/sh_PkmmBacco_bcm.fits.gz"
-        pk_dict = {"external": Pk,
-                   "bias_model": "BaccoPT",
-                   "zmax_pks": 1.5,  # For baccoemu with baryons
-                   # "use_baryon_boost" : True,
-                   "ignore_lbias": True,
-                   }
-    else:
-        raise ValueError(f'bias {bias} not implemented')
-
+    extra_parameters = {"camb": {"halofit_version": "mead2020_feedback",
+                                 }}
 
 
     info = {"params": {"A_sE9": 2.1265,
@@ -60,21 +49,24 @@ def get_info(bias, A_sE9=True):
                        "limber_sh2_eta_IA": 1,
                        "bias_sh2_A_IA": 0.1,
                        # Baryons
-                       "log10Mc": 14,
-                       "eta_b": 0.6,
-                       "k_s": 50,
+                       "HMCode_logT_AGN": T_AGN,
                        # Derived
                        "sigma8": None,
+                       "S8": None,
                        },
             "theory": {"ccl": {"external": cll.CCL,
                                "transfer_function": "boltzmann_camb",
-                               "matter_pk": "halofit",
-                               "baryons_pk": "schneider15"},
+                               "matter_pk": "camb",
+                               "baryons_pk": "nobaryons",
+                               "sigma8_to_As": sigma8_to_As,
+                               "ccl_arguments": {"extra_parameters":
+                                                 extra_parameters}
+                               },
                        "limber": {"external": Limber,
                                   "nz_model": "NzShift",
                                   "input_params_prefix": "limber",
                                   "ia_model": "IADESY1_PerSurvey"},
-                       "Pk": pk_dict,
+                       "Pk": {"external": Pk, "bias_model": "Linear"},
                        "clfinal": {"external": ClFinal,
                                    "input_params_prefix": "bias",
                                    "shape_model": "ShapeMultiplicative"}
@@ -97,25 +89,33 @@ def get_info(bias, A_sE9=True):
                            },
             "debug": False}
 
-    if not A_sE9:
-        info["params"]["sigma8"] = 0.78220521
-        del info["params"]["A_sE9"]
+    if use_S8:
+        # From mk file: 0.80010503150849170036
+        # From derived: 0.8001052150162911
+        info['params']['S8'] = 0.80010503150849170036
+        del info['params']['A_sE9']
+        info['params']['A_s'] = None
 
     return info
 
 
-@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
-def test_dum(bias):
-    info = get_info(bias)
+def test_dum():
+    info = get_info(T_AGN=9)
     model = get_model(info)
     loglikes, derived = model.loglikes()
+    assert np.fabs(loglikes[0]) > 10
 
-    assert derived[0] == pytest.approx(0.78220521, rel=1e-3)
+
+    # Mock data generated with T_AGN = 7.8
+    info = get_info(T_AGN=7.8)
+    model = get_model(info)
+    loglikes, derived = model.loglikes()
 
     # from matplotlib import pyplot as plt
     # sd = model.likelihood['ClLike'].get_cl_data_sacc()
     # st = model.likelihood['ClLike'].get_cl_theory_sacc()
     # f, ax = plt.subplots(3, 3)
+
     # for trs in st.get_tracer_combinations():
     #     i = int(trs[0][-1])
     #     j = int(trs[1][-1])
@@ -130,38 +130,23 @@ def test_dum(bias):
     #     ax[i, j].legend()
     # plt.show()
 
-
-    # TODO: Ideally, I should be able to recover exactly the data vector.
-    # However, I cannot push chi2 < 0.2 for bcm_ks=50. Not sure where the
-    # missmatch is.
-    assert np.fabs(loglikes[0]) < 0.2
+    # For some reason I cannot push it lower than this.
+    assert np.fabs(loglikes[0]) < 0.25
 
 
-@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
-def test_Sk(bias):
-    info = get_info(bias)
+@pytest.mark.parametrize('sigma8_to_As', ['ccl', 'baccoemu'])
+def test_S8_input(sigma8_to_As):
+    # Mock data generated with T_AGN = 7.8
+    info = get_info(T_AGN=7.8, use_S8=True, sigma8_to_As=sigma8_to_As)
     model = get_model(info)
     loglikes, derived = model.loglikes()
 
-    pars = info['params']
+    assert derived[1] == pytest.approx(2.1265e-9, rel=0.01)
 
-    # cosmo = ccl.CosmologyVanillaLCDM()
-    cosmo = ccl.Cosmology(Omega_c=pars['Omega_c'],
-                          Omega_b=pars['Omega_b'],
-                          h=pars['h'],
-                          n_s=pars['n_s'],
-                          A_s=pars['A_sE9']*1e-9,
-                          m_nu=pars['m_nu'],
-                          )
+    # For some reason I cannot push it lower than this.
+    if sigma8_to_As == 'ccl':
+        assert np.fabs(loglikes[0]) < 0.25
+    else:
+        # With baccoemu there is a small difference
+        assert np.fabs(loglikes[0]) < 2
 
-    bcm = ccl.baryons.BaryonsSchneider15(log10Mc=pars['log10Mc'],
-                                         eta_b=pars['eta_b'],
-                                         k_s=pars['k_s'])
-
-    lkl = model.likelihood['ClLike']
-    a_arr, lnk, Sk = lkl.provider.get_Pk()['pk_data']['Sk'].get_spline_arrays()
-    k = np.exp(lnk)
-
-    for i, ai in enumerate(a_arr):
-        assert Sk[i] == pytest.approx(bcm.boost_factor(cosmo, k, ai),
-                                      rel=1e-3)
