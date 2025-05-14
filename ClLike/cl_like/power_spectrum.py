@@ -32,6 +32,14 @@ except ImportError as e:
     BACCO_exception = e
     HAVE_BACCO = False
 
+try:
+    from .bacco_heft import BaccoCalculatorHEFT
+    HAVE_BACCOHEFT = True
+    BACCOHEFT_exception = None
+except ImportError as e:
+    BACCOHEFT_exception = e
+    HAVE_BACCOHEFT = False
+
 
 class Pk(Theory):
     """Computes the power spectrum"""
@@ -61,7 +69,7 @@ class Pk(Theory):
 
     def initialize(self):
         # Bias model
-        self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT', 'BaccoPT']
+        self.is_PT_bias = self.bias_model in ['LagrangianPT', 'EulerianPT', 'BaccoPT', 'BaccoHEFT']
         # Pk sampling
         self.a_s_pks = 1./(1+np.linspace(0., self.zmax_pks, self.nz_pks)[::-1])
         self.nk_pks = int((self.l10k_max_pks - self.l10k_min_pks) *
@@ -110,6 +118,8 @@ class Pk(Theory):
             raise EPT_exception
         elif self.bias_model == 'BaccoPT' and not HAVE_BACCO:
             raise BACCO_exception
+        elif self.bias_model == 'BaccoHEFT' and not HAVE_BACCOHEFT:
+            raise BACCOHEFT_exception
 
         if self.baryon_model not in ['', 'Bacco', 'CCL_BCM', 'Amon-Efstathiou']:
             raise ValueError("baryon_model must be one of '', 'Bacco' or "
@@ -134,6 +144,9 @@ class Pk(Theory):
             if self.baryon_model == 'Bacco':
                 raise ValueError("baryon_model 'Bacco' can only be used with "
                                  "bias_model 'BaccoPT' at the moment.")
+
+        if self.bias_model == 'BaccoHEFT':
+            self.baccoheft_calc = BaccoCalculatorHEFT()
 
     def must_provide(self, **requirements):
         if "Pk" not in requirements:
@@ -229,6 +242,8 @@ class Pk(Theory):
                                     k_filter=k_filter)
             elif self.bias_model == 'BaccoPT':
                 ptc = self.bacco_calc
+            elif self.bias_model == 'BaccoHEFT':
+                ptc = self.baccoheft_calc
             else:
                 raise NotImplementedError("Not yet: " + self.bias_model)
             ptc.update_pk(cosmo, bcmpar=bcmpar)
