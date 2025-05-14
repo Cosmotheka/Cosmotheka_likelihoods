@@ -285,7 +285,7 @@ class ClLikeFastBias(ClLike):
     # 2nd-derivative in Fisher term?
     bias_fisher_deriv2: bool = False
     # Update start point every time?
-    bias_update_every: bool = False
+    bias_update_every_step: bool = False
     # Number of minimiser starting points
     n_minim: int = 1
 
@@ -309,7 +309,7 @@ class ClLikeFastBias(ClLike):
         # Calculate chi2
         chi2, dchi2, biases, nfev = self._get_chi2(**pars)
 
-        if self.bias_update_every or (not self.updated_bias0):
+        if self.bias_update_every_step or (not self.updated_bias0):
             self.bias0 = biases.copy()
             self.updated_bias0 = True
 
@@ -327,7 +327,6 @@ class ClLikeFastBias(ClLike):
 
     def _get_chi2(self, **pars):
         bias_names, bias_info = self.provider.get_bias_info()
-        assert bias_names == self.bias_names
         global_bias = {name: 1 for name in self.bin_properties.keys()}
 
         def chi2_f(bias):
@@ -349,7 +348,7 @@ class ClLikeFastBias(ClLike):
             ddchi2 = 2*np.sum(g[:, None, :]*ic_g[:, :, None], axis=0) # (ndata, _, nbias) , (ndata, nbias, _) -> (nbias, nbias)
             # Bias prior
             ddchi2 += 2*np.diag(self.bias_pr_isigma2)
-            if include_DF:
+            if include_DF:  # Calculate second-derivative term? Eq. 16 of 2301.11895
                 ddt = self.provider.get_cl_theory_dderiv(bias, global_bias)
                 r = t-self.data_vec
                 ic_r = np.dot(self.inv_cov, r)
@@ -398,7 +397,7 @@ class ClLikeFastBias(ClLike):
 
         return chi2, dchi2, b_bf, nfev
 
-    def get_cl_theory_sacc(self,bias,global_bias):
+    def get_cl_theory_sacc_bias(self, bias, global_bias):
         # Create empty file
         s = sacc.Sacc()
 

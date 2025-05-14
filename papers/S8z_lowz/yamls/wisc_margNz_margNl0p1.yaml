@@ -100,7 +100,7 @@ likelihood:
     bias_fisher_deriv2: False
 
     # Update start point of minimiser every time?
-    bias_update_every: False
+    bias_update_every_step: False
 
     # Number of mininiser starting points
     n_minim: 10

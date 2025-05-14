@@ -184,7 +184,6 @@ class ClFinal(Theory):
                 cls_dderiv[inds] = np.transpose(cls_hess, axes=(2, 0, 1))
         return cls_dderiv # (ndata, nbias)
 
-
     def _get_bias_info(self, ia_model, bias_model, is_PT_bias):
         # Extract additional per-sample information from the sacc
         # file needed for this likelihood.
