@@ -1,0 +1,26 @@
+name: cosmotheka
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10,<3.13
+  - pip
+  - scipy
+  - numpy
+  - pytest
+  - pyccl>3
+  - sacc>=0.7
+  - camb
+  - mpi4py
+  # HDF5 handling (required by baccoemu?)
+  - deepdish
+  # Documentation
+  - sphinx
+  - sphinx-autoapi
+  - sphinx_rtd_theme
+  # Optional: documentation and extra tools
+  - pip:
+    - cobaya>=3.0
+    - fast-pt
+    # Pip does not want to install velocileptors due to old scikit-learn library
+    # - velocileptors @ git+https://github.com/sfschen/velocileptors.git@master
+    - baccoemu @ git+https://bitbucket.org/rangulo/baccoemu.git@master
