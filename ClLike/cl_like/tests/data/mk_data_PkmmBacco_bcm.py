@@ -59,6 +59,28 @@ pk_linear = {'a': a, 'k': k_emu, 'delta_matter:delta_matter': pklin_emu}
 pk_nonlinear = {'a': a, 'k': k_emu, 'delta_matter:delta_matter': pk_emu}
 
 # np.savez_compressed('pk_nonlinear_baryons.npz', **pk_nonlinear)
+cosmotmp = ccl.Cosmology(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
+                         Omega_b=cosmopars['omega_baryon'],
+                         h=cosmopars['hubble'],
+                         n_s=cosmopars['ns'],
+                         A_s=cosmopars['A_s'],
+                         m_nu = cosmopars['neutrino_mass'],
+                         w0=cosmopars['w0'],
+                         wa=cosmopars['wa'],
+                         matter_power_spectrum="halofit",
+                         )
+
+
+pk2d = ccl.Pk2D(a_arr=pk_nonlinear['a'], lk_arr=np.log(pk_nonlinear['k']),
+                pk_arr=np.log(pk_nonlinear['delta_matter:delta_matter']),
+                is_logp=True)
+
+# We need to create the Baryons class in CCLv3
+BaryonsClass = ccl.baryons.BaryonsSchneider15(log10Mc=14, eta_b=0.6, k_s=50)
+pk2d = BaryonsClass.include_baryonic_effects(cosmotmp, pk2d)
+a_arr, lk_arr, pk_arr= pk2d.get_spline_arrays()
+k_arr = np.exp(lk_arr)
+pk_nonlinear = {'a': a_arr, 'k': k_arr, 'delta_matter:delta_matter': pk_arr}
 
 cosmo = ccl.CosmologyCalculator(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
                                 Omega_b=cosmopars['omega_baryon'],
@@ -70,21 +92,6 @@ cosmo = ccl.CosmologyCalculator(Omega_c=cosmopars['omega_cold'] - cosmopars['ome
                                 wa=cosmopars['wa'],
                                 pk_linear=pk_linear,
                                 pk_nonlin=pk_nonlinear)
-
-cosmobcm = ccl.Cosmology(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
-                         Omega_b=cosmopars['omega_baryon'],
-                         h=cosmopars['hubble'],
-                         n_s=cosmopars['ns'],
-                         A_s=cosmopars['A_s'],
-                         m_nu = cosmopars['neutrino_mass'],
-                         w0=cosmopars['w0'],
-                         wa=cosmopars['wa'],
-                         matter_power_spectrum="halofit",
-                         bcm_log10Mc=14,
-                         bcm_etab=0.6,
-                         bcm_ks=50)
-
-ccl.bcm.bcm_correct_pk2d(cosmobcm, cosmo.get_nonlin_power())
 
 # Compute the Cells. This code is the same as in mk_data_baryons.py
 zs = np.linspace(0., 1.5, 1024)

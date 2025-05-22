@@ -69,7 +69,7 @@ print('sigma8 =', mpk.get_sigma8(**combined_pars, cold=False)[0])
 pk_linear = {'a': a, 'k': k_emu, 'delta_matter:delta_matter': pklin_emu}
 pk_nonlinear = {'a': a, 'k': k_emu, 'delta_matter:delta_matter': pk_emu}
 
-np.savez_compressed('pk_nonlinear_baryons.npz', **pk_nonlinear)
+# np.savez_compressed('pk_nonlinear_baryons.npz', **pk_nonlinear)
 
 cosmo = ccl.CosmologyCalculator(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
                                 Omega_b=cosmopars['omega_baryon'],
@@ -86,8 +86,8 @@ cosmo = ccl.CosmologyCalculator(Omega_c=cosmopars['omega_cold'] - cosmopars['ome
 
 pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
 apk2d, logkpk2d, pkpk2d = pkmm.get_spline_arrays()
-np.savez_compressed('pk_nonlinear_baryons_ccl.npz', a=apk2d, k=np.exp(logkpk2d),
-                    pk=pkpk2d)
+# np.savez_compressed('pk_nonlinear_baryons_ccl.npz', a=apk2d, k=np.exp(logkpk2d),
+#                     pk=pkpk2d)
 
 
 

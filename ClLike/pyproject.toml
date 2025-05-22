@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cl_like"
+name = "Cosmotheka"
 authors = [
   {name="Check README"}
 ]
