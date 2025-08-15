@@ -118,7 +118,7 @@ class Pk(Theory):
             raise EPT_exception
         elif self.bias_model == 'BaccoPT' and not HAVE_BACCO:
             raise BACCO_exception
-        elif self.bias_model == 'BaccoHEFT' and not HAVE_BACCOHEFT:
+        elif self.bias_model in ['BaccoHEFT', 'BaccoHEFT_lin'] and not HAVE_BACCOHEFT:
             raise BACCOHEFT_exception
 
         if self.baryon_model not in ['', 'Bacco', 'CCL_BCM', 'Amon-Efstathiou']:
@@ -145,7 +145,8 @@ class Pk(Theory):
                 raise ValueError("baryon_model 'Bacco' can only be used with "
                                  "bias_model 'BaccoPT' at the moment.")
 
-        if self.bias_model == 'BaccoHEFT':
+        if (self.bias_model == 'BaccoHEFT') or (self.bias_model == 'BaccoHEFT_lin'):
+            print('Bias Model is HEFT')
             self.baccoheft_calc = BaccoCalculatorHEFT()
 
     def must_provide(self, **requirements):
@@ -212,7 +213,7 @@ class Pk(Theory):
             pkd['pk_d1w'] = pkd['pk_wd1'] = pkwm
             pkd['pk_mw'] = pkd['pk_wm'] = pkwm
             pkd['pk_ww'] = pkww
-        elif self.is_PT_bias:
+        elif (self.is_PT_bias) or (self.bias_model=='BaccoHEFT_lin'):
             if ('delta_matter:Weyl' in cosmo._pk_nl) or \
                     ('Weyl:Weyl' in cosmo._pk_nl):
                 raise RuntimeError('Pk involving the Weyl potential not '
@@ -242,7 +243,7 @@ class Pk(Theory):
                                     k_filter=k_filter)
             elif self.bias_model == 'BaccoPT':
                 ptc = self.bacco_calc
-            elif self.bias_model == 'BaccoHEFT':
+            elif (self.bias_model == 'BaccoHEFT') or (self.bias_model == 'BaccoHEFT_lin') :
                 ptc = self.baccoheft_calc
             else:
                 raise NotImplementedError("Not yet: " + self.bias_model)

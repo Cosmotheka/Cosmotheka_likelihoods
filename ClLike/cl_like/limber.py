@@ -105,7 +105,7 @@ class Limber(Theory):
                 # Tracer for the unbiased component
                 t0 = None
                 t0n = [None]
-                if self.bias_model in ['LagrangianPT', 'BaccoPT', 'BaccoHEFT']:
+                if self.bias_model in ['LagrangianPT', 'BaccoPT', 'BaccoHEFT', 'BaccoHEFT_lin']:
                     t0 = tr
                     t0n = ["m"]
                 # Tracers for the biased components
