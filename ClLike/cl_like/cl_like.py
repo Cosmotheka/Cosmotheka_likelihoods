@@ -398,6 +398,10 @@ class ClLikeFastBias(ClLike):
         return chi2, dchi2, b_bf, nfev
 
     def get_cl_theory_sacc_bias(self, bias, global_bias):
+        '''
+        In the standard configuration, global bias is a DICTIONARY, bias is a NUMPY ARRAY
+        default should be global_bias = {name: 1 for name in self.bin_properties.keys()}
+        '''
         # Create empty file
         s = sacc.Sacc()
 
