@@ -62,7 +62,7 @@ class BaccoCalculatorHEFT(object):
         self.k_ccl = np.geomspace(1E-3, 10, self.nk_ccl)
 
         self.dx_par = {'omega_cold': 0.01,
-                       'omega_baryon': 0.01,
+                       'omega_baryon': 0.002,
                        'sigma8_cold': 0.01,
                        'ns': 0.01,
                        'hubble': 0.01,
@@ -147,9 +147,9 @@ class BaccoCalculatorHEFT(object):
             in_bounds[par] = (val >= val0) & (val <= valf)
             if not in_bounds[par]:
                 if val < val0:
-                    par_0[par] = val0+self.dx_par[par]
+                    par_0[par] = val0+self.dx_par[par]*1.1
                 else:
-                    par_0[par] = valf-self.dx_par[par]
+                    par_0[par] = valf-self.dx_par[par]*1.1
             else:
                 par_0[par] = val
         return in_bounds, par_0
