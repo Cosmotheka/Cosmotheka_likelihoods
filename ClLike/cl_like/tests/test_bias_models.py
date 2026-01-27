@@ -9,6 +9,7 @@ import os
 import shutil
 import sacc
 from cobaya import run
+from cobaya.log import LoggedError
 
 
 OUTDIR = 'dum'
@@ -431,3 +432,15 @@ def test_camb_hmcode_dum(case):
 
 
     assert np.abs(loglikes[0] / loglikes2[0] - 1) < 1e-5
+
+
+def test_duplicated_data_points_error():
+    info = get_info('Linear')
+
+    # Adding duplicated data points
+    info['likelihood']['ClLike']['twopoints'].append(
+        {"bins": ["gc0", "sh0"]}
+    )
+
+    with pytest.raises(LoggedError):
+        get_model(info)
