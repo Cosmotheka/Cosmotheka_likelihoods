@@ -169,6 +169,13 @@ class ClLike(Likelihood):
             indices += list(ind)
             id_sofar += c_ell.size
         indices = np.array(indices)
+        # Check that we have not duplicated indices
+        if len(indices) != len(set(indices)):
+            raise LoggedError(self.log,
+                              "Some data points have been included more "
+                              "than once in the data vector. Please check "
+                              "your scale cuts and two-point function "
+                              "definitions.")
         # Reorder data vector and covariance
         self.data_vec = s.mean[indices]
         self.cov = s.covariance.dense[indices][:, indices]
