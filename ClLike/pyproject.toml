@@ -48,7 +48,7 @@ lpt = [
 baccoemu = [
     "baccoemu @ git+https://bitbucket.org/rangulo/baccoemu.git@master",
     # I think this is required by baccoemu and not automatically installed
-    "deepdish"  
+    "deepdish"
 ]
 full = [
     "baccoemu @ git+https://bitbucket.org/rangulo/baccoemu.git@master",
@@ -59,6 +59,9 @@ full = [
     "sphinx-autoapi",
     "sphinx_rtd_theme",
 ]
+
+[tool.setuptools]
+packages = ["cl_like"]
 
 [project.urls]
 "Homepage" = "https://github.com/xC-ell/xCell-likelihoods"
