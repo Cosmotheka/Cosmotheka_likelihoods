@@ -18,9 +18,8 @@ class BaccoCalculator(object):
     """
     def __init__(self, log10k_min=np.log10(0.008), log10k_max=np.log10(0.5), nk_per_decade=20,
                  log10k_sh_sh_min=np.log10(0.0001), log10k_sh_sh_max=np.log10(50), nk_sh_sh_per_decade=20,
-                 a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None,
-                 nonlinear_emu_model_name=None, use_baryon_boost=False,
-                 ignore_lbias=False, allow_bcm_emu_extrapolation_for_shear=True,
+                 a_arr=None, nonlinear_emu_path=None, nonlinear_emu_details=None, nonlinear_emu_model_name='Angulo2021', use_baryon_boost=False,
+                 allow_bcm_emu_extrapolation_for_shear=True,
                  allow_halofit_extrapolation_for_shear=False,
                  allow_halofit_extrapolation_for_shear_on_k=False):
         nk_total = int((log10k_max - log10k_min) * nk_per_decade)
@@ -28,17 +27,13 @@ class BaccoCalculator(object):
         self.ks = np.logspace(log10k_min, log10k_max, nk_total)
         self.ks_sh_sh = np.logspace(log10k_sh_sh_min, log10k_sh_sh_max, nk_sh_sh_total)
         self.use_baryon_boost = use_baryon_boost
-        self.ignore_lbias = ignore_lbias
         self.allow_bcm_emu_extrapolation_for_shear = allow_bcm_emu_extrapolation_for_shear
         self.allow_halofit_extrapolation_for_shear = allow_halofit_extrapolation_for_shear
         self.allow_halofit_extrapolation_for_shear_on_k = allow_halofit_extrapolation_for_shear_on_k
 
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=UserWarning)
-            self.lbias = baccoemu.Lbias_expansion()
-            self.mpk = baccoemu.Matter_powerspectrum(nonlinear_emu_path=nonlinear_emu_path,
-                                                     nonlinear_emu_details=nonlinear_emu_details,
-                                                     model_name=nonlinear_emu_model_name)
+        self.mpk = baccoemu.Matter_powerspectrum(nonlinear_emu_path=nonlinear_emu_path,
+                                                 nonlinear_emu_details=nonlinear_emu_details,
+                                                 nonlinear_model_name=nonlinear_emu_model_name)
 
         # check with the currently loaded version of baccoemu if the a array is
         # all within the allowed ranges
@@ -161,17 +156,6 @@ class BaccoCalculator(object):
         h = cospar['hubble']
         cospar_and_a = self._get_pars_and_a_for_bacco(cospar, self.a_s)
 
-        # HEFT
-        k_for_bacco = self.ks/h
-        # TODO: Use lbias.emulator['nonlinear']['k'].max() instead of 0.75?
-        self.mask_ks_for_bacco = np.squeeze(np.where(k_for_bacco <= 0.75))
-        k_for_bacco = k_for_bacco[self.mask_ks_for_bacco]
-        if self.ignore_lbias:
-            self.pk_temp = None
-        else:
-            self.pk_temp = self.lbias.get_nonlinear_pnn(k=k_for_bacco,
-                                                        **cospar_and_a)[1]/h**3
-
         # Shear - Shear (and baryons)
         baryonic_boost = self.use_baryon_boost and (bcmpar is not None)
 
@@ -247,9 +231,7 @@ class BaccoCalculator(object):
         Sk = self.mpk.get_baryonic_boost(k=k_arr, **cospar_for_bcm)[1]
         return Sk
 
-    def get_pk(self, kind, **kwargs):
-        # kwargs only for compatibility with the others calculator classes
-
+    def get_pk(self, kind, pnl=None, cosmo=None, sub_lowk=False, alt=None):
         # Clarification:
         # We are expanding the galaxy overdensity as:
         #   1+ d_g = 1 + b1 d + b2 d2^2/2 + bs s^2/2 + bk k^2 d
@@ -278,37 +260,6 @@ class BaccoCalculator(object):
         if kind in self.pk2d_computed:
             return self.pk2d_computed[kind]
 
-        inds = {'mm': 0,
-                'md1': 1,
-                'md2': 2,
-                'ms2': 3,
-                'mk2': 4,
-                'd1d1': 5,
-                'd1d2': 6,
-                'd1s2': 7,
-                'd1k2': 8,
-                'd2d2': 9,
-                'd2s2': 10,
-                'd2k2': 11,
-                's2s2': 12,
-                's2k2': 13,
-                'k2k2': 14}
-        pfac = {'mm': 1.0,
-                'md1': 1.0,
-                'md2': 0.5,
-                'ms2': 0.5,
-                'mk2': 1.0,
-                'd1d1': 1.0,
-                'd1d2': 0.5,
-                'd1s2': 0.5,
-                'd1k2': 1.0,
-                'd2d2': 0.25,
-                'd2s2': 0.25,
-                'd2k2': 0.5,
-                's2s2': 0.25,
-                's2k2': 0.5,
-                'k2k2': 1.0}
-
         if kind == 'Sk':
             pk = np.log(self.Sk_temp)
             if self.allow_halofit_extrapolation_for_shear_on_k:
@@ -328,14 +279,6 @@ class BaccoCalculator(object):
                             is_logp=True)
             self.pk2d_computed[kind] = pk2d
         else:
-            if not self.ignore_lbias:
-                pk = pfac[kind]*self.pk_temp[inds[kind], :, :]
-                if kind in ['mm']:
-                    pk = np.log(pk)
-                pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks[self.mask_ks_for_bacco]),
-                                pk_arr=pk, is_logp=kind in ['mm'])
-                self.pk2d_computed[kind] = pk2d
-            else:
-                pk2d = None
+            pk2d = None
 
         return pk2d

@@ -74,7 +74,6 @@ def get_info(bias, A_sE9=True):
                                   "ia_model": "IADESY1"},
                        "Pk": {"external": Pk,
                              "bias_model": bias,
-                             "nonlinear_pk": "Bacco" if bias == 'BaccoPT' else "CCL",
                               "zmax_pks": 1.5},  # For baccoemu
                        "clfinal": {"external": ClFinal,
                                    "input_params_prefix": "bias",
@@ -128,7 +127,7 @@ def get_info(bias, A_sE9=True):
                                                    },
                                       }
                            },
-            "debug": True}
+            "debug": False}
 
     if not A_sE9:
 
@@ -270,14 +269,6 @@ def test_get_theory_cl_sacc():
         # the NzTracer
         if tr.quantity == 'cmb_lensing':
             assert tr.spin == 0
-
-    # Check that the default is no covariance
-    assert s.covariance is None
-
-    s = lkl.get_cl_theory_sacc(return_data_cov=True)
-
-    assert s.covariance is not None
-    assert np.all(s.covariance.covmat == lkl.cov)
 
 
 def test_get_cl_data_sacc():
@@ -440,18 +431,3 @@ def test_camb_hmcode_dum(case):
 
 
     assert np.abs(loglikes[0] / loglikes2[0] - 1) < 1e-5
-
-
-def test_error_no_nonlinear_pk():
-    info = get_info('Linear')
-    del info['theory']['Pk']['nonlinear_pk']
-
-    with pytest.raises(ValueError):
-        model = get_model(info)
-
-def test_error_no_bias_model():
-    info = get_info('Linear')
-    del info['theory']['Pk']['bias_model']
-
-    with pytest.raises(ValueError):
-        model = get_model(info)

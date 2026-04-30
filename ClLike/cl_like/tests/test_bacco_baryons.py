@@ -80,11 +80,9 @@ def get_info(A_sE9=True):
                                   "input_params_prefix": "limber",
                                   "ia_model": "IADESY1_PerSurvey"},
                        "Pk": {"external": Pk,
-                             "bias_model": "Linear",
-                             "nonlinear_pk": "Bacco",
-                             "use_baryon_boost" : True,
-                             "baryon_model": 'Bacco',
+                             "bias_model": "BaccoPT",
                              "zmax_pks": 1.5,  # For baccoemu with baryons
+                             "use_baryon_boost" : True,
                              },
                        "clfinal": {"external": ClFinal,
                                    "input_params_prefix": "bias",

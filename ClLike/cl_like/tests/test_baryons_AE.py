@@ -17,26 +17,24 @@ def run_clean_tmp():
         shutil.rmtree("dum")
 
 
-def get_info(nonlinear_pk, A_AE):
+def get_info(bias, A_AE):
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
-    if nonlinear_pk == 'Linear':
+    if bias == 'Linear':
         data += "cl_like/tests/data/linear_halofit_5x2pt.fits.gz"
-        pk_dict = {
-                   'nonlinear_pk': 'CCL',
+        pk_dict = {"external": Pk,
+                   "bias_model": "Linear",
                    }
-    elif nonlinear_pk == 'Bacco':
-        data += "cl_like/tests/data/linear_baccopkmm_5x2pt.fits.gz"
-        pk_dict = {
+    elif bias == 'BaccoPT':
+        data += "cl_like/tests/data/linear_baccopt_5x2pt.fits.gz"
+        pk_dict = {"external": Pk,
+                   "bias_model": "BaccoPT",
                    "zmax_pks": 1.5,  # For baccoemu with baryons
-                   "nonlinear_pk": 'Bacco',
-                   }
+                   "ignore_lbias": False}
     else:
-        raise ValueError(f'nonlinear_pk {nonlinear_pk} not implemented')
+        raise ValueError(f'bias {bias} not implemented')
 
-    pk_dict.update({"external": Pk,
-                    "bias_model": "Linear",
-                    "use_baryon_boost" : True,
-                    "baryon_model": 'Amon-Efstathiou',
+    pk_dict.update({"use_baryon_boost" : True,
+                    "baryon_model": 'Amon-Efstathiou'
                     })
 
 
@@ -101,9 +99,9 @@ def get_info(nonlinear_pk, A_AE):
     return info
 
 
-@pytest.mark.parametrize('nonlinear_pk', ['Linear', 'Bacco'])
-def test_dum(nonlinear_pk):
-    info = get_info(nonlinear_pk, A_AE=1)
+@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
+def test_dum(bias):
+    info = get_info(bias, A_AE=1)
     model = get_model(info)
     loglikes, derived = model.loglikes()
 
@@ -125,14 +123,14 @@ def test_dum(nonlinear_pk):
     #     ax[i, j].legend()
     # plt.show()
 
-    if nonlinear_pk != 'Bacco':
+    if bias != 'BaccoPT':
         assert np.fabs(loglikes[0]) < 3E-3
     else:
         # For some reason I cannot push it lower than this.
         assert np.fabs(loglikes[0]) < 0.2
 
     # A_AE = 0 (i.e. pk_ww = pklin
-    info = get_info(nonlinear_pk, A_AE=0)
+    info = get_info(bias, A_AE=0)
     model = get_model(info)
     loglikes, derived = model.loglikes()
 
@@ -145,9 +143,9 @@ def test_dum(nonlinear_pk):
         assert pklin[i] == pytest.approx(pkww(np.exp(lnklin), ai),
                                          rel=1e-5)
 
-@pytest.mark.parametrize('nonlinear_pk', ['Bacco'])
-def test_Sk(nonlinear_pk):
-    info = get_info(nonlinear_pk, A_AE=0)
+@pytest.mark.parametrize('bias', ['BaccoPT'])
+def test_Sk(bias):
+    info = get_info(bias, A_AE=0)
     model = get_model(info)
     loglikes, derived = model.loglikes()
 
@@ -161,7 +159,7 @@ def test_Sk(nonlinear_pk):
     for i, ai in enumerate(a_arr):
         assert pk2d_nlin[i] == pytest.approx(pk2d_lin(k, ai), rel=1e-4)
 
-    info = get_info(nonlinear_pk, A_AE=1)
+    info = get_info(bias, A_AE=1)
     model = get_model(info)
     loglikes, derived = model.loglikes()
 

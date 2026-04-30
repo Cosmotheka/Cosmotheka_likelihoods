@@ -18,24 +18,23 @@ def run_clean_tmp():
         shutil.rmtree("dum")
 
 
-def get_info(nonlinear_pk, A_sE9=True):
+def get_info(bias, A_sE9=True):
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
 
-    if nonlinear_pk== 'CCL':
+    if bias == 'Linear':
         data += "cl_like/tests/data/sh_bcm_baryons.fits.gz"
         pk_dict = {"external": Pk,
-                   "bias_model": "Linear",
-                   "nonlinear_pk": 'CCL',}
-    elif nonlinear_pk== 'Bacco':
+                   "bias_model": "Linear"}
+    elif bias == 'BaccoPT':
         data += "cl_like/tests/data/sh_PkmmBacco_bcm.fits.gz"
         pk_dict = {"external": Pk,
-                   "bias_model": "Linear",
+                   "bias_model": "BaccoPT",
                    "zmax_pks": 1.5,  # For baccoemu with baryons
-                   "use_baryon_boost" : False,
-                   "nonlinear_pk": 'Bacco',
+                   # "use_baryon_boost" : True,
+                   "ignore_lbias": True,
                    }
     else:
-        raise ValueError(f'nonlinear_pk {nonlinear_pk} not implemented')
+        raise ValueError(f'bias {bias} not implemented')
 
 
 
@@ -105,9 +104,9 @@ def get_info(nonlinear_pk, A_sE9=True):
     return info
 
 
-@pytest.mark.parametrize('nonlinear_pk', ['CCL', 'Bacco'])
-def test_dum(nonlinear_pk):
-    info = get_info(nonlinear_pk)
+@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
+def test_dum(bias):
+    info = get_info(bias)
     model = get_model(info)
     loglikes, derived = model.loglikes()
 
@@ -138,9 +137,9 @@ def test_dum(nonlinear_pk):
     assert np.fabs(loglikes[0]) < 0.2
 
 
-@pytest.mark.parametrize('nonlinear_pk', ['CCL', 'Bacco'])
-def test_Sk(nonlinear_pk):
-    info = get_info(nonlinear_pk)
+@pytest.mark.parametrize('bias', ['Linear', 'BaccoPT'])
+def test_Sk(bias):
+    info = get_info(bias)
     model = get_model(info)
     loglikes, derived = model.loglikes()
 
