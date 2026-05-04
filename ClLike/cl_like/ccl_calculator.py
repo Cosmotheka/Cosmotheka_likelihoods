@@ -99,18 +99,19 @@ class CCL_CosmologyCalculator(Theory):
 
         # Background
         b = provider.get_CLASS_background()
+        # NOTE: There is no need to select z<z_max since z_max is for the Pk
+        # grid.
         z_arr = b['z']
-        sel_z = z_arr <= self.z_max
-        z_arr = z_arr[sel_z]
+        z_arr = z_arr
         a_arr = 1 / (z_arr + 1)
-        H = b['H [1/Mpc]'][sel_z]
-        chi = b['comov. dist.'][sel_z]
+        H = b['H [1/Mpc]']
+        chi = b['comov. dist.']
         background = {'a': a_arr, 'chi': chi,
                       'h_over_h0':  H / H[-1]}
 
         # Growth
-        growth_factor = b['gr.fac. D'][sel_z]
-        growth_rate = b['gr.fac. f'][sel_z]
+        growth_factor = b['gr.fac. D']
+        growth_rate = b['gr.fac. f']
         growth = {'a': a_arr, 'growth_factor': growth_factor,
                   "growth_rate": growth_rate}
 
