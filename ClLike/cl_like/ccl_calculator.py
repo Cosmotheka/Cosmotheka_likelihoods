@@ -41,7 +41,6 @@ class CCL_CosmologyCalculator(Theory):
 
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
-        # return ['S8', 'sigma8', "Omega_m", "A_s"]
         return []
 
     def get_can_support_params(self):
@@ -50,18 +49,12 @@ class CCL_CosmologyCalculator(Theory):
 
     def get_requirements(self):
         return {
-            "Omega_cdm": None,
-            "Omega_b": None,
+            "Omega_cdm": {'z': [0.0]},
+            "Omega_b": {'z': [0.0]},
             "Omega_nu_massive": {'z': [0.0]},
-            "n_s": None,
             "CLASS_background": None,
             "Hubble": {"z": [0.0]},
             "sigma8_z": {"z": [0.0]},
-            # "comoving_radial_distance": {"z": [0.0, self.z_max]},
-            # "Pk_interpolator": {"z": [0.0, self.z_max],
-            #     "k_max": 10.0,
-            #     "nonlinear": True
-            #      },
             "Pk_grid": {
                 "vars_pairs": (("delta_tot", "delta_tot")),
                 "z": [0.0, self.z_max],
@@ -138,12 +131,12 @@ class CCL_CosmologyCalculator(Theory):
             "Weyl:Weyl": pk_ww
         }
 
-        Omega_cdm = params["Omega_cdm"]
-        Omega_b = params["Omega_b"]
-        h = provider.get_Hubble(0, units="km/s/Mpc")[0] / 100
+        Omega_cdm = provider.get_param("Omega_cdm")
+        Omega_b = provider.get_param("Omega_b")
+        h = provider.get_param("h")
         m_nu = np.sum(provider.get_Omega_nu_massive(z=0) * 93.14 * h**2)
-        n_s = params["n_s"]
-        sigma8 = provider.get_sigma8_z(0)[0]
+        n_s = provider.get_param("n_s")
+        sigma8 = provider.get_sigma8_z(z=0)[0]
         cosmo = ccl.CosmologyCalculator(Omega_c=Omega_cdm,
                                         Omega_b=Omega_b,
                                         h=h,
