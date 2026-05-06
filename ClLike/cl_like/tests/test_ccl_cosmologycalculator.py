@@ -227,13 +227,6 @@ def test_dum(non_linear):
     assert chi2 < 0.1
 
 
-def test_timing():
-    """Record timing for a single evaluation (benchmarking aid)."""
-    info = get_info()
-    info["timing"] = True
-    get_model(info)
-
-
 # ---------------------------------------------------------------------------
 # CCL vs. CLASS comparison tests
 # ---------------------------------------------------------------------------
