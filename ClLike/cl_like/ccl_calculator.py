@@ -1,5 +1,5 @@
 """
-This is a module that will use Cobaya's classy implemetation and pass the 
+This is a module that will use Cobaya's classy implemetation and pass the
 results to the CCL CosmologyCalculator. This way we can do CMB primary and
 Cells
 """
@@ -7,6 +7,9 @@ import numpy as np
 import pyccl as ccl
 import numpy as np
 from cobaya.theory import Theory
+from cobaya.log import get_logger
+
+logger = get_logger(__name__)
 
 
 class CCL_CosmologyCalculator(Theory):
@@ -18,16 +21,32 @@ class CCL_CosmologyCalculator(Theory):
     # TODO: Determine z_max. Consider computing linear Pk in CLASS and non-linear in CCL
     # Problem, non-lin is needed for CMB lensing.
     z_max: float = 4
+    log10k_min: float = -4
+    log10k_max: float = np.log10(50)
+    pk_nk_per_decade: int = 100
+    pk_na: int = 128
 
     def initialize(self):
         self._required_results = {}
-        self.baccompk = None
 
         # When ccl_arguments is not provided, Cobaya saves it in the
         # updated.yaml as null. When resuming the chains, we need to change the
         # type.
         if self.ccl_arguments is None:
             self.ccl_arguments = {}
+
+        # Precompute the k and z arrays for the P(k) interpolators. This is needed
+
+        pk_nk = int((self.log10k_max - self.log10k_min) * self.pk_nk_per_decade)
+        self.pk_k_arr = np.logspace(self.log10k_min, self.log10k_max, pk_nk)
+        self.pk_z_arr = np.linspace(0, self.z_max, self.pk_na)[::-1]
+        self.pk_a_arr = 1 / (self.pk_z_arr + 1)
+
+        # Log precomputed arrays for debugging
+        logger.debug(f"Precomputed k array for P(k) interpolators: {self.pk_k_arr}")
+        logger.debug(f"Precomputed z array for P(k) interpolators: {self.pk_z_arr}")
+        logger.debug(f"Precomputed a array for P(k) interpolators: {self.pk_a_arr}")
+        logger.info(f"P(k) grid: nk_per_decade={self.pk_nk_per_decade} (nk_total={pk_nk}), na={self.pk_na}, z_max={self.z_max}")
 
         # cosmo = ccl.CosmologyVanillaLCDM(transfer_function="boltzmann_class")
         # Copied from ccl/pk2d.py
@@ -55,7 +74,7 @@ class CCL_CosmologyCalculator(Theory):
             "CLASS_background": None,
             "Hubble": {"z": [0.0]},
             "sigma8_z": {"z": [0.0]},
-            "Pk_grid": {
+            "Pk_interpolator": {
                 "vars_pairs": (("delta_tot", "delta_tot")),
                 "z": [0.0, self.z_max],
                 "k_max": 50.0,
@@ -109,23 +128,29 @@ class CCL_CosmologyCalculator(Theory):
                   "growth_rate": growth_rate}
 
         # TODO: use Weyl instead of assume matter
-        k_arr, z_arr, pkln_mm = self.provider.get_Pk_grid(var_pair=("delta_tot", "delta_tot"), nonlinear=False)
+        pk_lin_interp = self.provider.get_Pk_interpolator(var_pair=("delta_tot", "delta_tot"), nonlinear=False).P
+        pk_nonlin_interp = self.provider.get_Pk_interpolator(var_pair=("delta_tot", "delta_tot"), nonlinear=True).P
+
+        # Evaluate interpolators on the k-z grid
+        pkln_mm = np.zeros((len(self.pk_z_arr), len(self.pk_k_arr)))
+        pk_mm = np.zeros((len(self.pk_z_arr), len(self.pk_k_arr)))
+        for i, zi in enumerate(self.pk_z_arr):
+            pkln_mm[i, :] = pk_lin_interp(zi, self.pk_k_arr)
+            pk_mm[i, :] = pk_nonlin_interp(zi, self.pk_k_arr)
+
         pkln_mw = pkln_ww = pkln_mm
-        a_arr = 1/(z_arr + 1)
         pk_linear = {
-            "a": a_arr,
-            "k": k_arr,
+            "a": self.pk_a_arr,
+            "k": self.pk_k_arr,
             "delta_matter:delta_matter": pkln_mm,
             "delta_matter:Weyl": pkln_mw,
             "Weyl:Weyl": pkln_ww
         }
 
-        k_arr, z_arr, pk_mm = self.provider.get_Pk_grid(var_pair=("delta_tot", "delta_tot"), nonlinear=True)
         pk_mw = pk_ww = pk_mm
-        a_arr = 1/(z_arr + 1)
         pk_nonlin = {
-            "a": a_arr,
-            "k": k_arr,
+            "a": self.pk_a_arr,
+            "k": self.pk_k_arr,
             "delta_matter:delta_matter": pk_mm,
             "delta_matter:Weyl": pk_mw,
             "Weyl:Weyl": pk_ww
@@ -158,11 +183,3 @@ class CCL_CosmologyCalculator(Theory):
         :return: dict of results
         """
         return self._current_state['CCL']
-
-    def get_Cl(self, units=None):
-        """
-        Get dictionary of Cls.
-
-        :return: dict of results
-        """
-        return self._current_state['Cl']
