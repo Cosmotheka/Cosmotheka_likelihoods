@@ -274,20 +274,24 @@ def test_sigma8(pipeline):
     assert cosmo_ccl.sigma8() == pytest.approx(cosmo_class.sigma8(), rel=1e-4)
 
 
-def test_pk_linear(pipeline):
-    """Linear P(k) at z=0 from CCL agrees with CLASS at 0.01%."""
+@pytest.mark.parametrize("z", [0.0, 1.0, 2.0, 3.0])
+def test_pk_linear(pipeline, z):
+    """Linear P(k) from CCL agrees with CLASS at 0.01% across z=0,1,2,3."""
     cosmo_ccl, cosmo_class = pipeline
     k_test = np.logspace(-3, np.log10(10.0), 20)  # k in [1/Mpc]
-    pk_class = np.array([cosmo_class.pk_lin(k, 0.0) for k in k_test])
-    pk_ccl = cosmo_ccl.get_linear_power()(k_test, 1.0)
+    a = 1.0 / (1.0 + z)
+    pk_class = np.array([cosmo_class.pk_lin(k, z) for k in k_test])
+    pk_ccl = cosmo_ccl.get_linear_power()(k_test, a)
     assert pk_ccl == pytest.approx(pk_class, rel=1e-4)
 
 
-def test_pk_nonlinear(pipeline):
-    """Non-linear P(k) at z=0 from CCL agrees with CLASS (halofit) at 0.01%."""
+@pytest.mark.parametrize("z", [0.0, 1.0, 2.0, 3.0])
+def test_pk_nonlinear(pipeline, z):
+    """Non-linear P(k) from CCL agrees with CLASS (halofit) at 0.01% across z=0,1,2,3."""
     cosmo_ccl, cosmo_class = pipeline
     # Avoid k-grid edges where spline extrapolation may be less accurate
     k_test = np.logspace(-2, np.log10(5.0), 15)  # k in [1/Mpc]
-    pk_class = np.array([cosmo_class.pk(k, 0.0) for k in k_test])
-    pk_ccl = cosmo_ccl.get_nonlin_power()(k_test, 1.0)
+    a = 1.0 / (1.0 + z)
+    pk_class = np.array([cosmo_class.pk(k, z) for k in k_test])
+    pk_ccl = cosmo_ccl.get_nonlin_power()(k_test, a)
     assert pk_ccl == pytest.approx(pk_class, rel=1e-4)
