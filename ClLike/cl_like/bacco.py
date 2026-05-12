@@ -182,6 +182,9 @@ class BaccoCalculator(object):
         else:
             Sk = np.ones_like(pk)
 
+        # save also neutrino linear power spectrum (needed to correct gg-lensing)
+        pnn_linear_approx = self.mpk.get_approximate_linear_neutrino_pk(k=k_sh_sh_for_bacco, **cospar_and_a)[1]/h**3
+
         if self.allow_halofit_extrapolation_for_shear_on_k:
             cosmo.compute_nonlin_power()
             pknl = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
@@ -193,9 +196,13 @@ class BaccoCalculator(object):
             Sk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
                             pk_arr=np.log(Sk), is_logp=True)
             Sk = np.array([Sk2d(self.ks_sh_sh, ai) for ai in self.a_s])
+            pnn_linear_approx2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]),
+                                            pk_arr=np.log(pnn_linear_approx), is_logp=True)
+            pnn_linear_approx = np.array([pnn_linear_approx2d(self.ks_sh_sh, ai) for ai in self.a_s])
 
         self.pk_temp_sh_sh = pk * Sk
         self.Sk_temp = Sk
+        self.pnn_linear_approx = pnn_linear_approx
         self.pk2d_computed = {}
 
     def _get_pars_and_a_for_bacco(self, pars, a):
@@ -275,6 +282,15 @@ class BaccoCalculator(object):
             else:
                 k = self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]
             pk = np.log(self.pk_temp_sh_sh)
+            pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(k), pk_arr=pk,
+                            is_logp=True)
+            self.pk2d_computed[kind] = pk2d
+        elif kind == 'pnn_linear_approx':
+            if self.allow_halofit_extrapolation_for_shear_on_k:
+                k = self.ks_sh_sh
+            else:
+                k = self.ks_sh_sh[self.mask_ks_sh_sh_for_bacco]
+            pk = np.log(self.pnn_linear_approx)
             pk2d = ccl.Pk2D(a_arr=self.a_s, lk_arr=np.log(k), pk_arr=pk,
                             is_logp=True)
             self.pk2d_computed[kind] = pk2d
