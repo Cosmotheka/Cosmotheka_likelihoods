@@ -300,6 +300,11 @@ class Pk(Theory):
             pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
         pkd['pk_ww'] = pkmm
 
+        if (self.bias_model == 'BaccoHEFT') & (self.matter_model == 'Bacco'):
+            # Add the neutrino linear power spectrum for the gg-lensing pk
+            pnn_linear_approx = ptc_matter.get_pk('pnn_linear_approx', cosmo=cosmo)
+            pkd['pk_pnn_linear_approx'] = pnn_linear_approx
+
         # Add baryon correction
         baryons_in_cosmo = cosmo._config_init_kwargs['baryonic_effects']
         if self.use_baryon_boost or (baryons_in_cosmo is not None):
@@ -311,7 +316,6 @@ class Pk(Theory):
                 pkd['Sk'] = ptc_matter.get_pk('Sk')
             elif isinstance(baryons_in_cosmo,
                             ccl.baryons.baryons_base.Baryons):
-                print("################", baryons_in_cosmo)
                 # This can be optimized using BaryonsClass.update_params()
                 if self.is_PT_bias:
                     # The correction happens in place
@@ -345,6 +349,20 @@ class Pk(Theory):
             else:
                 # TODO: Bacco returns a pk2d of 1's, maybe homogenize this
                 pkd['Sk'] = None
+
+        if (self.bias_model == 'BaccoHEFT') & (self.matter_model == 'Bacco'):
+            # Add missing neutrino contribution to the 11 term for gg-lensing
+            _aa, _lkk, _tmp_pk = pkd['pk_wm'].get_spline_arrays()
+            _tmp_pnn_linear_approx = pkd['pk_pnn_linear_approx'](np.exp(_lkk), _aa)
+            On = np.sum(cosmo['m_nu'])/93.14/cosmo['h']**2
+            Om = cosmo['Omega_c']+cosmo['Omega_b']+np.sum(cosmo['m_nu'])/93.14/cosmo['h']**2
+            fnu = On / Om
+            _tmp_pk = (1 - fnu)**2 * _tmp_pk + 2 * fnu * (1 - fnu) * np.sqrt(_tmp_pk * _tmp_pnn_linear_approx) + fnu**2 * _tmp_pnn_linear_approx
+            pkd['pk_wm'] = ccl.Pk2D(a_arr=_aa,
+                                    lk_arr=_lkk,
+                                    pk_arr=np.log(_tmp_pk),
+                                    is_logp=True)
+            pkd[f'pk_mw'] = pkd[f'pk_wm']
 
         if self.baryons_in_gglensing and (self.use_baryon_boost or (baryons_in_cosmo is not None)) and (self.bias_model == 'BaccoHEFT'):
             operators = ['m', 'd1', 'd2', 's2', 'k2']
