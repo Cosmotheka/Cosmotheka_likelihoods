@@ -350,13 +350,13 @@ class Pk(Theory):
             operators = ['m', 'd1', 'd2', 's2', 'k2']
             for i1, op1 in enumerate(operators):
                 comb_12 = 'w'+op1
-                _tmp_pk = pkd[f'pk_{comb_12}'](self.baccoheft_calc.k_ccl, self.baccoheft_calc.a_s)
-                _tmp_Sk = pkd['Sk'](self.baccoheft_calc.k_ccl, self.baccoheft_calc.a_s)
-                _tmp_pk_boosted = _tmp_pk * np.sqrt(_tmp_Sk)
-                pkd[f'pk_{comb_12}'] = ccl.Pk2D(a_arr=self.baccoheft_calc.a_s,
-                                                lk_arr=np.log(self.baccoheft_calc.k_ccl),
+                _aa, _lkk, _tmp_pk = pkd[f'pk_{comb_12}'].get_spline_arrays()
+                _tmp_Sk = pkd['Sk'](np.exp(_lkk), _aa)
+                _tmp_pk_boosted = np.log(_tmp_pk * np.sqrt(_tmp_Sk)) if comb_12 == 'wm' else _tmp_pk * np.sqrt(_tmp_Sk)
+                pkd[f'pk_{comb_12}'] = ccl.Pk2D(a_arr=_aa,
+                                                lk_arr=_lkk,
                                                 pk_arr=_tmp_pk_boosted,
-                                                is_logp=False)
+                                                is_logp=comb_12=='wm')
                 comb_21 = op1+'w'
                 pkd[f'pk_{comb_21}'] = pkd[f'pk_{comb_12}']
 
