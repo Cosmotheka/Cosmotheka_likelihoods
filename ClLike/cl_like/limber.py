@@ -185,10 +185,7 @@ class Limber(Theory):
             t1dn_2 = trs1_dnames[n2]
             # 00: unbiased x unbiased
             if t0_1 and t0_2:
-                print(n1, n2)
-                print(t0dn_1, t0dn_2)
                 pk = pkd[f'pk_{t0dn_1}{t0dn_2}']
-                print(pk)
                 cl00 = ccl.angular_cl(cosmo, t0_1, t0_2, ls,
                                       limber_integration_method=self.limber_integration_method,
                                       p_of_k_a=pk) * clm['pixbeam']
