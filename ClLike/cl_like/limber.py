@@ -24,6 +24,7 @@ class Limber(Theory):
 
     # Sample type
     sample_type: str = "convolve"
+    interpolate_cl: bool = True
     # Magnification bias selected per tracer in defaults
     # with_magnification_bias: bool = False
 
@@ -388,20 +389,23 @@ class Limber(Theory):
         l_min_sample = np.min(l_min_sample)
         l_max_sample = np.max(l_max_sample)
 
-        if l_min_sample == 0:
-            l_min_sample_here = 2
-        else:
-            l_min_sample_here = l_min_sample
-        nl_sample = int(np.log10(l_max_sample / l_min_sample_here) *
-                        nl_per_decade)
-        l_sample = np.unique(np.geomspace(l_min_sample_here,
-                                          l_max_sample+1,
-                                          nl_sample).astype(int)).astype(float)
+        if self.interpolate_cl:
+            if l_min_sample == 0:
+                l_min_sample_here = 2
+            else:
+                l_min_sample_here = l_min_sample
+            nl_sample = int(np.log10(l_max_sample / l_min_sample_here) *
+                            nl_per_decade)
+            l_sample = np.unique(np.geomspace(l_min_sample_here,
+                                            l_max_sample+1,
+                                            nl_sample).astype(int)).astype(float)
 
-        if l_min_sample == 0:
-            l_sample = np.concatenate((np.array([0.]), l_sample))
+            if l_min_sample == 0:
+                l_sample = np.concatenate((np.array([0.]), l_sample))
+            else:
+                l_sample = l_sample
         else:
-            l_sample = l_sample
+            l_sample = np.arange(l_min_sample, l_max_sample+1)
 
         return l_sample
 
