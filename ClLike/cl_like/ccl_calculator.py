@@ -68,9 +68,9 @@ class CCL_CosmologyCalculator(Theory):
 
     def get_requirements(self):
         return {
-            "Omega_cdm": {'z': [0.0]},
-            "Omega_b": {'z': [0.0]},
-            "Omega_nu_massive": {'z': [0.0]},
+            # "Omega_cdm": {'z': [0.0]},
+            # "Omega_b": {'z': [0.0]},
+            # "Omega_nu_massive": {'z': [0.0]},
             "CLASS_background": None,
             "Hubble": {"z": [0.0]},
             "sigma8_z": {"z": [0.0]},
@@ -156,11 +156,19 @@ class CCL_CosmologyCalculator(Theory):
             "Weyl:Weyl": pk_ww
         }
 
-        Omega_cdm = provider.get_param("Omega_cdm")
-        Omega_b = provider.get_param("Omega_b")
-        h = provider.get_param("h")
-        m_nu = np.sum(provider.get_Omega_nu_massive(z=0) * 93.14 * h**2)
-        n_s = provider.get_param("n_s")
+        h = provider.get_Hubble(z=0, units="km/s/Mpc")[0] / 100
+        rho_crit = b["(.)rho_crit"][-1]
+        Omega_cdm = b['(.)rho_cdm'][-1] / rho_crit
+        Omega_b = b['(.)rho_b'][-1] / rho_crit
+        m_nu = []
+        for i in range(3):
+            key = f'(.)rho_ncdm[{i}]' 
+            if key in b.keys():
+                Omega_nu = b[key][-1] / rho_crit
+                m_nu.append(Omega_nu * 93.14 * h**2)
+            else:
+                break
+        n_s = provider.get_param("n_s")  # This will only be relevant if Pk's are not passed
         sigma8 = provider.get_sigma8_z(z=0)[0]
         cosmo = ccl.CosmologyCalculator(Omega_c=Omega_cdm,
                                         Omega_b=Omega_b,
@@ -172,6 +180,7 @@ class CCL_CosmologyCalculator(Theory):
                                         pk_linear=pk_linear,
                                         pk_nonlin=pk_nonlin,
                                         nonlinear_model=None)
+        print(cosmo)
         return cosmo
 
     def get_CCL(self):
