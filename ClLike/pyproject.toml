@@ -48,7 +48,10 @@ lpt = [
 baccoemu = [
     "baccoemu @ git+https://bitbucket.org/rangulo/baccoemu.git@master",
     # I think this is required by baccoemu and not automatically installed
-    "deepdish"  
+    "deepdish"
+]
+calculator = [
+    "classy"
 ]
 full = [
     "baccoemu @ git+https://bitbucket.org/rangulo/baccoemu.git@master",
@@ -58,6 +61,7 @@ full = [
     "sphinx",
     "sphinx-autoapi",
     "sphinx_rtd_theme",
+    "classy"
 ]
 
 [project.urls]
