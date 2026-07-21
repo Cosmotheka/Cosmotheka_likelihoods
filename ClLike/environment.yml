@@ -19,7 +19,9 @@ dependencies:
   - sphinx-autoapi
   - sphinx_rtd_theme
   # Optional: documentation and extra tools
+  - tensorflow
   - pip:
+    - classy
     - cobaya>=3.0
     - fast-pt
     # Pip does not want to install velocileptors due to old scikit-learn library
