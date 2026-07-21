@@ -64,7 +64,7 @@ full = [
     "sphinx",
     "sphinx-autoapi",
     "sphinx_rtd_theme",
-    "classy"
+    "classy",
     "tensorflow"
 ]
 
