@@ -162,7 +162,7 @@ class CCL_CosmologyCalculator(Theory):
         Omega_b = b['(.)rho_b'][-1] / rho_crit
         m_nu = []
         for i in range(3):
-            key = f'(.)rho_ncdm[{i}]' 
+            key = f'(.)rho_ncdm[{i}]'
             if key in b.keys():
                 Omega_nu = b[key][-1] / rho_crit
                 m_nu.append(Omega_nu * 93.14 * h**2)
@@ -180,7 +180,6 @@ class CCL_CosmologyCalculator(Theory):
                                         pk_linear=pk_linear,
                                         pk_nonlin=pk_nonlin,
                                         nonlinear_model=None)
-        print(cosmo)
         return cosmo
 
     def get_CCL(self):
