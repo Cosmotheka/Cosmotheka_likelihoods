@@ -67,7 +67,7 @@ class CCL_CosmologyCalculator(Theory):
             "Pk_interpolator": {
                 "vars_pairs": (("delta_tot", "delta_tot")),
                 "z": [0.0, self.z_max],
-                "k_max": 50.0,
+                "k_max": 10**self.log10k_max,
                 "nonlinear": [False, True],
             },
         }
