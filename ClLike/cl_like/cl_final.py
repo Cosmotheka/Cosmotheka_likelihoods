@@ -32,18 +32,6 @@ class ClFinal(Theory):
                                                               is_PT_bias)
         self.ndata = np.sum([clm['l_eff'].size for clm in self.cl_meta])
 
-    # def get_requirements(self):
-    #     requirements = {}
-
-    #     if 'galaxy_density' in self.tracer_qs:
-    #         requirements['bias_model'] = None
-    #         requirements['is_PT_bias'] = None
-
-    #     if 'galaxy_shear' in self.tracer_qs:
-    #         requirements['ia_model'] = None
-
-    #     return requirements
-
     def must_provide(self, **requirements):
         if "cl_theory" not in requirements:
             return {}

@@ -48,16 +48,6 @@ class CCL_CosmologyCalculator(Theory):
         logger.debug(f"Precomputed a array for P(k) interpolators: {self.pk_a_arr}")
         logger.info(f"P(k) grid: nk_per_decade={self.pk_nk_per_decade} (nk_total={pk_nk}), na={self.pk_na}, z_max={self.z_max}")
 
-        # cosmo = ccl.CosmologyVanillaLCDM(transfer_function="boltzmann_class")
-        # Copied from ccl/pk2d.py
-        # These lines are needed to compute the Pk2D array
-        # self.nk = ccl.ccllib.get_pk_spline_nk(cosmo.cosmo)
-        # self.na = ccl.ccllib.get_pk_spline_na(cosmo.cosmo)
-        # self.a_arr, _ = ccl.ccllib.get_pk_spline_a(cosmo.cosmo, self.na, 0)
-        # self.z_arr = 1/self.a_arr - 1
-        # self.lk_arr, _ = ccl.ccllib.get_pk_spline_lk(cosmo.cosmo, self.nk, 0)
-        # self.k_arr = np.exp(self.lk_arr)
-
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
         return []
