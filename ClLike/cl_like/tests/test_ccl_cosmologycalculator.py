@@ -46,6 +46,7 @@ COSMO_PARAMS = {
     "T_cmb": 2.7255,
 }
 Z_MAX = 4.0
+NON_LINEAR_MODELS = ["halofit", "hmcode"]
 
 # Redshifts used in comparison tests
 Z_TEST = np.array([0, 0.1, 0.5, 1.0, 2.0, 3.0])
@@ -68,7 +69,7 @@ def get_info(non_linear="halofit"):
     Uses weak-lensing-only (sh0, sh1, sh2) data to keep the test lightweight.
     """
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
-    data += "cl_like/tests/data/linear_halofit_5x2pt.fits.gz"
+    data += f"cl_like/tests/data/linear_{non_linear}_5x2pt.fits.gz"
 
     info = {
         "params": {
@@ -104,7 +105,7 @@ def get_info(non_linear="halofit"):
                 "extra_args": {
                     "output": "mPk",
                     "non linear": non_linear,
-                    "P_k_max_1/Mpc": 50.0,
+                    "P_k_max_1/Mpc": 150.0,
                 }
             },
             # Assembles CCL CosmologyCalculator from CLASS tables
@@ -180,16 +181,18 @@ def get_info(non_linear="halofit"):
     return info
 
 
-@pytest.fixture(scope="module")
-def pipeline():
+@pytest.fixture(scope="module", params=NON_LINEAR_MODELS)
+def pipeline(request):
     """Run Cobaya + CCL once and also run Class() directly for reference.
 
     Yields (cosmo_ccl, cosmo_class) where:
       - cosmo_ccl   : ccl.CosmologyCalculator built by CCL_CosmologyCalculator
       - cosmo_class : classy.Class instance with the identical parameters
     """
+    non_linear = request.param
+
     # --- Cobaya pipeline ---
-    info = get_info()
+    info = get_info(non_linear=non_linear)
     model = get_model(info)
     model.loglikes()
     cosmo_ccl = model.likelihood["ClLike"].provider.get_CCL()["cosmo"]
@@ -205,7 +208,7 @@ def pipeline():
     cosmo_class.set({
         **pars,
         "output": "mPk",
-        "non linear": "halofit",
+        "non linear": non_linear,
         "P_k_max_1/Mpc": 50.0,
         "z_max_pk": Z_MAX,
     })
@@ -232,13 +235,48 @@ def _bg_interp(cosmo_class, key):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("non_linear", ["halofit"]) # , "hmcode"])
+# Test it only for halofit since not sure if CLASS hmcode and CAMB hmcode need
+# tweaking to get the same results.
+# @pytest.mark.parametrize("non_linear", NON_LINEAR_MODELS)
+@pytest.mark.parametrize("non_linear", ['halofit'])
 def test_dum(non_linear):
     """Full classy -> CCL_CosmologyCalculator -> ClLike pipeline runs without
     errors and returns a log-likelihood with chi2 < 0.1."""
     info = get_info(non_linear)
     model = get_model(info)
     loglikes, _ = model.loglikes()
+
+    # # Plot the Cell for visual inspection
+    # # 1 Figure: Top pannel: Cell, Bottom panel: residuals
+    # # 1 Figure for each gc0-gc0, gc0-sh0, sh0-sh0, kp-kp
+    # s_cld = model.likelihood["ClLike"].get_cl_data_sacc()
+    # s_clt = model.likelihood["ClLike"].get_cl_theory_sacc()
+
+    # # gc0-gc0
+    # for dtype, tr1, tr2 in [("cl_00", "gc0", "gc0"),
+    #                         ("cl_0e", "gc0", "sh0"),
+    #                         ("cl_ee", "sh0", "sh0"),
+    #                         ("cl_00", "kp", "kp")]:
+    #     ell, cld, cov = s_cld.get_ell_cl(dtype, tr1, tr2, return_cov=True)
+    #     ell, clt = s_clt.get_ell_cl(dtype, tr1, tr2)
+    #     diff = cld - clt
+    #     icov = np.linalg.inv(cov)
+    #     chi2 = diff.dot(icov.dot(diff))
+
+    #     from matplotlib import pyplot as plt
+    #     f, axes = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+    #     axes[0].loglog(ell, cld, label="data")
+    #     axes[0].loglog(ell, clt, label=rf"theory ($\chi2 = {chi2}$)")
+    #     axes[0].legend()
+    #     axes[0].set_ylabel(fr"$C_\ell^{{\rm {tr1}-{tr2}}}$")
+    #     axes[1].semilogx(ell, (cld - clt) / cld)
+    #     axes[1].axhline(0, color="k", ls="--")
+    #     axes[1].set_xlabel(r"$\ell$")
+    #     axes[1].set_ylabel(r"$C_\ell^{\rm data} - C_\ell^{\rm theory}$ / $C_\ell^{\rm data}$")
+    #     plt.tight_layout()
+    #     plt.savefig(f"test_dum_{tr1}_{tr2}_{non_linear}.png")
+
+
     # Data was generated with CAMB; CLASS produces a similar answer
     # chi2 = -2 * loglike, so chi2 < 0.1 means loglike > -0.05
     chi2 = -2 * loglikes[0]
@@ -305,7 +343,7 @@ def test_pk_linear(pipeline, z):
 
 @pytest.mark.parametrize("z", [0.0, 1.0, 2.0, 3.0])
 def test_pk_nonlinear(pipeline, z):
-    """Non-linear P(k) from CCL agrees with CLASS (halofit) at 0.01% across z=0,1,2,3."""
+    """Non-linear P(k) from CCL agrees with CLASS at 0.01% across z=0,1,2,3."""
     cosmo_ccl, cosmo_class = pipeline
     # Avoid k-grid edges where spline extrapolation may be less accurate
     k_test = np.logspace(-2, np.log10(5.0), 15)  # k in [1/Mpc]

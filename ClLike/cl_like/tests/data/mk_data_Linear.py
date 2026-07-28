@@ -145,7 +145,28 @@ elif args.non_linear == 'baccopkmm':
                                     pk_nonlin=pk_nonlinear,
                                     T_CMB=2.7255)
     fname = "linear_baccopkmm_5x2pt.fits"
+elif args.non_linear == 'hmcode':
+    cosmo = ccl.Cosmology(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
+                          Omega_b=cosmopars['omega_baryon'],
+                          h=cosmopars['hubble'],
+                          n_s=cosmopars['ns'],
+                          A_s=cosmopars['A_s'],
+                          m_nu = cosmopars['neutrino_mass'],
+                          w0=cosmopars['w0'],
+                          wa=cosmopars['wa'],
+                          T_CMB=2.7255,
+                          transfer_function='boltzmann_camb',
+                          matter_power_spectrum='camb',
+                          extra_parameters = {"camb": {"halofit_version": "mead2020"}}
+    )
+    print(cosmo.sigma8())
 
+    # cosmo.compute_nonlin_power()
+    # pkmm = cosmo.get_nonlin_power(name='delta_matter:delta_matter')
+    # a_s, k, pkmm = pkmm.get_spline_arrays()
+    # np.savez_compressed('pk_nonlinear_hmcode.npz', a=a_s, k=k, pk=pkmm)
+
+    fname = "linear_hmcode_5x2pt.fits"
 elif args.non_linear == 'halofit':
     cosmo = ccl.Cosmology(Omega_c=cosmopars['omega_cold'] - cosmopars['omega_baryon'],
                           Omega_b=cosmopars['omega_baryon'],
