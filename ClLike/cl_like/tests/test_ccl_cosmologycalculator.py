@@ -63,13 +63,25 @@ def run_clean_tmp():
         shutil.rmtree("dum")
 
 
-def get_info(non_linear="halofit"):
+def get_info(non_linear="halofit", use_class_nonlinear_pk=True):
     """Cobaya info dict: classy -> CCL_CosmologyCalculator -> ClLike.
 
     Uses weak-lensing-only (sh0, sh1, sh2) data to keep the test lightweight.
+
+    Args:
+      non_linear: non-linear model name (e.g. halofit, hmcode).
+      use_class_nonlinear_pk: if True, CCL_CosmologyCalculator consumes
+        non-linear P(k) from CLASS; if False, CLASS provides only linear P(k)
+        and CCL computes the non-linear correction internally.
     """
     data = "" if "ClLike" in os.getcwd() else "ClLike/"
     data += f"cl_like/tests/data/linear_{non_linear}_5x2pt.fits.gz"
+    classy_extra_args = {
+        "output": "mPk",
+        "P_k_max_1/Mpc": 150.0,
+    }
+    if use_class_nonlinear_pk:
+        classy_extra_args["non linear"] = non_linear
 
     info = {
         "params": {
@@ -102,16 +114,14 @@ def get_info(non_linear="halofit"):
         "theory": {
             # Boltzmann solver: provides CLASS_background, Pk_grid, sigma8_z
             "classy": {
-                "extra_args": {
-                    "output": "mPk",
-                    "non linear": non_linear,
-                    "P_k_max_1/Mpc": 150.0,
-                }
+                "extra_args": classy_extra_args
             },
             # Assembles CCL CosmologyCalculator from CLASS tables
             "ccl_calc": {
                 "external": CCL_CosmologyCalculator,
                 "z_max": Z_MAX,
+                "use_class_nonlinear_pk": use_class_nonlinear_pk,
+                "nonlinear_model": non_linear if not use_class_nonlinear_pk else None,
             },
             "limber": {
                 "external": Limber,
@@ -218,6 +228,54 @@ def pipeline(request):
     yield cosmo_ccl, cosmo_class
 
     cosmo_class.struct_cleanup()
+
+
+@pytest.fixture(scope="module")
+def pipeline_ccl_nonlinear(request):
+    """Run Cobaya in linear-only CLASS mode and let CCL compute non-linear P(k).
+
+    Yields (cosmo_ccl, cosmo_class) where:
+      - cosmo_ccl   : ccl.CosmologyCalculator with pk_nonlin computed in CCL
+      - cosmo_class : classy.Class instance used as non-linear reference
+    """
+    non_linear = 'halofit'  # Only halofit is internally supported in CCL
+
+    # --- Cobaya pipeline: CLASS linear P(k), CCL computes non-linear P(k) ---
+    info = get_info(non_linear=non_linear, use_class_nonlinear_pk=False)
+    model = get_model(info)
+    model.loglikes()
+    cosmo_ccl = model.likelihood["ClLike"].provider.get_CCL()["cosmo"]
+
+    # --- Reference CLASS run with explicit non-linear model ---
+    cosmo_class = Class()
+    pars = COSMO_PARAMS.copy()
+    m1 = pars.pop("m1")["value"]
+    m2 = pars.pop("m2")["value"]
+    m3 = pars.pop("m3")["value"]
+    m_ncdm = ",".join([str(mi) for mi in [m1, m2, m3]])
+    pars["m_ncdm"] = m_ncdm
+    cosmo_class.set({
+        **pars,
+        "output": "mPk",
+        "non linear": non_linear,
+        "P_k_max_1/Mpc": 50.0,
+        "z_max_pk": Z_MAX,
+    })
+    cosmo_class.compute()
+
+    cosmo_class_linear = Class()
+    cosmo_class_linear.set({
+        **pars,
+        "output": "mPk",
+        "P_k_max_1/Mpc": 50.0,
+        "z_max_pk": Z_MAX,
+    })
+    cosmo_class_linear.compute()
+
+    yield cosmo_ccl, cosmo_class, cosmo_class_linear
+
+    cosmo_class.struct_cleanup()
+    cosmo_class_linear.struct_cleanup()
 
 
 def _bg_interp(cosmo_class, key):
@@ -351,3 +409,32 @@ def test_pk_nonlinear(pipeline, z):
     pk_class = np.array([cosmo_class.pk(k, z) for k in k_test])
     pk_ccl = cosmo_ccl.get_nonlin_power()(k_test, a)
     assert pk_ccl == pytest.approx(pk_class, rel=1e-4)
+
+
+@pytest.mark.parametrize("z", [0.0, 1.0, 2.0, 3.0])
+def test_pk_nonlinear_internal(pipeline_ccl_nonlinear, z):
+    """CCL internal non-linear P(k) is consistent with CLASS for the same model."""
+    cosmo_ccl, cosmo_class, cosmo_class_linear = pipeline_ccl_nonlinear
+    # Avoid k-grid edges where different extrapolation choices dominate.
+    k_test = np.logspace(-2, np.log10(5.0), 15)  # k in [1/Mpc]
+    a = 1.0 / (1.0 + z)
+    pk_class = np.array([cosmo_class.pk(k, z) for k in k_test])
+    pk_class_linear = np.array([cosmo_class_linear.pk(k, z) for k in k_test])
+    pk_ccl = cosmo_ccl.get_nonlin_power()(k_test, a)
+
+    # CLASS and CCL use different implementations/tunings for non-linear
+    # models, so a looser tolerance is expected than table-to-table checks.
+    assert pk_ccl == pytest.approx(pk_class, rel=5e-2)
+    assert not np.all(pk_ccl == pk_class)  # Should not be identical
+    # pk_ccl should divert from the linear Pk by scales
+    assert pk_ccl != pytest.approx(pk_class_linear, rel=2)
+
+
+# Check that that one can't request 2 different non-linear models
+def test_non_linear_model_conflict():
+    """Check that CCL_CosmologyCalculator raises an error if both CLASS and CCL
+    non-linear models are requested."""
+    info = get_info(non_linear="halofit", use_class_nonlinear_pk=True)
+    info["theory"]["ccl_calc"]["nonlinear_model"] = "hmcode"
+    with pytest.raises(ValueError):
+        get_model(info)

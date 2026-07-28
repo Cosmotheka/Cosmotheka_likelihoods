@@ -5,9 +5,9 @@ Cells
 """
 import numpy as np
 import pyccl as ccl
-import numpy as np
 from cobaya.theory import Theory
 from cobaya.log import get_logger
+from typing import Literal
 
 logger = get_logger(__name__)
 
@@ -18,6 +18,8 @@ class CCL_CosmologyCalculator(Theory):
     parameters directly (i.e. cannot be used downstream from camb/CLASS).
     """
     ccl_arguments: dict = {}
+    use_class_nonlinear_pk: bool = True
+    nonlinear_model: Literal["halofit", "hmcode"] | None = None
     # TODO: Determine z_max. Consider computing linear Pk in CLASS and non-linear in CCL
     # Problem, non-lin is needed for CMB lensing.
     z_max: float = 4
@@ -47,6 +49,13 @@ class CCL_CosmologyCalculator(Theory):
         logger.debug(f"Precomputed z array for P(k) interpolators: {self.pk_z_arr}")
         logger.debug(f"Precomputed a array for P(k) interpolators: {self.pk_a_arr}")
         logger.info(f"P(k) grid: nk_per_decade={self.pk_nk_per_decade} (nk_total={pk_nk}), na={self.pk_na}, z_max={self.z_max}")
+        logger.info(
+            "Non-linear P(k) source: %s",
+            "CLASS" if self.use_class_nonlinear_pk else f"CCL ({self.nonlinear_model})"
+        )
+
+        if self.use_class_nonlinear_pk and self.nonlinear_model:
+            raise ValueError("When using CLASS non-linear P(k), 'nonlinear_model' must be left unspecified.")
 
     def get_can_provide_params(self):
         # return any derived quantities that CCL can compute
@@ -57,6 +66,7 @@ class CCL_CosmologyCalculator(Theory):
         return []
 
     def get_requirements(self):
+        nonlinear_reqs = [False, True] if self.use_class_nonlinear_pk else [False]
         return {
             # "Omega_cdm": {'z': [0.0]},
             # "Omega_b": {'z': [0.0]},
@@ -68,7 +78,7 @@ class CCL_CosmologyCalculator(Theory):
                 "vars_pairs": (("delta_tot", "delta_tot")),
                 "z": [0.0, self.z_max],
                 "k_max": 10**self.log10k_max,
-                "nonlinear": [False, True],
+                "nonlinear": nonlinear_reqs,
             },
         }
 
@@ -118,15 +128,12 @@ class CCL_CosmologyCalculator(Theory):
                   "growth_rate": growth_rate}
 
         # TODO: use Weyl instead of assume matter
+        # Get the linear P(k) from CLASS and evaluate the interpolators on the
+        # k-z grid
         pk_lin_interp = self.provider.get_Pk_interpolator(var_pair=("delta_tot", "delta_tot"), nonlinear=False).P
-        pk_nonlin_interp = self.provider.get_Pk_interpolator(var_pair=("delta_tot", "delta_tot"), nonlinear=True).P
-
-        # Evaluate interpolators on the k-z grid
         pkln_mm = np.zeros((len(self.pk_z_arr), len(self.pk_k_arr)))
-        pk_mm = np.zeros((len(self.pk_z_arr), len(self.pk_k_arr)))
         for i, zi in enumerate(self.pk_z_arr):
             pkln_mm[i, :] = pk_lin_interp(zi, self.pk_k_arr)
-            pk_mm[i, :] = pk_nonlin_interp(zi, self.pk_k_arr)
 
         pkln_mw = pkln_ww = pkln_mm
         pk_linear = {
@@ -137,14 +144,25 @@ class CCL_CosmologyCalculator(Theory):
             "Weyl:Weyl": pkln_ww
         }
 
-        pk_mw = pk_ww = pk_mm
-        pk_nonlin = {
-            "a": self.pk_a_arr,
-            "k": self.pk_k_arr,
-            "delta_matter:delta_matter": pk_mm,
-            "delta_matter:Weyl": pk_mw,
-            "Weyl:Weyl": pk_ww
-        }
+        # If requested, do the same for the non-linear P(k) from CLASS
+        if self.use_class_nonlinear_pk:
+            pk_nonlin_interp = self.provider.get_Pk_interpolator(var_pair=("delta_tot", "delta_tot"), nonlinear=True).P
+            pk_mm = np.zeros((len(self.pk_z_arr), len(self.pk_k_arr)))
+            for i, zi in enumerate(self.pk_z_arr):
+                pk_mm[i, :] = pk_nonlin_interp(zi, self.pk_k_arr)
+
+            pk_mw = pk_ww = pk_mm
+            pk_nonlin = {
+                "a": self.pk_a_arr,
+                "k": self.pk_k_arr,
+                "delta_matter:delta_matter": pk_mm,
+                "delta_matter:Weyl": pk_mw,
+                "Weyl:Weyl": pk_ww
+            }
+            nonlinear_model = None
+        else:
+            pk_nonlin = None
+            nonlinear_model = self.nonlinear_model
 
         h = provider.get_Hubble(z=0, units="km/s/Mpc")[0] / 100
         rho_crit = b["(.)rho_crit"][-1]
@@ -169,7 +187,7 @@ class CCL_CosmologyCalculator(Theory):
                                         background=background, growth=growth,
                                         pk_linear=pk_linear,
                                         pk_nonlin=pk_nonlin,
-                                        nonlinear_model=None)
+                                        nonlinear_model=nonlinear_model)
         return cosmo
 
     def get_CCL(self):
