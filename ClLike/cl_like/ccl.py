@@ -195,6 +195,8 @@ class CCL(Theory):
             raise NotImplementedError("Baryons class `{self.baryons_pk}` "
                                       "not implemented.")
 
+        # TODO: Move this to power_spectrum.py
+
         # Automatically detect the param names accepted by the Baryons class
         args = {}
         for p in BaryonsClass.__init__.__code__.co_varnames[1:]:
