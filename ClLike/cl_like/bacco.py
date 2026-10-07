@@ -36,9 +36,13 @@ class BaccoCalculator(object):
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=UserWarning)
             self.lbias = baccoemu.Lbias_expansion()
-            self.mpk = baccoemu.Matter_powerspectrum(nonlinear_emu_path=nonlinear_emu_path,
-                                                     nonlinear_emu_details=nonlinear_emu_details,
-                                                     nonlinear_model_name=nonlinear_emu_model_name)
+            mpk_kwargs = {
+                'nonlinear_emu_path': nonlinear_emu_path,
+                'nonlinear_emu_details': nonlinear_emu_details,
+            }
+            if nonlinear_emu_model_name is not None:
+                mpk_kwargs['nonlinear_emu_model_name'] = nonlinear_emu_model_name
+            self.mpk = baccoemu.Matter_powerspectrum(**mpk_kwargs)
 
         # check with the currently loaded version of baccoemu if the a array is
         # all within the allowed ranges
