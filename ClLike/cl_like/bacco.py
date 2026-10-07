@@ -41,7 +41,7 @@ class BaccoCalculator(object):
                 'nonlinear_emu_details': nonlinear_emu_details,
             }
             if nonlinear_emu_model_name is not None:
-                mpk_kwargs['nonlinear_emu_model_name'] = nonlinear_emu_model_name
+                mpk_kwargs['nonlinear_model_name'] = nonlinear_emu_model_name
             self.mpk = baccoemu.Matter_powerspectrum(**mpk_kwargs)
 
         # check with the currently loaded version of baccoemu if the a array is
